@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from _tolerances import EXACT
 
 from pynns import lpm, upm
@@ -25,6 +26,14 @@ def test_lpm_zero_at_sorted_points_is_empirical_cdf() -> None:
     expected = np.arange(1, x.size + 1) / x.size
 
     np.testing.assert_allclose(lpm(0, sorted_x, x), expected, atol=EXACT)
+
+
+def test_degree_zero_partition_at_target_equality() -> None:
+    x = np.array([1.0, 5.0, 10.0])
+
+    assert lpm(0, 5.0, x) == pytest.approx(2 / 3, rel=EXACT)
+    assert upm(0, 5.0, x) == pytest.approx(1 / 3, rel=EXACT)
+    assert lpm(0, 5.0, x) + upm(0, 5.0, x) == pytest.approx(1.0, rel=EXACT)
 
 
 def test_lpm_is_non_negative() -> None:
