@@ -11,7 +11,7 @@ from _tolerances import EXACT
 from conftest import EdgeCase
 from numpy.typing import NDArray
 
-from pynns import lpm, upm
+from pynns import lpm, lpm_ratio, upm
 
 DEGREES = [0.0, 0.5, 1.0, 2.0, 3.0]
 SIZES = [10, 100, 1000]
@@ -69,6 +69,33 @@ def test_upm_matches_r_vector_target(rng: np.random.Generator, degree: float) ->
     expected = nns("UPM", degree, target.tolist(), x.tolist())
     assert isinstance(expected, np.ndarray)
     np.testing.assert_allclose(upm(degree, target, x), expected, atol=EXACT)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("degree", DEGREES)
+@pytest.mark.parametrize("size", SIZES)
+def test_lpm_ratio_matches_r_scalar_targets(
+    rng: np.random.Generator,
+    degree: float,
+    size: int,
+) -> None:
+    x = rng.normal(size=size)
+
+    for target in _scalar_targets(x):
+        expected = nns("LPM.ratio", degree, target, x.tolist())
+        assert isinstance(expected, np.ndarray)
+        assert np.allclose(lpm_ratio(degree, target, x), expected.item(), atol=EXACT)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("degree", DEGREES)
+def test_lpm_ratio_matches_r_vector_target(rng: np.random.Generator, degree: float) -> None:
+    x = rng.normal(size=100)
+    target = np.linspace(x.min(), x.max(), 20)
+
+    expected = nns("LPM.ratio", degree, target.tolist(), x.tolist())
+    assert isinstance(expected, np.ndarray)
+    np.testing.assert_allclose(lpm_ratio(degree, target, x), expected, atol=EXACT)
 
 
 @pytest.mark.parity

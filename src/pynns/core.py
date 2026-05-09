@@ -21,6 +21,20 @@ def lpm(
     return _result_for_target(moments, target)
 
 
+def lpm_ratio(
+    degree: float,
+    target: float | NDArray[np.float64],
+    x: NDArray[np.float64],
+) -> float | NDArray[np.float64]:
+    if degree == 0:
+        return lpm(degree, target, x)
+
+    lower = lpm(degree, target, x)
+    upper = upm(degree, target, x)
+    ratio = np.asarray(lower) / (np.asarray(lower) + np.asarray(upper))
+    return _result_for_target(np.asarray(ratio).reshape(-1), target)
+
+
 def upm(
     degree: float,
     target: float | NDArray[np.float64],
@@ -36,6 +50,20 @@ def upm(
 
     moments = np.mean(np.maximum(0.0, values - targets[:, np.newaxis]) ** degree, axis=1)
     return _result_for_target(moments, target)
+
+
+def upm_ratio(
+    degree: float,
+    target: float | NDArray[np.float64],
+    x: NDArray[np.float64],
+) -> float | NDArray[np.float64]:
+    if degree == 0:
+        return upm(degree, target, x)
+
+    lower = lpm(degree, target, x)
+    upper = upm(degree, target, x)
+    ratio = np.asarray(upper) / (np.asarray(lower) + np.asarray(upper))
+    return _result_for_target(np.asarray(ratio).reshape(-1), target)
 
 
 def _as_1d_values(x: NDArray[np.float64]) -> NDArray[np.float64]:
