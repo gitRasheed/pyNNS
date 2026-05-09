@@ -28,3 +28,10 @@ PyNNS accepts `None` and `"mean"` for this behavior. PyNNS also broadcasts a
 scalar numeric target across all variables; R requires callers to pass an
 explicit vector such as `rep(0, ncol(variable))`. Target vectors whose length
 does not match the number of variables raise `ValueError`.
+
+## Classical Moment Normalization
+
+`mean_pm`, `var_pm`, `skew_pm`, and `kurt_pm` use population normalization by
+default, matching NumPy defaults and `NNS.moments(population = TRUE)`. `var_pm`
+accepts `ddof` for NumPy-style variance scaling. `skew_pm` and `kurt_pm` do not
+apply SciPy's optional finite-sample bias correction.
