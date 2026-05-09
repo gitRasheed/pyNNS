@@ -22,14 +22,21 @@ dev = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.9.0,<0.10.0"]
-build-backend = "uv_build"
+requires = [
+    "nanobind",
+    "scikit-build-core",
+]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+wheel.packages = ["src/pynns"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-ra -m 'not benchmark'"
 pythonpath = ["tests"]
 testpaths = ["tests"]
 markers = [
+    "benchmark: performance benchmarks excluded from the default test run",
     "parity: tests comparing pynns behavior to the reference R NNS package",
     "invariant: tests for mathematical or API invariants",
     "property: property-based tests",

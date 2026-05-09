@@ -1,10 +1,26 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
+from typing import TypeAlias, cast
 
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+
+_BENCHMARK_BASELINE_PATH = Path(__file__).parent / "benchmarks" / "_r_baseline.json"
+_BENCHMARK_SCHEMA_VERSION = 1
+_NNS_VERSION = "12.0"
+
+JsonValue: TypeAlias = float | int | str | list["JsonValue"] | dict[str, "JsonValue"]
+BenchmarkBaseline: TypeAlias = dict[str, JsonValue]
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    if config.getoption("benchmark_only", default=False):
+        config.option.markexpr = "benchmark"
 
 
 @dataclass(frozen=True)
@@ -36,3 +52,63 @@ def edge_case(request: pytest.FixtureRequest) -> EdgeCase:
 @pytest.fixture
 def rng() -> np.random.Generator:
     return np.random.default_rng(42)
+
+
+@pytest.fixture(scope="session")
+def r_baseline() -> BenchmarkBaseline:
+    cache = _read_benchmark_baseline()
+    if "lpm_small_seconds" not in cache:
+        cache["lpm_small_seconds"] = _time_r_lpm()
+        _write_benchmark_baseline(cache)
+    return cache
+
+
+def _read_benchmark_baseline() -> BenchmarkBaseline:
+    if not _BENCHMARK_BASELINE_PATH.exists():
+        return {}
+
+    cache = json.loads(_BENCHMARK_BASELINE_PATH.read_text(encoding="utf-8"))
+    if not isinstance(cache, dict) or cache.get("schema_version") != _BENCHMARK_SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Unsupported R benchmark baseline schema in {_BENCHMARK_BASELINE_PATH}."
+        )
+    if cache.get("nns_version") != _NNS_VERSION:
+        raise RuntimeError(
+            f"Unsupported NNS benchmark baseline version in {_BENCHMARK_BASELINE_PATH}."
+        )
+
+    entries = cache.get("entries")
+    if not isinstance(entries, dict):
+        raise RuntimeError(f"Invalid R benchmark baseline entries in {_BENCHMARK_BASELINE_PATH}.")
+    return cast(BenchmarkBaseline, entries)
+
+
+def _write_benchmark_baseline(entries: BenchmarkBaseline) -> None:
+    payload = {
+        "nns_version": _NNS_VERSION,
+        "schema_version": _BENCHMARK_SCHEMA_VERSION,
+        "entries": entries,
+    }
+    _BENCHMARK_BASELINE_PATH.write_text(
+        json.dumps(payload, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _time_r_lpm() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 1000)\n"
+        "invisible(NNS::LPM(1, 0, x))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(200)) invisible(NNS::LPM(1, 0, x))\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 200)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(completed.stdout)
