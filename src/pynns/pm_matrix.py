@@ -5,7 +5,6 @@ from typing import Literal, TypeAlias, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from pynns.co_moments import co_lpm, co_upm, d_lpm, d_upm
 from pynns.core import _as_degree
 
 Target: TypeAlias = float | None | Literal["mean"] | NDArray[np.float64]
@@ -25,26 +24,17 @@ def pm_matrix(
     values = _as_matrix(variable)
     targets = _as_target(target, values)
 
-    columns = values.shape[1]
-    cupm = np.empty((columns, columns), dtype=np.float64)
-    dupm = np.empty((columns, columns), dtype=np.float64)
-    dlpm = np.empty((columns, columns), dtype=np.float64)
-    clpm = np.empty((columns, columns), dtype=np.float64)
+    observations = values.shape[0]
+    dev_lower = _lower_deviation(values, targets, lpm_degree)
+    dev_upper = _upper_deviation(values, targets, upm_degree)
 
-    adjust = values.shape[0] / (values.shape[0] - 1) if values.shape[0] > 1 else 1.0
-    should_adjust = pop_adj and values.shape[0] > 1 and lpm_degree > 0 and upm_degree > 0
+    clpm = (dev_lower.T @ dev_lower) / observations
+    cupm = (dev_upper.T @ dev_upper) / observations
+    dlpm = (dev_upper.T @ dev_lower) / observations
+    dupm = (dev_lower.T @ dev_upper) / observations
 
-    for i in range(columns):
-        x = values[:, i]
-        target_x = targets[i]
-        for j in range(columns):
-            y = values[:, j]
-            target_y = targets[j]
-            clpm[i, j] = co_lpm(lpm_degree, x, y, target_x, target_y)
-            cupm[i, j] = co_upm(upm_degree, x, y, target_x, target_y)
-            dlpm[i, j] = d_lpm(lpm_degree, upm_degree, x, y, target_x, target_y)
-            dupm[i, j] = d_upm(lpm_degree, upm_degree, x, y, target_x, target_y)
-
+    adjust = observations / (observations - 1) if observations > 1 else 1.0
+    should_adjust = pop_adj and observations > 1 and lpm_degree > 0 and upm_degree > 0
     if should_adjust:
         clpm *= adjust
         cupm *= adjust
@@ -70,6 +60,26 @@ def pm_matrix(
         "clpm": clpm,
         "cov.matrix": cov_matrix,
     }
+
+
+def _lower_deviation(
+    values: NDArray[np.float64],
+    targets: NDArray[np.float64],
+    degree: float,
+) -> NDArray[np.float64]:
+    if degree == 0:
+        return (values <= targets[np.newaxis, :]).astype(np.float64)
+    return np.maximum(0.0, targets[np.newaxis, :] - values) ** degree
+
+
+def _upper_deviation(
+    values: NDArray[np.float64],
+    targets: NDArray[np.float64],
+    degree: float,
+) -> NDArray[np.float64]:
+    if degree == 0:
+        return (values > targets[np.newaxis, :]).astype(np.float64)
+    return np.maximum(0.0, values - targets[np.newaxis, :]) ** degree
 
 
 def _as_matrix(variable: NDArray[np.float64]) -> NDArray[np.float64]:
