@@ -1,0 +1,49 @@
+[project]
+name = "pynns"
+version = "0.1.0"
+description = "Python port of NNS"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-only"
+dependencies = [
+    "numpy",
+    "polars",
+    "scipy",
+]
+
+[dependency-groups]
+dev = [
+    "hypothesis",
+    "mypy",
+    "pytest",
+    "pytest-benchmark",
+    "pytest-cov",
+    "ruff",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.0,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["tests"]
+testpaths = ["tests"]
+markers = [
+    "parity: tests comparing pynns behavior to the reference R NNS package",
+    "invariant: tests for mathematical or API invariants",
+    "property: property-based tests",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/pynns", "tests"]
+mypy_path = ["tests"]
