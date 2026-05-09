@@ -97,7 +97,7 @@ def _call_r(function: str, args: tuple[Any, ...]) -> RValue:
 
     script = (
         "library(NNS)\n"
-        "args <- jsonlite::fromJSON(commandArgs(trailingOnly = TRUE)[[1]])\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
         f"result <- do.call(NNS::{function}, args)\n"
         "encode <- function(x) {\n"
         "  if (is.matrix(x)) {\n"
@@ -109,10 +109,11 @@ def _call_r(function: str, args: tuple[Any, ...]) -> RValue:
         "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(
-        ["Rscript", "-e", script, json.dumps(args)],
+        ["Rscript", "-e", script],
         check=True,
         capture_output=True,
         env=_r_env(),
+        input=json.dumps(args),
         text=True,
     )
     return _decode(json.loads(completed.stdout))

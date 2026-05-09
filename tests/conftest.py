@@ -60,6 +60,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "lpm_small_seconds" not in cache:
         cache["lpm_small_seconds"] = _time_r_lpm()
         _write_benchmark_baseline(cache)
+    if "pm_matrix_10x500_seconds" not in cache:
+        cache["pm_matrix_10x500_seconds"] = _time_r_pm_matrix()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -104,6 +107,29 @@ def _time_r_lpm() -> float:
         "for (i in seq_len(200)) invisible(NNS::LPM(1, 0, x))\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 200)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_pm_matrix() -> float:
+    script = (
+        "library(NNS)\n"
+        "row <- seq_len(500)\n"
+        "col <- seq_len(10)\n"
+        "x <- outer(row, col, function(i, j) sin(i * j / 11) + cos((i + 1) / (j + 2)))\n"
+        "invisible(NNS::PM.matrix(1, 1, target = NULL, variable = x, pop_adj = TRUE))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(20)) {\n"
+        "  invisible(NNS::PM.matrix(1, 1, target = NULL, variable = x, pop_adj = TRUE))\n"
+        "}\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 20)\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],
