@@ -1,3 +1,5 @@
+reference/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -172,6 +174,13 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
 
 # Cursor  
 #  Cursor is an AI-powered code editor.`.cursorignore` specifies files/directories to 
