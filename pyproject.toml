@@ -40,7 +40,14 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "N", "RUF"]
+select = ["E", "F", "I", "B", "UP", "N", "RUF", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"subprocess" = { msg = "Do not call subprocess from pynns implementation code. Keep R parity calls in tests/_r.py." }
+"rpy2" = { msg = "Do not use rpy2 from pynns implementation code. Keep R parity calls outside the package." }
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["TID251"]
 
 [tool.mypy]
 python_version = "3.11"
