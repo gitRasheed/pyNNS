@@ -31,3 +31,8 @@ class EdgeCase:
 )
 def edge_case(request: pytest.FixtureRequest) -> EdgeCase:
     return request.param  # type: ignore[no-any-return]
+
+
+@pytest.fixture
+def rng() -> np.random.Generator:
+    return np.random.default_rng(42)
