@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from pynns import lpm, pm_matrix
+from pynns import lpm, pm_matrix, sd_efficient_set
 
 
 @pytest.mark.benchmark
@@ -33,3 +33,14 @@ def test_pm_matrix_scale(
 
     assert set(result) == {"cupm", "dupm", "dlpm", "clpm", "cov.matrix"}
     assert isinstance(r_baseline[f"pm_matrix_{n_variables}x500_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_sd_efficient_set_degree_2_scale(benchmark: Any) -> None:
+    row = np.arange(1, 253, dtype=np.float64)[:, np.newaxis]
+    col = np.arange(1, 51, dtype=np.float64)[np.newaxis, :]
+    returns = np.sin(row * col / 17.0) + np.cos((row + 3.0) / (col + 5.0))
+
+    result = benchmark(sd_efficient_set, returns, 2)
+
+    assert all(0 <= index < 50 for index in result)

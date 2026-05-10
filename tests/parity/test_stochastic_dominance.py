@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+
+import numpy as np
+import pytest
+from _r import RValue, nns
+
+from pynns import fsd, sd_efficient_set, ssd, tsd
+
+SIZES = [50, 200, 1000]
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize(
+    ("r_name", "function", "x_dominates", "y_dominates", "none"),
+    [
+        ("NNS.FSD", fsd, "X FSD Y", "Y FSD X", "NO FSD EXISTS"),
+        ("NNS.SSD", ssd, "X SSD Y", "Y SSD X", "NO SSD EXISTS"),
+        ("NNS.TSD", tsd, "X TSD Y", "Y TSD X", "NO TSD EXISTS"),
+    ],
+)
+@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("case", ["shifted", "stretched", "crossing", "random"])
+def test_sd_functions_match_r(
+    rng: np.random.Generator,
+    r_name: str,
+    function: SDPairFunction,
+    x_dominates: str,
+    y_dominates: str,
+    none: str,
+    size: int,
+    case: str,
+) -> None:
+    x, y = _pair(case, size, rng)
+    expected = _sd_result_from_r(r_name, x, y, x_dominates, y_dominates, none)
+
+    assert function(x, y) == expected
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("degree", [1, 2, 3])
+@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("case", ["constructed", "random"])
+def test_sd_efficient_set_matches_r(
+    rng: np.random.Generator,
+    degree: int,
+    size: int,
+    case: str,
+) -> None:
+    if case == "constructed":
+        base = np.linspace(-1.0, 1.0, size)
+        returns = np.column_stack(
+            [
+                base + 0.05,
+                base,
+                np.sin(np.linspace(0.0, 4.0, size)),
+                np.cos(np.linspace(0.0, 4.0, size)) * 0.4,
+            ]
+        )
+    else:
+        returns = rng.normal(size=(size, 6))
+
+    expected = nns(
+        "NNS.SD.efficient.set",
+        returns.tolist(),
+        degree,
+        "discrete",
+        False,
+    )
+    assert _strings(expected) == [f"X_{index + 1}" for index in sd_efficient_set(returns, degree)]
+
+
+SDPairFunction = Callable[[np.ndarray, np.ndarray], int]
+
+
+def _pair(
+    case: str,
+    size: int,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray]:
+    if case == "shifted":
+        y = rng.normal(size=size)
+        return y + 0.25, y
+    if case == "stretched":
+        base = rng.normal(size=size)
+        return base + 0.05, base * 1.4 - 0.05
+    if case == "crossing":
+        half = size // 2
+        x = np.concatenate((np.full(half, -0.2), np.full(size - half, 1.0)))
+        y = np.concatenate((np.full(half, 0.0), np.full(size - half, 0.7)))
+        return x, y
+    return rng.normal(size=size), rng.normal(size=size)
+
+
+def _sd_result_from_r(
+    r_name: str,
+    x: np.ndarray,
+    y: np.ndarray,
+    x_dominates: str,
+    y_dominates: str,
+    none: str,
+) -> int:
+    if r_name == "NNS.FSD":
+        result = nns(r_name, x.tolist(), y.tolist(), "discrete", False)
+    else:
+        result = nns(r_name, x.tolist(), y.tolist(), False)
+    assert isinstance(result, str)
+    return {x_dominates: 1, y_dominates: -1, none: 0}[result]
+
+
+def _strings(value: RValue) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return value
+    if isinstance(value, np.ndarray):
+        return [str(item) for item in value.tolist()]
+    raise TypeError("Expected an R character vector.")

@@ -15,8 +15,8 @@ _CACHE_PATH = Path(__file__).with_name("_r_cache.json")
 _SCHEMA_VERSION = 1
 _NNS_VERSION = "12.0"
 
-JsonValue: TypeAlias = float | list["JsonValue"] | dict[str, "JsonValue"]
-RValue: TypeAlias = NDArray[np.float64] | dict[str, "RValue"]
+JsonValue: TypeAlias = str | float | list["JsonValue"] | dict[str, "JsonValue"]
+RValue: TypeAlias = str | list[str] | NDArray[np.float64] | dict[str, "RValue"]
 Cache: TypeAlias = dict[str, JsonValue]
 
 
@@ -104,6 +104,7 @@ def _call_r(function: str, args: tuple[Any, ...]) -> RValue:
         "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"
         "  }\n"
         "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
         "  as.numeric(x)\n"
         "}\n"
         "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA))\n"
@@ -128,11 +129,19 @@ def _r_env() -> dict[str, str]:
 def _decode(value: JsonValue) -> RValue:
     if isinstance(value, dict):
         return {key: _decode(item) for key, item in value.items()}
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return cast(list[str], value)
     return np.asarray(value, dtype=np.float64)
 
 
 def _encode(value: RValue) -> JsonValue:
     if isinstance(value, dict):
         return {key: _encode(item) for key, item in value.items()}
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return cast(JsonValue, value)
     encoded = value.tolist()
     return cast(JsonValue, encoded)
