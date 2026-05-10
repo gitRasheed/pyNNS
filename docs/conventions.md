@@ -62,6 +62,18 @@ signed net log-ratio key selected by R, either `C(x--->y)` or `C(y--->x)`.
 detection, which will be ported with the time-series toolkit. Numeric `tau`
 lag values are fully supported.
 
+## Partition
+
+`nns_part` maps to R's `NNS.part` but returns plain NumPy arrays instead of
+`data.table` objects: `"dt"` and `"regression.points"` are dictionaries of
+arrays. Installed R 12.0 only distinguishes `type = NULL` from any non-null
+`type`: `None` uses XY quadrant splits, while every non-`None` value uses
+X-only splits. This differs from documentation that implies separate `"X"`,
+`"Y"`, and `"XONLY"` modes. PyNNS matches the installed binary.
+`order="max"` is rejected with `TypeError`; installed R coerces it to `NA` and
+returns a useless zero-order map. All five `noise_reduction` modes are
+supported: `"off"`, `"mean"`, `"median"`, `"mode"`, and `"mode_class"`.
+
 ## Normalization
 
 `nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with

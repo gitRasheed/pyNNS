@@ -93,6 +93,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_anova_100x2_seconds" not in cache:
         cache["nns_anova_100x2_seconds"] = _time_r_nns_anova()
         _write_benchmark_baseline(cache)
+    if "nns_part_500_seconds" not in cache:
+        cache["nns_part_500_seconds"] = _time_r_nns_part()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -368,6 +371,27 @@ def _time_r_nns_anova() -> float:
         "invisible(run())\n"
         "start <- proc.time()[['elapsed']]\n"
         "for (i in seq_len(20)) invisible(run())\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 20)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_part() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 500)\n"
+        "y <- sin(x) + 0.05 * cos(7 * x)\n"
+        "invisible(NNS::NNS.part(x, y, Voronoi = FALSE))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(20)) invisible(NNS::NNS.part(x, y, Voronoi = FALSE))\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 20)\n"
     )

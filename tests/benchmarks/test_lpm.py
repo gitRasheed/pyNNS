@@ -15,6 +15,7 @@ from pynns import (
     nns_distance,
     nns_distance_bulk,
     nns_norm,
+    nns_part,
     pm_matrix,
     sd_efficient_set,
 )
@@ -161,3 +162,14 @@ def test_nns_anova_100x2(benchmark: Any, r_baseline: dict[str, object]) -> None:
     assert isinstance(result, dict)
     assert 0.0 <= result["Certainty"] <= 1.0
     assert isinstance(r_baseline["nns_anova_100x2_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_part_500(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 500)
+    y = np.sin(x) + 0.05 * np.cos(7.0 * x)
+
+    result = benchmark(nns_part, x, y)
+
+    assert result["order"] >= 0
+    assert isinstance(r_baseline["nns_part_500_seconds"], float)
