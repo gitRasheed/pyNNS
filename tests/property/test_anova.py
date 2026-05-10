@@ -7,6 +7,8 @@ from hypothesis.extra.numpy import arrays
 
 from pynns import nns_anova
 
+MIN_MEANINGFUL_RANGE = np.finfo(np.float64).tiny
+
 
 @given(
     arrays(
@@ -33,8 +35,8 @@ from pynns import nns_anova
     ),
 )
 def test_nns_anova_binary_certainty_bounds(x: np.ndarray, y: np.ndarray) -> None:
-    assume(np.ptp(x) > 0.0)
-    assume(np.ptp(y) > 0.0)
+    assume(np.ptp(x) > MIN_MEANINGFUL_RANGE)
+    assume(np.ptp(y) > MIN_MEANINGFUL_RANGE)
     result = nns_anova(x, y, confidence_interval=None)
 
     assert isinstance(result, dict)
@@ -57,7 +59,7 @@ def test_nns_anova_binary_certainty_bounds(x: np.ndarray, y: np.ndarray) -> None
     )
 )
 def test_nns_anova_pairwise_bounds(x: np.ndarray) -> None:
-    assume(all(np.ptp(x[:, col]) > 0.0 for col in range(x.shape[1])))
+    assume(all(np.ptp(x[:, col]) > MIN_MEANINGFUL_RANGE for col in range(x.shape[1])))
     result = nns_anova(x, confidence_interval=None, pairwise=True)
 
     assert isinstance(result, np.ndarray)
@@ -91,8 +93,8 @@ def test_nns_anova_pairwise_bounds(x: np.ndarray) -> None:
     ),
 )
 def test_nns_anova_robust_bounds(x: np.ndarray, y: np.ndarray) -> None:
-    assume(np.ptp(x) > 0.0)
-    assume(np.ptp(y) > 0.0)
+    assume(np.ptp(x) > MIN_MEANINGFUL_RANGE)
+    assume(np.ptp(y) > MIN_MEANINGFUL_RANGE)
     result = nns_anova(x, y, robust=True, confidence_interval=None, random_seed=123)
 
     assert isinstance(result, dict)

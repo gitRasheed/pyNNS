@@ -89,10 +89,12 @@ The derivative table still comes from R's pre-reset regression-point constructio
 which PyNNS matches rather than recomputing adjacent slopes from all observations.
 
 The `"mode"` and `"mode_class"` noise-reduction modes are accepted in the
-univariate path and use the shared `nns_part`/`nns_mode` implementation. These
-paths are structurally ported, but exact per-value regression parity remains
-concentrated on `"off"`, `"mean"`, and `"median"` until the remaining
-classification/factor regression batches land.
+univariate path and use the shared `nns_part`/`nns_mode` implementation. The
+`"mode_class"` default-order path can produce segment `standard.errors` values
+that differ from R at floating grouping granularity: installed R groups the
+`gradient` column through data.table's numeric radix grouping, while NumPy keeps
+near-identical binary floating values as separate groups. Regression points,
+coefficients, fitted values, and point estimates still match R on that path.
 
 ## Normalization
 

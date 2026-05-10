@@ -334,18 +334,12 @@ def _add_endpoint_points(
     y: NDArray[np.float64],
     dependence: float,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    interior = (rp_x != float(np.min(x))) & (rp_x != float(np.max(x)))
-    endpoint_base_x = rp_x[interior]
-    if endpoint_base_x.size == 0:
-        endpoint_base_x = rp_x
     if dependence >= 1.0:
         min_y = float(y[np.flatnonzero(x == np.min(x))[0]])
         max_y = float(y[np.flatnonzero(x == np.max(x))[0]])
     else:
-        min_y = _endpoint_y(x, y, endpoint_base_x, low=True, dependence=dependence)
-        max_y = _endpoint_y(x, y, endpoint_base_x, low=False, dependence=dependence)
-    rp_x = rp_x[interior]
-    rp_y = rp_y[interior]
+        min_y = _endpoint_y(x, y, rp_x, low=True, dependence=dependence)
+        max_y = _endpoint_y(x, y, rp_x, low=False, dependence=dependence)
     return _consolidate_points(
         np.concatenate((rp_x, np.array([float(np.min(x)), float(np.max(x))]))),
         np.concatenate((rp_y, np.array([min_y, max_y]))),

@@ -13,11 +13,18 @@ from pynns.regression import Order
 
 SIZES = [50, 200, 1000]
 RELATIONSHIPS = ["linear", "quadratic", "cubic", "sin", "random"]
+MODE_RELATIONSHIPS = ["linear", "quadratic", "sin", "random"]
 CASES: list[tuple[int | str | None, str, np.ndarray | None]] = [
     (None, "off", None),
     (1, "mean", None),
     (2, "median", np.array([-3.0, -1.0, 0.25, 3.0])),
     ("max", "off", np.array([-3.0, 0.0, 3.0])),
+]
+MODE_ORDERS: list[int | None] = [None, 1, 2, 3, 5]
+MEAN_POINT_EST_CASES = [
+    np.array([-3.0]),
+    np.array([3.0]),
+    np.array([-3.0, -1.0, 0.0, 2.5]),
 ]
 
 
@@ -43,6 +50,62 @@ def test_nns_reg_univariate_matches_r(
         noise_reduction=cast(NoiseReduction, noise),
         point_est=point_est,
     )
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("relationship", MODE_RELATIONSHIPS)
+@pytest.mark.parametrize("order", MODE_ORDERS)
+def test_nns_reg_mode_noise_reduction_matches_r(
+    rng: np.random.Generator,
+    size: int,
+    relationship: str,
+    order: int | None,
+) -> None:
+    x, y = _relationship(relationship, size, rng)
+
+    expected = _r_nns_reg(x, y, order=order, noise="mode", point_est=None)
+    actual = nns_reg(x, y, order=order, noise_reduction="mode")
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("relationship", MODE_RELATIONSHIPS)
+@pytest.mark.parametrize("order", MODE_ORDERS)
+def test_nns_reg_mode_class_noise_reduction_matches_r(
+    rng: np.random.Generator,
+    size: int,
+    relationship: str,
+    order: int | None,
+) -> None:
+    x, y = _relationship(relationship, size, rng)
+
+    expected = _r_nns_reg(x, y, order=order, noise="mode_class", point_est=None)
+    actual = nns_reg(x, y, order=order, noise_reduction="mode_class")
+
+    _assert_reg_matches(
+        actual,
+        expected,
+        skip_standard_errors=order is None,
+    )
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("point_est", MEAN_POINT_EST_CASES)
+def test_nns_reg_mean_out_of_range_point_est_matches_r(
+    size: int,
+    point_est: np.ndarray,
+) -> None:
+    x = np.linspace(-2.0, 2.0, size)
+    y = np.sin(x)
+
+    expected = _r_nns_reg(x, y, order=1, noise="mean", point_est=point_est)
+    actual = nns_reg(x, y, order=1, noise_reduction="mean", point_est=point_est)
 
     _assert_reg_matches(actual, expected)
 
@@ -92,7 +155,12 @@ def _r_nns_reg(
     )
 
 
-def _assert_reg_matches(actual: dict[str, Any], expected: Any) -> None:
+def _assert_reg_matches(
+    actual: dict[str, Any],
+    expected: Any,
+    *,
+    skip_standard_errors: bool = False,
+) -> None:
     assert isinstance(expected, dict)
     assert set(actual) == set(expected)
     np.testing.assert_allclose(actual["R2"], _array(expected["R2"]), atol=COMPOUND)
@@ -104,6 +172,8 @@ def _assert_reg_matches(actual: dict[str, Any], expected: Any) -> None:
         assert isinstance(actual[key], dict)
         assert set(actual[key]) == set(expected[key])
         for column in actual[key]:
+            if skip_standard_errors and key == "Fitted.xy" and column == "standard.errors":
+                continue
             if column == "NNS.ID":
                 np.testing.assert_array_equal(
                     actual[key][column].astype(str),
