@@ -49,6 +49,8 @@ If an ignored docs file exists locally, read it but do not assume it is tracked.
 - Preserve GPL-3.0-only licensing.
 - Installed R is ground truth, not the source in `reference/NNS/`; when parity tests fail, match the installed binary and document the divergence.
 - Watch R C-API distribution functions (`Rf_dexp`, `Rf_dnorm`, `Rf_dbinom`, etc.); verify at least one numeric case against the installed binary before trusting source-level parameter meaning.
+- If a function being ported depends on another NNS function not yet implemented in PyNNS, stop and report; do not substitute a different algorithm or mirror the workflow with different internals.
+- Before implementing, list the R function's dependencies, including other NNS functions, internal C++ kernels, and R helpers; report any unported NNS dependency before writing code.
 
 ## Tolerances
 
