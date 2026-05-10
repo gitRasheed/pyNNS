@@ -58,3 +58,11 @@ The `target_x` and `target_y` arguments map to R's two-element target vector.
 numeric-vector path. It returns the two directional components and the named
 signed net log-ratio key selected by R, either `C(x--->y)` or `C(y--->x)`.
 `causal_matrix` maps to R's `NNS.caus.matrix` antisymmetric matrix convention.
+
+## Normalization
+
+`nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with
+plotting disabled. PyNNS accepts finite 2D arrays. `linear=True` uses R's
+mean-ratio scaling, while `linear=False` additionally weights scaling by
+absolute correlation for fewer than 10 columns and NNS dependence for 10 or
+more columns.

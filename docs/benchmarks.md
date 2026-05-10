@@ -17,3 +17,4 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_dep`, T_obs=1000 | 7.465 ms | 11.300 ms | 0.66x |
 | `nns_copula`, T_obs=1000 | 0.524 ms | 4.800 ms | 0.11x |
 | `nns_causation`, T_obs=1000 | 23.572 ms | 97.600 ms | 0.24x |
+| `nns_norm`, N=3, T_obs=1000 | 0.167 ms | 1.500 ms | 0.11x |

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -18,6 +17,7 @@ from pynns.dependence import (
     _is_discrete_case,
     _xonly_partition,
 )
+from pynns.norm import nns_norm
 
 CausationResult = dict[str, float]
 
@@ -88,7 +88,7 @@ def causal_matrix(
 
 def _uni_caus(x: NDArray[np.float64], y: NDArray[np.float64], tau: int) -> float:
     x_norm_tau, y_norm_tau = _tau_normalized(x, y, tau)
-    x_norm_to_y, y_norm_to_x = _nns_norm(np.column_stack((x_norm_tau, y_norm_tau))).T
+    x_norm_to_y, y_norm_to_x = nns_norm(np.column_stack((x_norm_tau, y_norm_tau))).T
 
     p_x_given_y = 1.0 - (
         float(lpm_ratio(1.0, float(np.min(y_norm_to_x)), x_norm_to_y))
@@ -119,21 +119,7 @@ def _tau_normalized(
 
     x_tau = np.column_stack(x_vectors)
     y_tau = np.column_stack(y_vectors)
-    return _nns_norm(x_tau)[:, 0], _nns_norm(y_tau)[:, 0]
-
-
-def _nns_norm(values: NDArray[np.float64]) -> NDArray[np.float64]:
-    matrix = np.asarray(values, dtype=np.float64)
-    if matrix.ndim != 2:
-        raise ValueError("values must be 2D.")
-
-    means = np.mean(matrix, axis=0)
-    means = means.copy()
-    means[means == 0.0] = 1e-10
-    rg = means[:, np.newaxis] * (1.0 / means[np.newaxis, :])
-    scale_factor = np.abs(np.corrcoef(matrix, rowvar=False))
-    scales = np.mean(rg * scale_factor, axis=0)
-    return cast(NDArray[np.float64], matrix * scales[np.newaxis, :])
+    return nns_norm(x_tau)[:, 0], nns_norm(y_tau)[:, 0]
 
 
 def _asym_dep(x: NDArray[np.float64], y: NDArray[np.float64]) -> float:
