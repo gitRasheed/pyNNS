@@ -84,3 +84,12 @@ as a rate.
 `nns_diff` maps to R's scalar callable `NNS.diff` path with plotting and trace
 output disabled. It returns a dictionary keyed by R's matrix row names and
 rounds results to `digits`, matching R's default output convention.
+
+## ANOVA
+
+`nns_anova` maps to R's non-plotting `NNS.ANOVA` paths. Binary comparisons
+return a dictionary keyed like R's list output, aggregate multi-group
+comparisons return `{"Certainty": value}`, and `pairwise=True` returns R's
+symmetric certainty matrix. Confidence intervals use bootstrap resampling in R,
+so parity tests disable them with `confidence_interval=None`. Degenerate
+zero-variance groups preserve R's `NaN` CDF/certainty convention.

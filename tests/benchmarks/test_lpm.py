@@ -7,6 +7,7 @@ import pytest
 
 from pynns import (
     lpm,
+    nns_anova,
     nns_causation,
     nns_copula,
     nns_dep,
@@ -147,3 +148,16 @@ def test_nns_diff_sin(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert result["DERIVATIVE"] == pytest.approx(np.cos(1.0), abs=1e-6)
     assert isinstance(r_baseline["nns_diff_sin_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_anova_100x2(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    idx = np.arange(100, dtype=np.float64)
+    x = np.linspace(-2.0, 2.0, 100) + 0.1 * np.sin(idx / 3.0)
+    y = x + 0.25 + 0.05 * np.cos(idx / 5.0)
+
+    result = benchmark(nns_anova, x, y, confidence_interval=None)
+
+    assert isinstance(result, dict)
+    assert 0.0 <= result["Certainty"] <= 1.0
+    assert isinstance(r_baseline["nns_anova_100x2_seconds"], float)
