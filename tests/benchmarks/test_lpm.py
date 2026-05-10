@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from pynns import lpm, nns_copula, nns_dep, pm_matrix, sd_efficient_set
+from pynns import lpm, nns_causation, nns_copula, nns_dep, pm_matrix, sd_efficient_set
 
 
 @pytest.mark.benchmark
@@ -70,3 +70,15 @@ def test_nns_copula_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert 0.0 <= result <= 1.0
     assert isinstance(r_baseline["nns_copula_1000_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_causation_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 1000)
+    y = np.sin(x) + 0.05 * np.cos(7.0 * x)
+
+    result = benchmark(nns_causation, x, y)
+
+    assert "Causation.x.given.y" in result
+    assert "Causation.y.given.x" in result
+    assert isinstance(r_baseline["nns_causation_1000_seconds"], float)

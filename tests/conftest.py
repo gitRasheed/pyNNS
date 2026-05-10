@@ -75,6 +75,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_copula_1000_seconds" not in cache:
         cache["nns_copula_1000_seconds"] = _time_r_nns_copula()
         _write_benchmark_baseline(cache)
+    if "nns_causation_1000_seconds" not in cache:
+        cache["nns_causation_1000_seconds"] = _time_r_nns_causation()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -216,6 +219,29 @@ def _time_r_nns_copula() -> float:
         "}\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 10)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_causation() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 1000)\n"
+        "y <- sin(x) + 0.05 * cos(7 * x)\n"
+        "invisible(NNS::NNS.caus(x, y, tau = 0, plot = FALSE, p.value = FALSE))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(5)) {\n"
+        "  invisible(NNS::NNS.caus(x, y, tau = 0, plot = FALSE, p.value = FALSE))\n"
+        "}\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 5)\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

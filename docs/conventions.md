@@ -51,3 +51,10 @@ dependence component for near-binary inputs.
 `nns_copula(x, y)` is the bivariate scalar form of R's `NNS.copula(cbind(x, y))`.
 When targets are omitted, PyNNS uses column means, matching R's `target = NULL`.
 The `target_x` and `target_y` arguments map to R's two-element target vector.
+
+## Causation
+
+`nns_causation(x, y)` maps to R's `NNS.caus(x, y, tau = 0, p.value = FALSE)`
+numeric-vector path. It returns the two directional components and the named
+signed net log-ratio key selected by R, either `C(x--->y)` or `C(y--->x)`.
+`causal_matrix` maps to R's `NNS.caus.matrix` antisymmetric matrix convention.

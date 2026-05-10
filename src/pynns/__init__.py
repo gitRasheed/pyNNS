@@ -1,3 +1,4 @@
+from pynns.causation import causal_matrix, nns_causation
 from pynns.classical import ecdf_pm, kurt_pm, mean_pm, skew_pm, var_pm
 from pynns.co_moments import co_lpm, co_upm, d_lpm, d_upm
 from pynns.copula import nns_copula
@@ -7,6 +8,7 @@ from pynns.pm_matrix import pm_matrix
 from pynns.stochastic_dominance import fsd, sd_efficient_set, ssd, tsd
 
 __all__ = [
+    "causal_matrix",
     "co_lpm",
     "co_upm",
     "d_lpm",
@@ -17,6 +19,7 @@ __all__ = [
     "lpm",
     "lpm_ratio",
     "mean_pm",
+    "nns_causation",
     "nns_copula",
     "nns_cor",
     "nns_dep",
