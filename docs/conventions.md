@@ -90,6 +90,8 @@ rounds results to `digits`, matching R's default output convention.
 `nns_anova` maps to R's non-plotting `NNS.ANOVA` paths. Binary comparisons
 return a dictionary keyed like R's list output, aggregate multi-group
 comparisons return `{"Certainty": value}`, and `pairwise=True` returns R's
-symmetric certainty matrix. Confidence intervals use bootstrap resampling in R,
-so parity tests disable them with `confidence_interval=None`. Degenerate
-zero-variance groups preserve R's `NaN` CDF/certainty convention.
+symmetric certainty matrix. Confidence interval bootstrapping is structurally
+identical to R but uses NumPy RNG instead of R's `sample()`, so exact per-call
+parity is not achievable; numeric values converge to the same population CI.
+Pass `random_seed` for reproducible PyNNS results. Degenerate zero-variance
+groups preserve R's `NaN` CDF/certainty convention.

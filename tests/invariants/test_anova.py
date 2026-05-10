@@ -42,3 +42,25 @@ def test_nns_anova_pairwise_matrix_is_symmetric_with_unit_diagonal() -> None:
     np.testing.assert_allclose(result, result.T)
     np.testing.assert_allclose(np.diag(result), np.ones(3))
     assert np.all((0.0 <= result) & (result <= 1.0))
+
+
+def test_nns_anova_robust_degenerate_inputs_do_not_crash() -> None:
+    x = np.ones(20)
+
+    result = nns_anova(x, x, robust=True, random_seed=123)
+
+    assert isinstance(result, dict)
+    assert "Robust Certainty Estimate" in result
+    assert np.isnan(result["Robust Certainty Estimate"])
+
+
+def test_nns_anova_robust_reproducible_with_seed() -> None:
+    x = np.linspace(-2.0, 2.0, 40)
+    y = x + 0.25
+
+    first = nns_anova(x, y, robust=True, random_seed=123)
+    second = nns_anova(x, y, robust=True, random_seed=123)
+
+    assert isinstance(first, dict)
+    assert isinstance(second, dict)
+    assert first == second

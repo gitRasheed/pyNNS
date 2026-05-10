@@ -77,6 +77,36 @@ def test_nns_anova_pairwise_matches_r() -> None:
     np.testing.assert_allclose(actual, expected, atol=ANOVA_PARITY)
 
 
+@pytest.mark.parity
+def test_nns_anova_robust_structure_matches_r_shape() -> None:
+    control, treatment = _groups(30)
+
+    expected = _r_anova_binary(control, treatment, robust=True)
+    actual = nns_anova(control, treatment, robust=True, random_seed=123)
+
+    assert isinstance(actual, dict)
+    assert set(expected).issuperset(
+        {"Control", "Treatment", "Grand_Statistic", "Control_CDF", "Treatment_CDF", "Certainty"}
+    )
+    assert set(actual) == {
+        "Control",
+        "Treatment",
+        "Grand_Statistic",
+        "Control_CDF",
+        "Treatment_CDF",
+        "Certainty",
+        "Effect_Size_LB",
+        "Effect_Size_UB",
+        "Confidence_Level",
+        "Robust Certainty Estimate",
+        "Lower Bound Robust Certainty",
+        "Upper Bound Robust Certainty",
+    }
+    assert 0.0 <= actual["Robust Certainty Estimate"] <= 1.0
+    assert 0.0 <= actual["Lower Bound Robust Certainty"] <= 1.0
+    assert 0.0 <= actual["Upper Bound Robust Certainty"] <= 1.0
+
+
 def _groups(size: int) -> tuple[np.ndarray, np.ndarray]:
     idx = np.arange(size, dtype=np.float64)
     x = np.linspace(-2.0, 2.0, size) + 0.1 * np.sin(idx / 3.0)
@@ -96,6 +126,7 @@ def _r_anova_binary(
     *,
     means_only: bool = False,
     medians: bool = False,
+    robust: bool = False,
 ) -> dict[str, float]:
     result = _r_anova(
         {
@@ -104,6 +135,7 @@ def _r_anova_binary(
             "treatment": treatment.tolist(),
             "means_only": means_only,
             "medians": medians,
+            "robust": robust,
         }
     )
     assert isinstance(result, dict)
@@ -130,9 +162,10 @@ def _r_anova(payload: dict[str, Any]) -> dict[str, float] | np.ndarray | float:
         "args <- jsonlite::fromJSON("
         "paste(readLines('stdin'), collapse = '\\n'), simplifyVector = FALSE)\n"
         "if (args$mode == 'binary') {\n"
+        "  ci <- if (isTRUE(args$robust)) 0.95 else NULL\n"
         "  result <- NNS::NNS.ANOVA(unlist(args$control), unlist(args$treatment), "
         "means.only = args$means_only, medians = args$medians, "
-        "confidence.interval = NULL, plot = FALSE)\n"
+        "confidence.interval = ci, robust = args$robust, plot = FALSE)\n"
         "} else {\n"
         "  groups <- lapply(args$groups, unlist)\n"
         "  result <- NNS::NNS.ANOVA(groups, means.only = args$means_only, "

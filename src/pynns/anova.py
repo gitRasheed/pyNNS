@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 from scipy import optimize  # type: ignore[import-untyped]
 
 from pynns.core import lpm_ratio, upm_ratio
+from pynns.dependence import _gravity
 
 AnovaResult = dict[str, float]
 Tail = Literal["both", "left", "right"]
@@ -24,22 +25,34 @@ def nns_anova(
     pairwise: bool = False,
     robust: bool = False,
     n_boot: int = 1000,
+    random_seed: int | None = None,
 ) -> AnovaResult | NDArray[np.float64]:
     """Partial-moment ANOVA, matching R's non-plotting NNS.ANOVA paths."""
-    if robust:
-        raise NotImplementedError(
-            "robust=True is not ported; use the non-robust R-compatible path."
-        )
     tail = _tail(tails)
     if treatment is not None:
+        control_values = _as_group(control, "control")
+        treatment_values = _as_group(treatment, "treatment")
+        rng = np.random.default_rng(random_seed)
+        if robust:
+            return _anova_robust(
+                control_values,
+                treatment_values,
+                means_only=means_only,
+                medians=medians,
+                confidence_interval=confidence_interval,
+                tails=tail,
+                n_boot=n_boot,
+                rng=rng,
+            )
         return _anova_bin(
-            _as_group(control, "control"),
-            _as_group(treatment, "treatment"),
+            control_values,
+            treatment_values,
             means_only=means_only,
             medians=medians,
             confidence_interval=confidence_interval,
             tails=tail,
             n_boot=n_boot,
+            rng=rng,
         )
 
     groups = _as_groups(control)
@@ -108,6 +121,7 @@ def _anova_bin(
     confidence_interval: float | None = None,
     tails: Tail = "both",
     n_boot: int = 1000,
+    rng: np.random.Generator | None = None,
 ) -> AnovaResult:
     if mean_of_means is None:
         control_stat = float(np.median(control) if medians else np.mean(control))
@@ -197,9 +211,55 @@ def _anova_bin(
                 confidence_interval=confidence_interval,
                 tails=tails,
                 n_boot=n_boot,
+                rng=np.random.default_rng() if rng is None else rng,
             )
         )
     return result
+
+
+def _anova_robust(
+    control: NDArray[np.float64],
+    treatment: NDArray[np.float64],
+    *,
+    means_only: bool,
+    medians: bool,
+    confidence_interval: float | None,
+    tails: Tail,
+    n_boot: int,
+    rng: np.random.Generator,
+) -> AnovaResult:
+    base = _anova_bin(
+        control,
+        treatment,
+        means_only=means_only,
+        medians=medians,
+        confidence_interval=confidence_interval,
+        tails=tails,
+        n_boot=n_boot,
+        rng=rng,
+    )
+    sample_size = min(control.size, treatment.size)
+    indices = rng.integers(0, sample_size, size=(sample_size, 100))
+    certainties = np.array(
+        [
+            _anova_bin(
+                control[indices[:, col]],
+                treatment[indices[:, col]],
+                means_only=means_only,
+                medians=medians,
+                confidence_interval=None,
+                tails=tails,
+            )["Certainty"]
+            for col in range(indices.shape[1])
+        ],
+        dtype=np.float64,
+    )
+
+    alpha = _ci_alpha(confidence_interval, tails)
+    base["Robust Certainty Estimate"] = _gravity(certainties)
+    base["Lower Bound Robust Certainty"] = _lpm_var(alpha, 0, certainties)
+    base["Upper Bound Robust Certainty"] = _upm_var(alpha, 0, certainties)
+    return base
 
 
 def _effect_size_bounds(
@@ -210,19 +270,20 @@ def _effect_size_bounds(
     confidence_interval: float,
     tails: Tail,
     n_boot: int,
+    rng: np.random.Generator,
 ) -> AnovaResult:
     if not 0.0 <= confidence_interval <= 1.0:
         raise ValueError("confidence_interval must be in [0, 1].")
     if n_boot < 1:
         raise ValueError("n_boot must be >= 1.")
 
-    control_boot = np.random.choice(control, size=(control.size, n_boot), replace=True)
-    treatment_boot = np.random.choice(treatment, size=(treatment.size, n_boot), replace=True)
+    control_boot = rng.choice(control, size=(control.size, n_boot), replace=True)
+    treatment_boot = rng.choice(treatment, size=(treatment.size, n_boot), replace=True)
     control_stats = np.median(control_boot, axis=0) if medians else np.mean(control_boot, axis=0)
     treatment_stats = (
         np.median(treatment_boot, axis=0) if medians else np.mean(treatment_boot, axis=0)
     )
-    alpha = (1.0 - confidence_interval) / 2.0 if tails == "both" else 1.0 - confidence_interval
+    alpha = _ci_alpha(confidence_interval, tails)
 
     control_upper = treatment_upper = np.inf
     control_lower = treatment_lower = -np.inf
@@ -249,6 +310,13 @@ def _effect_size_bounds(
     }
 
 
+def _ci_alpha(confidence_interval: float | None, tails: Tail) -> float:
+    interval = 0.95 if confidence_interval is None else confidence_interval
+    if not 0.0 <= interval <= 1.0:
+        raise ValueError("confidence_interval must be in [0, 1].")
+    return (1.0 - interval) / 2.0 if tails == "both" else 1.0 - interval
+
+
 def _lower_area_share(target: float, values: NDArray[np.float64]) -> float:
     lower = float(lpm_ratio(1, target, values))
     upper = float(upm_ratio(1, target, values))
@@ -265,6 +333,9 @@ def _r_max(left: float, right: float) -> float:
 
 def _lpm_var(percentile: float, degree: int, values: NDArray[np.float64]) -> float:
     percentile = float(np.clip(percentile, 0.0, 1.0))
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return float("nan")
     if degree == 0:
         return float(np.quantile(values, percentile))
     if float(np.min(values)) == float(np.max(values)):
@@ -284,6 +355,9 @@ def _lpm_var(percentile: float, degree: int, values: NDArray[np.float64]) -> flo
 
 def _upm_var(percentile: float, degree: int, values: NDArray[np.float64]) -> float:
     percentile = float(np.clip(percentile, 0.0, 1.0))
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return float("nan")
     if degree == 0:
         return float(np.quantile(values, 1.0 - percentile))
     if float(np.min(values)) == float(np.max(values)):
