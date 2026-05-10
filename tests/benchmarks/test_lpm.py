@@ -76,6 +76,17 @@ def test_nns_dep_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
 
 @pytest.mark.benchmark
+def test_nns_dep_asym_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 1000)
+    y = np.sin(x) + 0.05 * np.cos(7.0 * x)
+
+    result = benchmark(nns_dep, x, y, True)
+
+    assert set(result) == {"Correlation", "Dependence"}
+    assert isinstance(r_baseline["nns_dep_asym_1000_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_copula_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-3.0, 3.0, 1000)
     y = np.sin(x) + 0.05 * np.cos(7.0 * x)

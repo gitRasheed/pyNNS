@@ -156,10 +156,11 @@ def _smooth_counts_tri7(counts: NDArray[np.int64]) -> NDArray[np.float64]:
     smooth = np.zeros(n, dtype=np.float64)
 
     def at(index: int) -> int:
-        if index < 0:
-            return int(counts[-index])
-        if index >= n:
-            return int(counts[2 * n - 2 - index])
+        while index < 0 or index >= n:
+            if index < 0:
+                index = -index
+            if index >= n:
+                index = 2 * n - 2 - index
         return int(counts[index])
 
     for i in range(n):

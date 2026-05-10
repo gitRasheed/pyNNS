@@ -33,6 +33,26 @@ def test_nns_dep_matches_r(
 
 
 @pytest.mark.parity
+@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("relationship", RELATIONSHIPS)
+def test_nns_dep_asym_matches_r(
+    rng: np.random.Generator,
+    size: int,
+    relationship: str,
+) -> None:
+    x, y = _relationship(relationship, size, rng)
+
+    expected = nns("NNS.dep", x.tolist(), y.tolist(), True, False, False)
+    assert isinstance(expected, dict)
+    expected_correlation = _scalar(expected["Correlation"])
+    expected_dependence = _scalar(expected["Dependence"])
+    actual = nns_dep(x, y, asym=True)
+
+    np.testing.assert_allclose(actual["Correlation"], expected_correlation, atol=EXACT)
+    np.testing.assert_allclose(actual["Dependence"], expected_dependence, atol=EXACT)
+
+
+@pytest.mark.parity
 def test_nns_dep_identical_pair_matches_r() -> None:
     x = np.linspace(-2.0, 2.0, 200)
 
@@ -41,6 +61,20 @@ def test_nns_dep_identical_pair_matches_r() -> None:
     expected_correlation = _scalar(expected["Correlation"])
     expected_dependence = _scalar(expected["Dependence"])
     actual = nns_dep(x, x)
+
+    np.testing.assert_allclose(actual["Correlation"], expected_correlation, atol=EXACT)
+    np.testing.assert_allclose(actual["Dependence"], expected_dependence, atol=EXACT)
+
+
+@pytest.mark.parity
+def test_nns_dep_asym_identical_pair_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 200)
+
+    expected = nns("NNS.dep", x.tolist(), x.tolist(), True, False, False)
+    assert isinstance(expected, dict)
+    expected_correlation = _scalar(expected["Correlation"])
+    expected_dependence = _scalar(expected["Dependence"])
+    actual = nns_dep(x, x, asym=True)
 
     np.testing.assert_allclose(actual["Correlation"], expected_correlation, atol=EXACT)
     np.testing.assert_allclose(actual["Dependence"], expected_dependence, atol=EXACT)

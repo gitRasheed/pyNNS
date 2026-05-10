@@ -9,7 +9,11 @@ from numpy.typing import NDArray
 from pynns.co_moments import co_lpm, co_upm, d_lpm, d_upm
 
 
-def nns_dep(x: NDArray[np.float64], y: NDArray[np.float64]) -> dict[str, float]:
+def nns_dep(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    asym: bool = False,
+) -> dict[str, float]:
     """Return NNS nonlinear correlation and dependence for a pair of variables."""
     x_values, y_values = _as_pair(x, y)
     if _is_constant(x_values) or _is_constant(y_values):
@@ -18,7 +22,7 @@ def nns_dep(x: NDArray[np.float64], y: NDArray[np.float64]) -> dict[str, float]:
     obs_req = max(8, x_values.size // 8)
     quad_xy = _xonly_partition(x_values, obs_req)
     quad_yx = _xonly_partition(y_values, obs_req)
-    correlation, dependence = _dep_pair(x_values, y_values, quad_xy, quad_yx)
+    correlation, dependence = _dep_pair(x_values, y_values, quad_xy, quad_yx, asym)
     return {"Correlation": correlation, "Dependence": dependence}
 
 
@@ -32,6 +36,7 @@ def _dep_pair(
     y: NDArray[np.float64],
     quad_xy: list[str],
     quad_yx: list[str],
+    asym: bool,
 ) -> tuple[float, float]:
     global_cop = _finite_or_zero(_copula_signed(x, y))
 
@@ -42,9 +47,15 @@ def _dep_pair(
         disc_cop = _copula_degree0_unsigned(x, y)
         if not math.isfinite(disc_cop):
             disc_cop = max(dep_xy, dep_yx)
-        dep_sym = _gravity(np.array([max(dep_xy, dep_yx), disc_cop], dtype=np.float64))
-        dep_xy = dep_sym
-        dep_yx = dep_sym
+        if asym:
+            dep_xy = _gravity(np.array([dep_xy, disc_cop], dtype=np.float64))
+        else:
+            dep_sym = _gravity(np.array([max(dep_xy, dep_yx), disc_cop], dtype=np.float64))
+            dep_xy = dep_sym
+            dep_yx = dep_sym
+
+    if asym:
+        return corr_xy, dep_xy
 
     return max(corr_xy, corr_yx), max(dep_xy, dep_yx)
 
