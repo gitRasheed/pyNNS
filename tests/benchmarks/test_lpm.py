@@ -8,6 +8,7 @@ import pytest
 from pynns import (
     lpm,
     nns_anova,
+    nns_boost,
     nns_causation,
     nns_copula,
     nns_dep,
@@ -161,3 +162,28 @@ def test_nns_anova_100x2(benchmark: Any, r_baseline: dict[str, object]) -> None:
     assert isinstance(result, dict)
     assert 0.0 <= result["Certainty"] <= 1.0
     assert isinstance(r_baseline["nns_anova_100x2_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_boost_100x3_50(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    row = np.linspace(-2.0, 2.0, 100)
+    x = np.column_stack((row, row**2, np.sin(row)))
+    y = x[:, 0] + 0.5 * x[:, 1] - 0.25 * x[:, 2]
+    test_row = np.linspace(-1.8, 1.8, 50)
+    z = np.column_stack((test_row, test_row**2, np.sin(test_row)))
+
+    result = benchmark(
+        nns_boost,
+        x,
+        y,
+        z,
+        epochs=10,
+        learner_trials=10,
+        cv_size=0.25,
+        feature_importance=False,
+        random_seed=123,
+    )
+
+    assert isinstance(result["results"], np.ndarray)
+    assert result["results"].shape == (50,)
+    assert isinstance(r_baseline["nns_boost_100x3_50_seconds"], float)

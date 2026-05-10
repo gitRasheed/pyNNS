@@ -2,6 +2,7 @@
   "entries": {
     "lpm_small_seconds": 7.5e-05,
     "nns_anova_100x2_seconds": 0.0044,
+    "nns_boost_100x3_50_seconds": 6.534,
     "nns_causation_1000_seconds": 0.0976,
     "nns_copula_1000_seconds": 0.0048,
     "nns_dep_1000_seconds": 0.0113,

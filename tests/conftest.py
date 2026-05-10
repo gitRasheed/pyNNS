@@ -93,6 +93,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_anova_100x2_seconds" not in cache:
         cache["nns_anova_100x2_seconds"] = _time_r_nns_anova()
         _write_benchmark_baseline(cache)
+    if "nns_boost_100x3_50_seconds" not in cache:
+        cache["nns_boost_100x3_50_seconds"] = _time_r_nns_boost()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -370,6 +373,34 @@ def _time_r_nns_anova() -> float:
         "for (i in seq_len(20)) invisible(run())\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 20)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_boost() -> float:
+    script = (
+        "library(NNS)\n"
+        "row <- seq(-2, 2, length.out = 100)\n"
+        "x <- cbind(row, row^2, sin(row))\n"
+        "colnames(x) <- c('x1', 'x2', 'x3')\n"
+        "y <- x[,1] + 0.5 * x[,2] - 0.25 * x[,3]\n"
+        "test_row <- seq(-1.8, 1.8, length.out = 50)\n"
+        "z <- cbind(test_row, test_row^2, sin(test_row))\n"
+        "colnames(z) <- colnames(x)\n"
+        "run <- function() NNS::NNS.boost(x, y, z, epochs = 10, learner.trials = 10, "
+        "CV.size = 0.25, feature.importance = FALSE, status = FALSE)\n"
+        "invisible(run())\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(3)) invisible(run())\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 3)\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],
