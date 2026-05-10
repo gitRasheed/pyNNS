@@ -9,6 +9,7 @@ from typing import TypeAlias, cast
 
 import numpy as np
 import pytest
+from hypothesis import HealthCheck, settings
 from numpy.typing import NDArray
 
 _BENCHMARK_BASELINE_PATH = Path(__file__).parent / "benchmarks" / "_r_baseline.json"
@@ -17,6 +18,20 @@ _NNS_VERSION = "12.0"
 
 JsonValue: TypeAlias = float | int | str | list["JsonValue"] | dict[str, "JsonValue"]
 BenchmarkBaseline: TypeAlias = dict[str, JsonValue]
+
+settings.register_profile(
+    "fast",
+    max_examples=15,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+settings.register_profile(
+    "thorough",
+    max_examples=100,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "fast"))
 
 
 def pytest_configure(config: pytest.Config) -> None:

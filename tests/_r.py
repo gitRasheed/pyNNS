@@ -4,6 +4,8 @@ import hashlib
 import json
 import os
 import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, TypeAlias, cast
 from warnings import warn
@@ -12,6 +14,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 _CACHE_PATH = Path(__file__).with_name("_r_cache.json")
+_LOCK_PATH = _CACHE_PATH.with_suffix(".lock")
 _SCHEMA_VERSION = 1
 _NNS_VERSION = "12.0"
 
@@ -19,10 +22,13 @@ JsonValue: TypeAlias = str | float | list["JsonValue"] | dict[str, "JsonValue"]
 RValue: TypeAlias = str | list[str] | NDArray[np.float64] | dict[str, "RValue"]
 Cache: TypeAlias = dict[str, JsonValue]
 
+_CACHE: Cache | None = None
+_CACHE_REFRESH = False
+
 
 def nns(function: str, *args: Any) -> RValue:
     key = _cache_key(function, args)
-    cache, refresh = _read_cache()
+    cache, refresh = _cache_state()
 
     if key in cache:
         return _decode(cache[key])
@@ -33,12 +39,30 @@ def nns(function: str, *args: Any) -> RValue:
             f"Run without CI/PYNNS_R_CACHE_ONLY/PYNNS_OFFLINE to populate {_CACHE_PATH}."
         )
 
-    result = _call_r(function, args)
-    if refresh:
-        cache = {}
-    cache[key] = _encode(result)
-    _write_cache(cache)
-    return result
+    return _uncached_nns(function, args, key, refresh)
+
+
+def _uncached_nns(
+    function: str,
+    args: tuple[Any, ...],
+    key: str,
+    refresh: bool,
+) -> RValue:
+    global _CACHE, _CACHE_REFRESH
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+            _CACHE_REFRESH = False
+        if key in disk_cache:
+            _CACHE = disk_cache
+            return _decode(disk_cache[key])
+
+        result = _call_r(function, args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        _CACHE = disk_cache
+        return result
 
 
 def _cache_key(function: str, args: tuple[Any, ...]) -> str:
@@ -50,7 +74,14 @@ def _cache_key(function: str, args: tuple[Any, ...]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _read_cache() -> tuple[Cache, bool]:
+def _cache_state() -> tuple[Cache, bool]:
+    global _CACHE, _CACHE_REFRESH
+    if _CACHE is None:
+        _CACHE, _CACHE_REFRESH = _read_cache_from_disk()
+    return _CACHE, _CACHE_REFRESH
+
+
+def _read_cache_from_disk() -> tuple[Cache, bool]:
     if not _CACHE_PATH.exists():
         return {}, False
 
@@ -80,7 +111,26 @@ def _write_cache(entries: Cache) -> None:
         "schema_version": _SCHEMA_VERSION,
         "entries": entries,
     }
-    _CACHE_PATH.write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    tmp_path = _CACHE_PATH.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    tmp_path.replace(_CACHE_PATH)
+
+
+@contextmanager
+def _cache_lock() -> Iterator[None]:
+    _LOCK_PATH.touch(exist_ok=True)
+    with _LOCK_PATH.open("r+") as lock_file:
+        if os.name == "posix":
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if os.name == "posix":
+                import fcntl
+
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def _offline() -> bool:

@@ -54,6 +54,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+tests/_r_cache.lock
+tests/_r_cache.json.tmp
 cover/
 
 # Translations

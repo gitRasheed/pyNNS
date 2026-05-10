@@ -18,6 +18,7 @@ dev = [
     "pytest",
     "pytest-benchmark",
     "pytest-cov",
+    "pytest-xdist>=3.8.0",
     "ruff",
 ]
 
@@ -32,7 +33,7 @@ build-backend = "scikit_build_core.build"
 wheel.packages = ["src/pynns"]
 
 [tool.pytest.ini_options]
-addopts = "-ra -m 'not benchmark'"
+addopts = "-ra -m 'not benchmark' --benchmark-disable -n auto"
 pythonpath = ["tests"]
 testpaths = ["tests"]
 markers = [

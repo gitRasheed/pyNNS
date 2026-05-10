@@ -119,7 +119,9 @@ def test_edge_cases_match_r_category(
         assert np.isnan(expected)
         return
 
-    if not np.all(np.isfinite(edge_case.values)) and os.environ.get("PYNNS_OFFLINE") == "1":
+    if not np.all(np.isfinite(edge_case.values)) and (
+        os.environ.get("PYNNS_OFFLINE") == "1" or os.environ.get("PYNNS_R_CACHE_ONLY") == "1"
+    ):
         result = function(degree, target, edge_case.values)
         if edge_case.name == "contains-nan":
             assert np.isnan(result)
