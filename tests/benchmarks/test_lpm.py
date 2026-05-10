@@ -14,6 +14,7 @@ from pynns import (
     nns_diff,
     nns_distance,
     nns_distance_bulk,
+    nns_mode,
     nns_norm,
     nns_part,
     pm_matrix,
@@ -173,3 +174,13 @@ def test_nns_part_500(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert result["order"] >= 0
     assert isinstance(r_baseline["nns_part_500_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_mode_continuous_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.concatenate((np.linspace(-3.0, 3.0, 500), np.linspace(1.0, 2.0, 500)))
+
+    result = benchmark(nns_mode, x)
+
+    assert np.isfinite(result)
+    assert isinstance(r_baseline["nns_mode_continuous_1000_seconds"], float)

@@ -8,6 +8,7 @@
     "nns_diff_sin_seconds": 0.00405,
     "nns_distance_1000x3_seconds": 0.00116,
     "nns_distance_bulk_1000x3_100_seconds": 0.0092,
+    "nns_mode_continuous_1000_seconds": 0.0001,
     "nns_norm_1000x3_seconds": 0.0015,
     "nns_part_500_seconds": 0.00375,
     "pm_matrix_100x500_seconds": 0.0168,

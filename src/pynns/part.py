@@ -6,6 +6,7 @@ from typing import Literal, TypeAlias, TypedDict, cast
 import numpy as np
 from numpy.typing import NDArray
 
+from pynns.central_tendencies import _nearest_int_half_up_array, nns_mode
 from pynns.dependence import _gravity
 
 NoiseReduction: TypeAlias = Literal["off", "mean", "median", "mode", "mode_class"]
@@ -202,29 +203,8 @@ def _aggregate_y(values: NDArray[np.float64], noise: NoiseReduction) -> float:
 
 
 def _mode(values: NDArray[np.float64]) -> float:
-    """Private port of NNS_mode_cpp(..., discrete=TRUE, multi=FALSE)."""
-    finite = values[np.isfinite(values)]
-    n = finite.size
-    if n == 0:
-        return float("nan")
-    if n <= 3:
-        return float(_nearest_int_half_up(float(np.median(np.sort(finite)))))
-
-    integerized = _nearest_int_half_up_array(finite).astype(np.int64)
-    modes, counts = np.unique(integerized, return_counts=True)
-    max_count = int(np.max(counts))
-    tied_modes = modes[counts == max_count]
-    return float(np.mean(tied_modes))
-
-
-def _nearest_int_half_up(value: float) -> float:
-    floor = math.floor(value)
-    return float(floor if value - floor < 0.5 else math.ceil(value))
-
-
-def _nearest_int_half_up_array(values: NDArray[np.float64]) -> NDArray[np.float64]:
-    floors = np.floor(values)
-    return np.where(values - floors < 0.5, floors, np.ceil(values)).astype(np.float64)
+    """Private compatibility wrapper for NNS_part's discrete mode path."""
+    return float(nns_mode(values, discrete=True, multi=False))
 
 
 def _is_discrete_like_r(values: NDArray[np.float64]) -> bool:
