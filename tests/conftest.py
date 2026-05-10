@@ -68,6 +68,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "sd_efficient_set_50x252_degree2_seconds" not in cache:
         cache["sd_efficient_set_50x252_degree2_seconds"] = _time_r_sd_efficient_set()
         _write_benchmark_baseline(cache)
+    if "nns_dep_1000_seconds" not in cache:
+        cache["nns_dep_1000_seconds"] = _time_r_nns_dep()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -158,6 +161,28 @@ def _time_r_sd_efficient_set() -> float:
         "}\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 5)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_dep() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 1000)\n"
+        "y <- sin(x) + 0.05 * cos(7 * x)\n"
+        "invisible(NNS::NNS.dep(x, y, asym = FALSE, p.value = FALSE, print.map = FALSE))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(10)) {\n"
+        "  invisible(NNS::NNS.dep(x, y, asym = FALSE, p.value = FALSE, print.map = FALSE))\n"
+        "}\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 10)\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

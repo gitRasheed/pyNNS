@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from pynns import lpm, pm_matrix, sd_efficient_set
+from pynns import lpm, nns_dep, pm_matrix, sd_efficient_set
 
 
 @pytest.mark.benchmark
@@ -48,3 +48,14 @@ def test_sd_efficient_set_degree_2_scale(
 
     assert all(0 <= index < 50 for index in result)
     assert isinstance(r_baseline["sd_efficient_set_50x252_degree2_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_dep_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 1000)
+    y = np.sin(x) + 0.05 * np.cos(7.0 * x)
+
+    result = benchmark(nns_dep, x, y)
+
+    assert set(result) == {"Correlation", "Dependence"}
+    assert isinstance(r_baseline["nns_dep_1000_seconds"], float)

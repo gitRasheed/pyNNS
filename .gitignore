@@ -1,5 +1,7 @@
 reference/
-docs/
+docs/*
+!docs/benchmarks.md
+!docs/conventions.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
