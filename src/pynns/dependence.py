@@ -211,13 +211,13 @@ def _gravity(x: NDArray[np.float64]) -> float:
     if np.all(values == values[0]):
         return float(values[0])
 
-    value_range = abs(float(values[-1] - values[0]))
-    if value_range == 0.0:
+    value_range = float(np.ptp(values))
+    if abs(value_range) == 0.0:
         return float(values[0])
 
     q1, q2, q3 = _quartiles_like_r_code(values)
     width = (q3 - q1) * n**-0.5
-    if not (width > 0.0) or not math.isfinite(width):
+    if width <= 0.0 or not np.isfinite(width):
         width = value_range / 128.0
 
     bin_names, counts = _simple_bin_counts(values, width, float(values[0]))
@@ -275,9 +275,19 @@ def _simple_bin_counts(
     width: float,
     origin: float,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64]]:
-    bin_count = math.floor((float(values[-1]) - origin) / width + 1e-12) + 1
-    bin_count = max(1, bin_count)
+    int_max = np.iinfo(np.int32).max
+    if width <= 0.0 or not math.isfinite(width):
+        bin_count = 1
+    else:
+        bin_ratio = (float(values[-1]) - origin) / width + 1e-12
+        if not math.isfinite(bin_ratio) or bin_ratio > int_max:
+            bin_count = 1
+        else:
+            bin_count = math.floor(bin_ratio) + 1
+    bin_count = min(max(1, bin_count), 4 * values.size)
     bin_names = origin + np.arange(bin_count, dtype=np.float64) * width
+    if bin_count == 1:
+        return bin_names, np.array([values.size], dtype=np.int64)
     indices = np.floor((values - origin) / width).astype(np.int64)
     indices = np.clip(indices, 0, bin_count - 1)
     counts = np.bincount(indices, minlength=bin_count)

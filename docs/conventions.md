@@ -35,3 +35,13 @@ does not match the number of variables raise `ValueError`.
 default, matching NumPy defaults and `NNS.moments(population = TRUE)`. `var_pm`
 accepts `ddof` for NumPy-style variance scaling. `skew_pm` and `kurt_pm` do not
 apply SciPy's optional finite-sample bias correction.
+
+## Dependence
+
+`nns_dep` follows R's `NNS.dep` bivariate path, including `NNS.gravity` handling
+for zero-range inputs and non-positive or non-finite bin widths. PyNNS also caps
+the internal gravity bin count at `4 * len(input)` to prevent pathological
+allocations on inputs where R's C++ `int` conversion effectively collapses an
+absurd bin count. `abs(Correlation) <= Dependence` is not guaranteed by
+`NNS.dep`; both R and PyNNS can return signed correlation magnitudes above the
+dependence component for near-binary inputs.

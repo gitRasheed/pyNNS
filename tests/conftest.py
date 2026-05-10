@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -120,6 +121,7 @@ def _time_r_lpm() -> float:
         ["Rscript", "-e", script],
         check=True,
         capture_output=True,
+        env=_r_env(),
         text=True,
     )
     return float(completed.stdout)
@@ -143,6 +145,7 @@ def _time_r_pm_matrix(n_variables: int) -> float:
         ["Rscript", "-e", script],
         check=True,
         capture_output=True,
+        env=_r_env(),
         text=True,
     )
     return float(completed.stdout)
@@ -166,6 +169,7 @@ def _time_r_sd_efficient_set() -> float:
         ["Rscript", "-e", script],
         check=True,
         capture_output=True,
+        env=_r_env(),
         text=True,
     )
     return float(completed.stdout)
@@ -188,6 +192,13 @@ def _time_r_nns_dep() -> float:
         ["Rscript", "-e", script],
         check=True,
         capture_output=True,
+        env=_r_env(),
         text=True,
     )
     return float(completed.stdout)
+
+
+def _r_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("R_LIBS_USER", str(Path.home() / "R" / "library"))
+    return env

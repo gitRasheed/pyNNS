@@ -13,7 +13,7 @@ def test_nns_dep_identical_has_unit_dependence() -> None:
     assert nns_dep(x, x)["Dependence"] == pytest.approx(1.0, abs=EXACT)
 
 
-def test_nns_dep_bounds_and_correlation_magnitude() -> None:
+def test_nns_dep_bounds() -> None:
     x = np.linspace(-2.0, 2.0, 200)
     y = np.sin(x)
 
@@ -21,7 +21,6 @@ def test_nns_dep_bounds_and_correlation_magnitude() -> None:
 
     assert result["Dependence"] >= 0.0
     assert result["Dependence"] <= 1.0
-    assert abs(result["Correlation"]) <= result["Dependence"] + EXACT
 
 
 def test_nns_dep_is_symmetric() -> None:
