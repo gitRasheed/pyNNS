@@ -143,7 +143,10 @@ def _tau_value(tau: int | str) -> int:
     if tau == "cs":
         return 0
     if tau == "ts":
-        return 3
+        raise NotImplementedError(
+            "tau='ts' requires NNS.seas (seasonality detection), which is not yet ported in PyNNS. "
+            "Use a numeric tau (lag) value instead."
+        )
     tau_value = int(tau)
     if tau_value < 0:
         raise ValueError("tau must be non-negative.")

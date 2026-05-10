@@ -58,6 +58,9 @@ The `target_x` and `target_y` arguments map to R's two-element target vector.
 numeric-vector path. It returns the two directional components and the named
 signed net log-ratio key selected by R, either `C(x--->y)` or `C(y--->x)`.
 `causal_matrix` maps to R's `NNS.caus.matrix` antisymmetric matrix convention.
+`tau='ts'` is not implemented because it requires R's `NNS.seas` seasonality
+detection, which will be ported with the time-series toolkit. Numeric `tau`
+lag values are fully supported.
 
 ## Normalization
 
