@@ -87,6 +87,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_distance_bulk_1000x3_100_seconds" not in cache:
         cache["nns_distance_bulk_1000x3_100_seconds"] = _time_r_nns_distance_bulk()
         _write_benchmark_baseline(cache)
+    if "nns_diff_sin_seconds" not in cache:
+        cache["nns_diff_sin_seconds"] = _time_r_nns_diff()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -320,6 +323,26 @@ def _time_r_nns_distance_bulk() -> float:
         "invisible(NNS:::NNS.distance.bulk(rpm, Xtest, k = 20))\n"
         "start <- proc.time()[['elapsed']]\n"
         "for (i in seq_len(20)) invisible(NNS:::NNS.distance.bulk(rpm, Xtest, k = 20))\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 20)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_diff() -> float:
+    script = (
+        "library(NNS)\n"
+        "f <- function(x) sin(x)\n"
+        "invisible(NNS::NNS.diff(f, 1.0, plot = FALSE))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(20)) invisible(NNS::NNS.diff(f, 1.0, plot = FALSE))\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 20)\n"
     )

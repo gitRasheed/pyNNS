@@ -20,3 +20,4 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_norm`, N=3, T_obs=1000 | 0.167 ms | 1.500 ms | 0.11x |
 | `nns_distance`, N=3, T_obs=1000 | 1.266 ms | 1.160 ms | 1.09x |
 | `nns_distance_bulk`, N=3, T_obs=1000, T_test=100 | 13.780 ms | 9.200 ms | 1.50x |
+| `nns_diff`, f=sin, point=1 | 1.356 ms | 4.050 ms | 0.33x |

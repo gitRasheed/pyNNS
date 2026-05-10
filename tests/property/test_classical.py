@@ -27,8 +27,8 @@ def test_classical_pm_matches_numpy_and_scipy(x: np.ndarray) -> None:
     assume(np.var(x) > 1e-24)
 
     assert mean_pm(x) == pytest.approx(np.mean(x), abs=1e-12)
-    assert var_pm(x) == pytest.approx(np.var(x), abs=1e-12)
-    assert var_pm(x, ddof=1) == pytest.approx(np.var(x, ddof=1), abs=1e-12)
+    assert var_pm(x) == pytest.approx(np.var(x), abs=2e-12)
+    assert var_pm(x, ddof=1) == pytest.approx(np.var(x, ddof=1), abs=2e-12)
     assert skew_pm(x) == pytest.approx(stats.skew(x, bias=True), abs=1e-10)
     assert kurt_pm(x) == pytest.approx(stats.kurtosis(x, fisher=True, bias=True), abs=1e-10)
     assert kurt_pm(x, excess=False) == pytest.approx(

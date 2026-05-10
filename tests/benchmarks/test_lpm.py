@@ -10,6 +10,7 @@ from pynns import (
     nns_causation,
     nns_copula,
     nns_dep,
+    nns_diff,
     nns_distance,
     nns_distance_bulk,
     nns_norm,
@@ -138,3 +139,11 @@ def test_nns_distance_bulk_1000x3_100(
 
     assert result.shape == (100,)
     assert isinstance(r_baseline["nns_distance_bulk_1000x3_100_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_diff_sin(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    result = benchmark(nns_diff, np.sin, 1.0)
+
+    assert result["DERIVATIVE"] == pytest.approx(np.cos(1.0), abs=1e-6)
+    assert isinstance(r_baseline["nns_diff_sin_seconds"], float)

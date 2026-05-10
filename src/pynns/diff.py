@@ -1,0 +1,236 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import cast
+
+import numpy as np
+from numpy.typing import NDArray
+from scipy import optimize  # type: ignore[import-untyped]
+
+DiffResult = dict[str, float]
+
+_RESULT_KEYS = [
+    "Value of f(x) at point",
+    "Final y-intercept (B)",
+    "DERIVATIVE",
+    "Inferred h",
+    "iterations",
+    "converged",
+    "termination.code",
+    "Initial h finite step: f(x-h)",
+    "Initial h finite step: f(x+h)",
+    "Initial h averaged finite step",
+    "Inferred h finite step: f(x-h)",
+    "Inferred h finite step: f(x+h)",
+    "Inferred h averaged finite step",
+    "Complex Step Derivative (Inferred h)",
+]
+
+
+def nns_diff(
+    f: Callable[[float | complex | NDArray[np.float64]], float | complex | NDArray[np.float64]],
+    point: float,
+    h: float | None = None,
+    tol: float = 1e-10,
+    max_iter: int | None = None,
+    digits: int = 12,
+) -> DiffResult:
+    """Numerically differentiate a scalar callable, matching R's NNS.diff."""
+    point = _finite_scalar(point, "point")
+    h_value = abs(point) * 0.1 + 0.01 if h is None else _finite_scalar(h, "h")
+    if h_value <= 0.0:
+        raise ValueError("h must be > 0.")
+    tol = _finite_scalar(tol, "tol")
+    if tol <= 0.0:
+        raise ValueError("tol must be > 0.")
+    max_iter_value = 100 if max_iter is None else int(max_iter)
+    if max_iter_value < 1:
+        raise ValueError("max_iter must be >= 1.")
+    if digits < 0:
+        raise ValueError("digits must be >= 0.")
+
+    f_x = _eval_real(f, point, "f(point)")
+    f_lower = _eval_real(f, point - h_value, "f(point - h)")
+    f_upper = _eval_real(f, point + h_value, "f(point + h)")
+
+    left_slope = (f_x - f_lower) / h_value
+    right_slope = (f_upper - f_x) / h_value
+    b1 = f_x - left_slope * point
+    b2 = f_x - right_slope * point
+    lower_b = min(b1, b2)
+    upper_b = max(b1, b2)
+
+    if np.isclose(lower_b, upper_b, rtol=np.sqrt(np.finfo(float).eps), atol=0.0):
+        slope = float(np.mean([left_slope, right_slope]))
+        return _rounded_result(
+            [
+                f_x,
+                b1,
+                slope,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                left_slope,
+                right_slope,
+                slope,
+                np.nan,
+                np.nan,
+                np.nan,
+                np.nan,
+            ],
+            digits,
+        )
+
+    high_b = max(b1, b2)
+    new_b = float(np.mean([lower_b, upper_b]))
+    iteration = 1
+    converged = False
+    termination_code = 2
+    inferred_h = np.nan
+
+    while iteration >= 1:
+
+        current_b = new_b
+
+        def new_f(x: float, intercept: float = current_b) -> float:
+            return -f_x + ((f_x - _eval_real(f, point - x, "f(point - x)")) / x) * point + intercept
+
+        inferred_h = _uniroot_extend(new_f, -2.0 * h_value, 2.0 * h_value)
+        if not np.isfinite(inferred_h):
+            termination_code = 2
+            break
+        if abs(inferred_h) < tol:
+            converged = True
+            termination_code = 0
+            break
+        if iteration >= max_iter_value:
+            termination_code = 1
+            break
+
+        if b1 == high_b:
+            if np.sign(inferred_h) < 0:
+                lower_b = new_b
+            else:
+                upper_b = new_b
+        else:
+            if np.sign(inferred_h) < 0:
+                upper_b = new_b
+            else:
+                lower_b = new_b
+        new_b = float(np.mean([lower_b, upper_b]))
+        iteration += 1
+
+    final_b = float(np.mean([upper_b, lower_b]))
+    if np.isfinite(inferred_h):
+        inferred_h = abs(float(inferred_h))
+
+    if abs(point) < np.sqrt(np.finfo(float).eps):
+        slope = float(np.mean(_finite_step(f, point, h_value)[:2]))
+    else:
+        slope = (f_x - final_b) / point
+
+    complex_step = np.nan
+    if np.isfinite(inferred_h) and inferred_h != 0.0:
+        try:
+            f_z = f(complex(point, inferred_h))
+            if np.isscalar(f_z):
+                complex_step = float(np.imag(f_z) / inferred_h)
+        except (ArithmeticError, ValueError, TypeError, OverflowError):
+            complex_step = np.nan
+
+    initial = _finite_step(f, point, h_value)
+    inferred = (
+        _finite_step(f, point, inferred_h)
+        if np.isfinite(inferred_h) and inferred_h != 0.0
+        else (np.nan, np.nan, np.nan)
+    )
+    return _rounded_result(
+        [
+            f_x,
+            final_b,
+            slope,
+            inferred_h,
+            float(iteration),
+            float(int(converged)),
+            float(termination_code),
+            initial[0],
+            initial[1],
+            initial[2],
+            inferred[0],
+            inferred[1],
+            inferred[2],
+            complex_step,
+        ],
+        digits,
+    )
+
+
+def _finite_step(
+    f: Callable[[float | complex | NDArray[np.float64]], float | complex | NDArray[np.float64]],
+    point: float,
+    h: float,
+) -> tuple[float, float, float]:
+    f_x = _eval_real(f, point, "f(point)")
+    neg_step = (f_x - _eval_real(f, point - h, "f(point - h)")) / h
+    pos_step = (_eval_real(f, point + h, "f(point + h)") - f_x) / h
+    return neg_step, pos_step, float(np.mean([neg_step, pos_step]))
+
+
+def _uniroot_extend(fn: Callable[[float], float], lower: float, upper: float) -> float:
+    eps = np.finfo(float).eps
+    lo = lower if lower != 0.0 else -eps
+    hi = upper if upper != 0.0 else eps
+    try:
+        f_lo = fn(lo)
+        f_hi = fn(hi)
+        for _ in range(100):
+            if np.isfinite(f_lo) and np.isfinite(f_hi) and f_lo * f_hi <= 0.0:
+                return float(
+                    optimize.brentq(
+                        fn,
+                        lo,
+                        hi,
+                        xtol=1e-14,
+                        rtol=np.finfo(float).eps * 4.0,
+                        maxiter=1000,
+                    )
+                )
+            lo *= 2.0
+            hi *= 2.0
+            f_lo = fn(lo)
+            f_hi = fn(hi)
+    except (ArithmeticError, ValueError, TypeError, OverflowError):
+        return np.nan
+    return np.nan
+
+
+def _eval_real(
+    f: Callable[[float | complex | NDArray[np.float64]], float | complex | NDArray[np.float64]],
+    value: float,
+    label: str,
+) -> float:
+    result = f(value)
+    if not np.isscalar(result):
+        raise ValueError(f"{label} must return a scalar.")
+    scalar = cast(float | complex, result)
+    if isinstance(scalar, complex):
+        if scalar.imag != 0.0:
+            raise ValueError(f"{label} must return a real value.")
+        scalar = scalar.real
+    out = float(scalar)
+    if not np.isfinite(out):
+        raise ValueError(f"{label} must return a finite value.")
+    return out
+
+
+def _finite_scalar(value: float, name: str) -> float:
+    out = float(value)
+    if not np.isfinite(out):
+        raise ValueError(f"{name} must be finite.")
+    return out
+
+
+def _rounded_result(values: list[float], digits: int) -> DiffResult:
+    rounded = np.round(np.asarray(values, dtype=np.float64), decimals=digits)
+    return {key: float(value) for key, value in zip(_RESULT_KEYS, rounded, strict=True)}

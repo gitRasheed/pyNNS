@@ -78,3 +78,9 @@ For `nns_distance` with `k > 1`, PyNNS matches the installed R 12.0 binary:
 the exponential rank-weight family uses the R C API's `Rf_dexp` scale argument
 as `1 / k`. This differs from the nearby source-code comment that describes it
 as a rate.
+
+## Differentiation
+
+`nns_diff` maps to R's scalar callable `NNS.diff` path with plotting and trace
+output disabled. It returns a dictionary keyed by R's matrix row names and
+rounds results to `digits`, matching R's default output convention.
