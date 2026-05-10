@@ -15,7 +15,7 @@ from pynns import nns_distance, nns_distance_bulk
 
 
 @pytest.mark.parity
-@pytest.mark.parametrize("k", [1])
+@pytest.mark.parametrize("k", [1, 2, 3, "all"])
 def test_nns_distance_matches_r(k: int | Literal["all"]) -> None:
     rpm, dest = _rpm_and_target()
 

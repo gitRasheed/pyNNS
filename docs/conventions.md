@@ -74,3 +74,7 @@ helpers. PyNNS accepts `rpm` as a finite 2D numeric array with R's `y.hat`
 column in the final position. `nns_distance` applies R's per-target min-max
 rescaling before computing weighted nearest-neighbor predictions. `nns_distance_bulk`
 matches R's compiled bulk helper, including its raw-feature distance convention.
+For `nns_distance` with `k > 1`, PyNNS matches the installed R 12.0 binary:
+the exponential rank-weight family uses the R C API's `Rf_dexp` scale argument
+as `1 / k`. This differs from the nearby source-code comment that describes it
+as a rate.

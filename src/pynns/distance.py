@@ -114,7 +114,7 @@ def _combined_weights(distances: NDArray[np.float64]) -> NDArray[np.float64]:
     empirical = _normalized(
         np.divide(1.0, distances, out=np.zeros_like(distances), where=distances > 0.0)
     )
-    exponential = _normalized(stats.expon.pdf(ranks, scale=count))
+    exponential = _normalized(stats.expon.pdf(ranks, scale=1.0 / count))
 
     lognormal = np.zeros(count, dtype=np.float64)
     if count >= 2:
