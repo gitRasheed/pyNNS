@@ -74,6 +74,26 @@ X-only splits. This differs from documentation that implies separate `"X"`,
 returns a useless zero-order map. All five `noise_reduction` modes are
 supported: `"off"`, `"mean"`, `"median"`, `"mode"`, and `"mode_class"`.
 
+## Regression
+
+`nns_reg` currently maps to R's univariate numeric `NNS.reg` path with
+`factor.2.dummy = FALSE`, plotting disabled, and no confidence interval or
+smoothing. Return keys match R's list names, but data.table outputs are plain
+dictionaries of NumPy arrays. Matrix `x`, dimension reduction, classification,
+smooth splines, confidence intervals, and multivariate caller modes are explicit
+future batches and raise `NotImplementedError`.
+
+`order="max"` follows installed R's univariate convention: fitted values are the
+observed `y` values and `regression.points` is the sorted observed `(x, y)` map.
+The derivative table still comes from R's pre-reset regression-point construction,
+which PyNNS matches rather than recomputing adjacent slopes from all observations.
+
+The `"mode"` and `"mode_class"` noise-reduction modes are accepted in the
+univariate path and use the shared `nns_part`/`nns_mode` implementation. These
+paths are structurally ported, but exact per-value regression parity remains
+concentrated on `"off"`, `"mean"`, and `"median"` until the remaining
+classification/factor regression batches land.
+
 ## Normalization
 
 `nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with

@@ -12,6 +12,7 @@
     "nns_mode_continuous_1000_seconds": 0.0001,
     "nns_norm_1000x3_seconds": 0.0015,
     "nns_part_500_seconds": 0.00375,
+    "nns_reg_500_seconds": 0.0372,
     "pm_matrix_100x500_seconds": 0.0168,
     "pm_matrix_10x500_seconds": 0.0004,
     "pm_matrix_50x500_seconds": 0.0038,

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 import numpy as np
 from numpy.typing import NDArray
 
@@ -29,9 +27,7 @@ def _fast_lm(x: NDArray[np.float64], y: NDArray[np.float64]) -> tuple[float, flo
     return intercept, slope
 
 
-def _is_fcl(
-    x: NDArray[np.object_] | NDArray[np.str_] | NDArray[np.bool_] | Sequence[object],
-) -> bool:
+def _is_fcl(x: object) -> bool:
     """Return whether x maps to R factor/character/logical input."""
     values = np.asarray(x)
     if values.dtype.kind in {"O", "S", "U", "b"}:

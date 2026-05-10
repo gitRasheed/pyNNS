@@ -11,6 +11,7 @@ from pynns.distance import nns_distance, nns_distance_bulk
 from pynns.norm import nns_norm
 from pynns.part import nns_part
 from pynns.pm_matrix import pm_matrix
+from pynns.regression import nns_reg
 from pynns.stochastic_dominance import fsd, sd_efficient_set, ssd, tsd
 from pynns.var import lpm_var, upm_var
 
@@ -38,6 +39,7 @@ __all__ = [
     "nns_mode",
     "nns_norm",
     "nns_part",
+    "nns_reg",
     "nns_rescale",
     "pm_matrix",
     "sd_efficient_set",
