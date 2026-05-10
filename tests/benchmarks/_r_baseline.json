@@ -1,9 +1,10 @@
 {
   "entries": {
-    "lpm_small_seconds": 0.000075,
+    "lpm_small_seconds": 7.5e-05,
+    "pm_matrix_100x500_seconds": 0.0168,
     "pm_matrix_10x500_seconds": 0.0004,
     "pm_matrix_50x500_seconds": 0.0038,
-    "pm_matrix_100x500_seconds": 0.0168
+    "sd_efficient_set_50x252_degree2_seconds": 0.0046
   },
   "nns_version": "12.0",
   "schema_version": 1

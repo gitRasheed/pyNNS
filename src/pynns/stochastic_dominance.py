@@ -8,6 +8,8 @@ C++ routine's LPM-at-global-maximum ordering and original-index tie break.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -50,16 +52,31 @@ def sd_efficient_set(returns: NDArray[np.float64], degree: int) -> list[int]:
     if values.shape[1] == 0:
         return []
 
+    sorted_values = np.sort(values, axis=0)
+    curves = _sd_curve_table(sorted_values, degree)
+    minimums = sorted_values[0, :]
+    means = np.mean(values, axis=0)
     tmax = float(np.max(values))
+    order_lpm = _lpm_at_target(values, tmax, degree)
     order = sorted(
         range(values.shape[1]),
-        key=lambda index: (float(lpm(degree, tmax, values[:, index])), index),
+        key=lambda index: (order_lpm[index], index),
     )
 
     keep: list[int] = []
     for index in order:
-        candidate = values[:, index]
-        dominated = any(_dominates(values[:, kept], candidate, degree) for kept in keep)
+        dominated = any(
+            _dominates_from_curves(
+                kept,
+                index,
+                degree,
+                curves,
+                sorted_values,
+                minimums,
+                means,
+            )
+            for kept in keep
+        )
         if not dominated:
             keep.append(index)
     return keep
@@ -99,6 +116,124 @@ def _dominance_curve(
     if degree == 1:
         return np.asarray(lpm(0, grid, values), dtype=np.float64)
     return np.asarray(lpm(degree - 1, grid, values), dtype=np.float64)
+
+
+def _dominates_from_curves(
+    x_index: int,
+    y_index: int,
+    degree: int,
+    curves: NDArray[np.float64],
+    sorted_values: NDArray[np.float64],
+    minimums: NDArray[np.float64],
+    means: NDArray[np.float64],
+) -> bool:
+    if np.array_equal(sorted_values[:, x_index], sorted_values[:, y_index]):
+        return False
+    if minimums[x_index] < minimums[y_index]:
+        return False
+    if degree > 1 and means[x_index] < means[y_index]:
+        return False
+
+    x_curve = curves[:, x_index]
+    y_curve = curves[:, y_index]
+    if np.array_equal(x_curve, y_curve):
+        return False
+    return bool(not np.any(x_curve > y_curve))
+
+
+def _sd_curve_table(
+    sorted_values: NDArray[np.float64],
+    degree: int,
+) -> NDArray[np.float64]:
+    grid = np.unique(sorted_values.reshape(-1))
+    observations, columns = sorted_values.shape
+    curves = np.empty((grid.size, columns), dtype=np.float64)
+
+    if degree == 1:
+        _fill_cdf_curves(curves, grid, sorted_values)
+        return curves
+
+    prefix1 = _prefix_sum(sorted_values)
+    if degree == 2:
+        _fill_lpm_degree1_curves(curves, grid, sorted_values, prefix1, observations)
+        return curves
+
+    prefix2 = _prefix_sum(sorted_values * sorted_values)
+    _fill_lpm_degree2_curves(curves, grid, sorted_values, prefix1, prefix2, observations)
+    return curves
+
+
+def _fill_cdf_curves(
+    curves: NDArray[np.float64],
+    grid: NDArray[np.float64],
+    sorted_values: NDArray[np.float64],
+) -> None:
+    observations = sorted_values.shape[0]
+    for start, stop in _grid_chunks(grid.size, sorted_values.shape[1]):
+        thresholds = grid[start:stop]
+        for index in range(sorted_values.shape[1]):
+            counts = np.searchsorted(sorted_values[:, index], thresholds, side="right")
+            curves[start:stop, index] = counts / observations
+
+
+def _fill_lpm_degree1_curves(
+    curves: NDArray[np.float64],
+    grid: NDArray[np.float64],
+    sorted_values: NDArray[np.float64],
+    prefix1: NDArray[np.float64],
+    observations: int,
+) -> None:
+    for start, stop in _grid_chunks(grid.size, sorted_values.shape[1]):
+        thresholds = grid[start:stop]
+        for index in range(sorted_values.shape[1]):
+            counts = np.searchsorted(sorted_values[:, index], thresholds, side="right")
+            sums1 = prefix1[counts, index]
+            curves[start:stop, index] = (counts * thresholds - sums1) / observations
+
+
+def _fill_lpm_degree2_curves(
+    curves: NDArray[np.float64],
+    grid: NDArray[np.float64],
+    sorted_values: NDArray[np.float64],
+    prefix1: NDArray[np.float64],
+    prefix2: NDArray[np.float64],
+    observations: int,
+) -> None:
+    for start, stop in _grid_chunks(grid.size, sorted_values.shape[1]):
+        thresholds = grid[start:stop]
+        for index in range(sorted_values.shape[1]):
+            counts = np.searchsorted(sorted_values[:, index], thresholds, side="right")
+            sums1 = prefix1[counts, index]
+            sums2 = prefix2[counts, index]
+            curves[start:stop, index] = (
+                counts * thresholds * thresholds - 2.0 * thresholds * sums1 + sums2
+            ) / observations
+
+
+def _prefix_sum(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    prefix = np.empty((values.shape[0] + 1, values.shape[1]), dtype=np.float64)
+    prefix[0, :] = 0.0
+    np.cumsum(values, axis=0, out=prefix[1:, :])
+    return prefix
+
+
+def _lpm_at_target(
+    values: NDArray[np.float64],
+    target: float,
+    degree: int,
+) -> NDArray[np.float64]:
+    deviations = np.maximum(0.0, target - values)
+    if degree > 1:
+        deviations = deviations**degree
+    return np.asarray(np.mean(deviations, axis=0), dtype=np.float64)
+
+
+def _grid_chunks(grid_size: int, columns: int) -> Iterator[tuple[int, int]]:
+    max_intermediate_bytes = 100 * 1024 * 1024
+    row_bytes = columns * np.dtype(np.float64).itemsize
+    chunk_size = max(1, max_intermediate_bytes // max(row_bytes, 1))
+    for start in range(0, grid_size, chunk_size):
+        yield start, min(start + chunk_size, grid_size)
 
 
 def _as_sd_values(x: NDArray[np.float64], name: str) -> NDArray[np.float64]:

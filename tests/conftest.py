@@ -65,6 +65,9 @@ def r_baseline() -> BenchmarkBaseline:
         if key not in cache:
             cache[key] = _time_r_pm_matrix(n_variables)
             _write_benchmark_baseline(cache)
+    if "sd_efficient_set_50x252_degree2_seconds" not in cache:
+        cache["sd_efficient_set_50x252_degree2_seconds"] = _time_r_sd_efficient_set()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -129,6 +132,29 @@ def _time_r_pm_matrix(n_variables: int) -> float:
         "start <- proc.time()[['elapsed']]\n"
         "for (i in seq_len(5)) {\n"
         "  invisible(NNS::PM.matrix(1, 1, target = NULL, variable = x, pop_adj = TRUE))\n"
+        "}\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 5)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_sd_efficient_set() -> float:
+    script = (
+        "library(NNS)\n"
+        "row <- seq_len(252)\n"
+        "col <- seq_len(50)\n"
+        "x <- outer(row, col, function(i, j) sin(i * j / 17) + cos((i + 3) / (j + 5)))\n"
+        "invisible(NNS::NNS.SD.efficient.set(x, degree = 2, type = 'discrete', status = FALSE))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(5)) {\n"
+        "  invisible(NNS::NNS.SD.efficient.set(x, degree = 2, type = 'discrete', status = FALSE))\n"
         "}\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 5)\n"

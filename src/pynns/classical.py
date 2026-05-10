@@ -22,7 +22,7 @@ def var_pm(x: NDArray[np.float64], ddof: int = 0) -> float:
     variance = float(upm(2, mean, values) + lpm(2, mean, values))
     if ddof == 0:
         return variance
-    return variance * values.size / (values.size - ddof)
+    return float(np.var(values, ddof=ddof))
 
 
 def skew_pm(x: NDArray[np.float64]) -> float:

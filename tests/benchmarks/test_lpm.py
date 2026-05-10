@@ -36,7 +36,10 @@ def test_pm_matrix_scale(
 
 
 @pytest.mark.benchmark
-def test_sd_efficient_set_degree_2_scale(benchmark: Any) -> None:
+def test_sd_efficient_set_degree_2_scale(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
     row = np.arange(1, 253, dtype=np.float64)[:, np.newaxis]
     col = np.arange(1, 51, dtype=np.float64)[np.newaxis, :]
     returns = np.sin(row * col / 17.0) + np.cos((row + 3.0) / (col + 5.0))
@@ -44,3 +47,4 @@ def test_sd_efficient_set_degree_2_scale(benchmark: Any) -> None:
     result = benchmark(sd_efficient_set, returns, 2)
 
     assert all(0 <= index < 50 for index in result)
+    assert isinstance(r_baseline["sd_efficient_set_50x252_degree2_seconds"], float)
