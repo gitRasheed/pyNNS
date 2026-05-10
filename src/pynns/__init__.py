@@ -1,53 +1,54 @@
-from pynns.anova import nns_anova
-from pynns.causation import causal_matrix, nns_causation
-from pynns.central_tendencies import nns_mode, nns_rescale
-from pynns.classical import ecdf_pm, kurt_pm, mean_pm, skew_pm, var_pm
-from pynns.co_moments import co_lpm, co_upm, d_lpm, d_upm
-from pynns.copula import nns_copula
-from pynns.core import lpm, lpm_ratio, upm, upm_ratio
-from pynns.dependence import nns_cor, nns_dep
-from pynns.diff import nns_diff
-from pynns.distance import nns_distance, nns_distance_bulk
-from pynns.norm import nns_norm
-from pynns.part import nns_part
-from pynns.pm_matrix import pm_matrix
-from pynns.regression import nns_reg
-from pynns.stochastic_dominance import fsd, sd_efficient_set, ssd, tsd
-from pynns.var import lpm_var, upm_var
+from __future__ import annotations
 
-__all__ = [
-    "causal_matrix",
-    "co_lpm",
-    "co_upm",
-    "d_lpm",
-    "d_upm",
-    "ecdf_pm",
-    "fsd",
-    "kurt_pm",
-    "lpm",
-    "lpm_ratio",
-    "lpm_var",
-    "mean_pm",
-    "nns_anova",
-    "nns_causation",
-    "nns_copula",
-    "nns_cor",
-    "nns_dep",
-    "nns_diff",
-    "nns_distance",
-    "nns_distance_bulk",
-    "nns_mode",
-    "nns_norm",
-    "nns_part",
-    "nns_reg",
-    "nns_rescale",
-    "pm_matrix",
-    "sd_efficient_set",
-    "skew_pm",
-    "ssd",
-    "tsd",
-    "upm",
-    "upm_ratio",
-    "upm_var",
-    "var_pm",
-]
+from typing import Any
+
+from pynns.pm_matrix import pm_matrix as pm_matrix
+
+_EXPORTS = {
+    "causal_matrix": ("pynns.causation", "causal_matrix"),
+    "co_lpm": ("pynns.co_moments", "co_lpm"),
+    "co_upm": ("pynns.co_moments", "co_upm"),
+    "d_lpm": ("pynns.co_moments", "d_lpm"),
+    "d_upm": ("pynns.co_moments", "d_upm"),
+    "ecdf_pm": ("pynns.classical", "ecdf_pm"),
+    "fsd": ("pynns.stochastic_dominance", "fsd"),
+    "kurt_pm": ("pynns.classical", "kurt_pm"),
+    "lpm": ("pynns.core", "lpm"),
+    "lpm_ratio": ("pynns.core", "lpm_ratio"),
+    "lpm_var": ("pynns.var", "lpm_var"),
+    "mean_pm": ("pynns.classical", "mean_pm"),
+    "nns_anova": ("pynns.anova", "nns_anova"),
+    "nns_causation": ("pynns.causation", "nns_causation"),
+    "nns_copula": ("pynns.copula", "nns_copula"),
+    "nns_cor": ("pynns.dependence", "nns_cor"),
+    "nns_dep": ("pynns.dependence", "nns_dep"),
+    "nns_diff": ("pynns.diff", "nns_diff"),
+    "nns_distance": ("pynns.distance", "nns_distance"),
+    "nns_distance_bulk": ("pynns.distance", "nns_distance_bulk"),
+    "nns_mode": ("pynns.central_tendencies", "nns_mode"),
+    "nns_norm": ("pynns.norm", "nns_norm"),
+    "nns_part": ("pynns.part", "nns_part"),
+    "nns_reg": ("pynns.regression", "nns_reg"),
+    "nns_rescale": ("pynns.central_tendencies", "nns_rescale"),
+    "sd_efficient_set": ("pynns.stochastic_dominance", "sd_efficient_set"),
+    "skew_pm": ("pynns.classical", "skew_pm"),
+    "ssd": ("pynns.stochastic_dominance", "ssd"),
+    "tsd": ("pynns.stochastic_dominance", "tsd"),
+    "upm": ("pynns.core", "upm"),
+    "upm_ratio": ("pynns.core", "upm_ratio"),
+    "upm_var": ("pynns.var", "upm_var"),
+    "var_pm": ("pynns.classical", "var_pm"),
+}
+
+__all__ = sorted((*_EXPORTS, "pm_matrix"))
+
+
+def __getattr__(name: str) -> Any:
+    if name not in _EXPORTS:
+        raise AttributeError(f"module 'pynns' has no attribute {name!r}")
+    module_name, attr_name = _EXPORTS[name]
+    from importlib import import_module
+
+    value = getattr(import_module(module_name), attr_name)
+    globals()[name] = value
+    return value

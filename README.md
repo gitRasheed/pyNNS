@@ -31,6 +31,9 @@ uv run ruff check .
 uv run mypy
 ```
 
+Pytest uses 4 xdist workers by default. Override with
+`PYNNS_PYTEST_WORKERS=<n> uv run pytest` for larger or smaller machines.
+
 ## Attribution
 
 NNS was created by Fred Viole as the companion R package to Viole, F. and

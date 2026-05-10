@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import assume, given
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
-from scipy import stats  # type: ignore[import-untyped]
 
 from pynns import ecdf_pm, kurt_pm, mean_pm, skew_pm, var_pm
 
@@ -22,8 +21,9 @@ from pynns import ecdf_pm, kurt_pm, mean_pm, skew_pm, var_pm
         ),
     )
 )
-@settings(max_examples=100, deadline=None)
 def test_classical_pm_matches_numpy_and_scipy(x: np.ndarray) -> None:
+    from scipy import stats  # type: ignore[import-untyped]
+
     assume(np.var(x) > 1e-24)
 
     assert mean_pm(x) == pytest.approx(np.mean(x), abs=1e-12)

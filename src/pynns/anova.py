@@ -5,7 +5,6 @@ from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import optimize  # type: ignore[import-untyped]
 
 from pynns.core import lpm_ratio, upm_ratio
 from pynns.dependence import _gravity
@@ -344,6 +343,8 @@ def _lpm_var(percentile: float, degree: int, values: NDArray[np.float64]) -> flo
     def objective(target: float) -> float:
         return abs(float(lpm_ratio(degree, target, values)) - percentile)
 
+    from scipy import optimize  # type: ignore[import-untyped]
+
     result = optimize.minimize_scalar(
         objective,
         bounds=(float(np.min(values)), float(np.max(values))),
@@ -365,6 +366,8 @@ def _upm_var(percentile: float, degree: int, values: NDArray[np.float64]) -> flo
 
     def objective(target: float) -> float:
         return abs(float(upm_ratio(degree, target, values)) - percentile)
+
+    from scipy import optimize
 
     result = optimize.minimize_scalar(
         objective,

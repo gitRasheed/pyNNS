@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
@@ -18,7 +18,6 @@ from pynns import pm_matrix
         elements=st.floats(min_value=-10.0, max_value=10.0, allow_nan=False, allow_infinity=False),
     )
 )
-@settings(max_examples=50, deadline=None)
 def test_pm_matrix_reconstruction_and_psd_properties(variable: np.ndarray) -> None:
     result = pm_matrix(2, 2, "mean", variable, pop_adj=True)
 

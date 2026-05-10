@@ -68,6 +68,9 @@ Do not write unexplained magic tolerance numbers in parity tests.
 
 `CI=true` and `PYNNS_R_CACHE_ONLY=1` also force cache-only mode.
 
+Pytest defaults to 4 xdist workers. Set `PYNNS_PYTEST_WORKERS=<n>` to override
+the worker count for a local machine or CI runner.
+
 The cache schema is versioned. Schema mismatches fail. NNS version mismatches warn
 and refresh entries when online.
 

@@ -35,6 +35,9 @@ settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "fast"))
 
 
 def pytest_configure(config: pytest.Config) -> None:
+    workers = os.environ.get("PYNNS_PYTEST_WORKERS")
+    if workers:
+        config.option.numprocesses = workers
     if config.getoption("benchmark_only", default=False):
         config.option.markexpr = "benchmark"
 

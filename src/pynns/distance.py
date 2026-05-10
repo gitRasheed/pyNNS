@@ -5,7 +5,6 @@ from typing import Literal, cast
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import stats  # type: ignore[import-untyped]
 
 KValue = int | Literal["all"]
 
@@ -106,6 +105,8 @@ def _distance_sum(
 
 
 def _combined_weights(distances: NDArray[np.float64]) -> NDArray[np.float64]:
+    from scipy import stats  # type: ignore[import-untyped]
+
     count = distances.size
     ranks = np.arange(1, count + 1, dtype=np.float64)
 

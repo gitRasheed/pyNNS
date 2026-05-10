@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.optimize import minimize_scalar  # type: ignore[import-untyped]
 
 from pynns.core import lpm_ratio, upm_ratio
 
@@ -19,6 +18,8 @@ def lpm_var(percentile: float, degree: float, x: NDArray[np.float64]) -> float:
     xmax = float(np.max(values))
     if xmin == xmax:
         return xmin
+
+    from scipy.optimize import minimize_scalar  # type: ignore[import-untyped]
 
     result = minimize_scalar(
         lambda target: abs(float(lpm_ratio(degree, target, values)) - pct),
@@ -39,6 +40,8 @@ def upm_var(percentile: float, degree: float, x: NDArray[np.float64]) -> float:
     xmax = float(np.max(values))
     if xmin == xmax:
         return xmin
+
+    from scipy.optimize import minimize_scalar
 
     result = minimize_scalar(
         lambda target: abs(float(upm_ratio(degree, target, values)) - pct),

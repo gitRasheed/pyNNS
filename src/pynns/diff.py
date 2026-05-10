@@ -5,7 +5,6 @@ from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import optimize  # type: ignore[import-untyped]
 
 DiffResult = dict[str, float]
 
@@ -186,6 +185,8 @@ def _uniroot_extend(fn: Callable[[float], float], lower: float, upper: float) ->
         f_hi = fn(hi)
         for _ in range(100):
             if np.isfinite(f_lo) and np.isfinite(f_hi) and f_lo * f_hi <= 0.0:
+                from scipy import optimize  # type: ignore[import-untyped]
+
                 return float(
                     optimize.brentq(
                         fn,

@@ -43,4 +43,4 @@ def test_nns_part_rejects_order_max_instead_of_matching_installed_r_useless_na_p
     x = np.linspace(0.0, 1.0, 10)
 
     with pytest.raises(TypeError):
-        nns_part(x, x, order="max")  # type: ignore[arg-type]
+        nns_part(x, x, order="max")
