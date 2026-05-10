@@ -95,14 +95,3 @@ identical to R but uses NumPy RNG instead of R's `sample()`, so exact per-call
 parity is not achievable; numeric values converge to the same population CI.
 Pass `random_seed` for reproducible PyNNS results. Degenerate zero-variance
 groups preserve R's `NaN` CDF/certainty convention.
-
-## Boost
-
-`nns_boost` ports the continuous numeric `NNS.boost` feature-trial,
-thresholding, frequency-weighting, and final weighted-projection workflow. R's
-implementation delegates its weak learners and final stack to `NNS.reg` and
-`NNS.stack`, which are not yet ported in PyNNS; PyNNS therefore uses local
-nearest-neighbor and one-dimensional interpolation learners while preserving the
-same output keys. Classification, balancing, and time-series `ts_test` paths are
-not ported. R's one-feature path can fail in the installed binary because it
-samples feature counts from `2:n`; PyNNS supports one numeric feature.

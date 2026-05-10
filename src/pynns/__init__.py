@@ -1,5 +1,4 @@
 from pynns.anova import nns_anova
-from pynns.boost import nns_boost
 from pynns.causation import causal_matrix, nns_causation
 from pynns.classical import ecdf_pm, kurt_pm, mean_pm, skew_pm, var_pm
 from pynns.co_moments import co_lpm, co_upm, d_lpm, d_upm
@@ -25,7 +24,6 @@ __all__ = [
     "lpm_ratio",
     "mean_pm",
     "nns_anova",
-    "nns_boost",
     "nns_causation",
     "nns_copula",
     "nns_cor",
