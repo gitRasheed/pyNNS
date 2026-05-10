@@ -72,6 +72,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_dep_1000_seconds" not in cache:
         cache["nns_dep_1000_seconds"] = _time_r_nns_dep()
         _write_benchmark_baseline(cache)
+    if "nns_copula_1000_seconds" not in cache:
+        cache["nns_copula_1000_seconds"] = _time_r_nns_copula()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -184,6 +187,32 @@ def _time_r_nns_dep() -> float:
         "start <- proc.time()[['elapsed']]\n"
         "for (i in seq_len(10)) {\n"
         "  invisible(NNS::NNS.dep(x, y, asym = FALSE, p.value = FALSE, print.map = FALSE))\n"
+        "}\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 10)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_copula() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 1000)\n"
+        "y <- sin(x) + 0.05 * cos(7 * x)\n"
+        "xy <- cbind(x, y)\n"
+        "run <- function() NNS::NNS.copula("
+        "xy, target = NULL, continuous = TRUE, plot = FALSE, independence.overlay = FALSE)\n"
+        "invisible(run())\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(10)) {\n"
+        "  invisible(run())\n"
         "}\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 10)\n"

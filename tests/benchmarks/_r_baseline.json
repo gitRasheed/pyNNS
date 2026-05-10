@@ -1,6 +1,7 @@
 {
   "entries": {
     "lpm_small_seconds": 7.5e-05,
+    "nns_copula_1000_seconds": 0.0048,
     "nns_dep_1000_seconds": 0.0113,
     "pm_matrix_100x500_seconds": 0.0168,
     "pm_matrix_10x500_seconds": 0.0004,

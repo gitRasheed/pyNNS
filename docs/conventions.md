@@ -45,3 +45,9 @@ allocations on inputs where R's C++ `int` conversion effectively collapses an
 absurd bin count. `abs(Correlation) <= Dependence` is not guaranteed by
 `NNS.dep`; both R and PyNNS can return signed correlation magnitudes above the
 dependence component for near-binary inputs.
+
+## Copula
+
+`nns_copula(x, y)` is the bivariate scalar form of R's `NNS.copula(cbind(x, y))`.
+When targets are omitted, PyNNS uses column means, matching R's `target = NULL`.
+The `target_x` and `target_y` arguments map to R's two-element target vector.
