@@ -4,6 +4,7 @@ from pynns.co_moments import co_lpm, co_upm, d_lpm, d_upm
 from pynns.copula import nns_copula
 from pynns.core import lpm, lpm_ratio, upm, upm_ratio
 from pynns.dependence import nns_cor, nns_dep
+from pynns.distance import nns_distance, nns_distance_bulk
 from pynns.norm import nns_norm
 from pynns.pm_matrix import pm_matrix
 from pynns.stochastic_dominance import fsd, sd_efficient_set, ssd, tsd
@@ -24,6 +25,8 @@ __all__ = [
     "nns_copula",
     "nns_cor",
     "nns_dep",
+    "nns_distance",
+    "nns_distance_bulk",
     "nns_norm",
     "pm_matrix",
     "sd_efficient_set",

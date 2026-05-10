@@ -5,7 +5,17 @@ from typing import Any
 import numpy as np
 import pytest
 
-from pynns import lpm, nns_causation, nns_copula, nns_dep, nns_norm, pm_matrix, sd_efficient_set
+from pynns import (
+    lpm,
+    nns_causation,
+    nns_copula,
+    nns_dep,
+    nns_distance,
+    nns_distance_bulk,
+    nns_norm,
+    pm_matrix,
+    sd_efficient_set,
+)
 
 
 @pytest.mark.benchmark
@@ -93,3 +103,38 @@ def test_nns_norm_1000x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert result.shape == variable.shape
     assert isinstance(r_baseline["nns_norm_1000x3_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_distance_1000x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    row = np.arange(1, 1001, dtype=np.float64)
+    features = np.column_stack(
+        (np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 1000.0)
+    )
+    rpm = np.column_stack((features, np.sin(row / 7.0)))
+
+    result = benchmark(nns_distance, rpm, np.array([1.25, 2.75, 0.4]), 20)
+
+    assert np.isfinite(result)
+    assert isinstance(r_baseline["nns_distance_1000x3_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_distance_bulk_1000x3_100(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    row = np.arange(1, 1001, dtype=np.float64)
+    features = np.column_stack(
+        (np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 1000.0)
+    )
+    rpm = np.column_stack((features, np.sin(row / 7.0)))
+    test_row = np.arange(1, 101, dtype=np.float64)
+    x_test = np.column_stack(
+        (np.sin(test_row / 4.0) + 1.5, np.cos(test_row / 6.0) + 2.0, test_row / 100.0)
+    )
+
+    result = benchmark(nns_distance_bulk, rpm, x_test, 20)
+
+    assert result.shape == (100,)
+    assert isinstance(r_baseline["nns_distance_bulk_1000x3_100_seconds"], float)

@@ -4,6 +4,8 @@
     "nns_causation_1000_seconds": 0.0976,
     "nns_copula_1000_seconds": 0.0048,
     "nns_dep_1000_seconds": 0.0113,
+    "nns_distance_1000x3_seconds": 0.00116,
+    "nns_distance_bulk_1000x3_100_seconds": 0.0092,
     "nns_norm_1000x3_seconds": 0.0015,
     "pm_matrix_100x500_seconds": 0.0168,
     "pm_matrix_10x500_seconds": 0.0004,

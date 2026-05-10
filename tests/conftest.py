@@ -81,6 +81,12 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_norm_1000x3_seconds" not in cache:
         cache["nns_norm_1000x3_seconds"] = _time_r_nns_norm()
         _write_benchmark_baseline(cache)
+    if "nns_distance_1000x3_seconds" not in cache:
+        cache["nns_distance_1000x3_seconds"] = _time_r_nns_distance()
+        _write_benchmark_baseline(cache)
+    if "nns_distance_bulk_1000x3_100_seconds" not in cache:
+        cache["nns_distance_bulk_1000x3_100_seconds"] = _time_r_nns_distance_bulk()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -268,6 +274,54 @@ def _time_r_nns_norm() -> float:
         "}\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 50)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_distance() -> float:
+    script = (
+        "library(NNS)\n"
+        "row <- seq_len(1000)\n"
+        "rpm <- data.frame(x1 = sin(row / 3) + 1.5, x2 = cos(row / 5) + 2, "
+        "x3 = row / 1000, y.hat = sin(row / 7))\n"
+        "dest <- c(x1 = 1.25, x2 = 2.75, x3 = 0.4)\n"
+        "invisible(NNS::NNS.distance(rpm, dest, k = 20))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(50)) invisible(NNS::NNS.distance(rpm, dest, k = 20))\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 50)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_distance_bulk() -> float:
+    script = (
+        "library(NNS)\n"
+        "row <- seq_len(1000)\n"
+        "rpm <- data.frame(x1 = sin(row / 3) + 1.5, x2 = cos(row / 5) + 2, "
+        "x3 = row / 1000, y.hat = sin(row / 7))\n"
+        "test_row <- seq_len(100)\n"
+        "Xtest <- data.frame(x1 = sin(test_row / 4) + 1.5, "
+        "x2 = cos(test_row / 6) + 2, x3 = test_row / 100)\n"
+        "invisible(NNS:::NNS.distance.bulk(rpm, Xtest, k = 20))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(20)) invisible(NNS:::NNS.distance.bulk(rpm, Xtest, k = 20))\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 20)\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

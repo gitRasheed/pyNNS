@@ -66,3 +66,11 @@ plotting disabled. PyNNS accepts finite 2D arrays. `linear=True` uses R's
 mean-ratio scaling, while `linear=False` additionally weights scaling by
 absolute correlation for fewer than 10 columns and NNS dependence for 10 or
 more columns.
+
+## Distance
+
+`nns_distance` and `nns_distance_bulk` map to R's regression-point-matrix
+helpers. PyNNS accepts `rpm` as a finite 2D numeric array with R's `y.hat`
+column in the final position. `nns_distance` applies R's per-target min-max
+rescaling before computing weighted nearest-neighbor predictions. `nns_distance_bulk`
+matches R's compiled bulk helper, including its raw-feature distance convention.
