@@ -5,7 +5,6 @@ limits stay visible.
 
 | Area | Deferred path | Reason | Dependency / next action |
 |---|---|---|---|
-| ARMA | `pred_int` | Requires Monte Carlo/bootstrap prediction interval wiring | `NNS.MC` and `NNS.meboot` are ported; enable the ARMA prediction-interval branch in a follow-up |
 | ARMA.optim | default optimizer path | Default optimizer evaluates `nns_reg(..., smooth=True)`, so it cannot be faithfully ported until smooth regression is real | Port `smooth=True` first, then `NNS.ARMA.optim` |
 | Boost | `n_features > 10` stochastic epoch keeper loop | R uses stochastic epoch loop not yet ported | Port stochastic boost epoch loop |
 | Boost | `type="class"`, `balance=True` | Classification path not ported | Port factor/classification boost path |

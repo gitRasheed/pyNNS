@@ -161,10 +161,15 @@ avoiding repeated reverse-step scans for identical series.
 
 ## ARMA
 
-`nns_arma` maps to R's no-prediction-interval `NNS.ARMA` forecast path and
-returns a NumPy forecast vector of length `h`. Forecasts are recursive: each
-estimate is appended before the next horizon step. Plot arguments are ignored.
-`pred_int` is deferred because it requires `NNS.MC` / `NNS.meboot`.
+`nns_arma` maps to R's installed `NNS.ARMA` forecast path. Without prediction
+intervals it returns a NumPy forecast vector of length `h`; with `pred_int` it
+returns a dict keyed like R's data.table columns (`Estimates`,
+`Lower <percent>% pred.int`, `Upper <percent>% pred.int`). Forecasts are
+recursive: each estimate is appended before the next horizon step. Plot
+arguments are ignored. Prediction intervals use `nns_mc` / `nns_meboot`; exact
+stochastic parity with R is not expected because RNG streams differ.
+`random_seed` is a PyNNS-only convenience for reproducible interval tests.
+No-`pred_int` deterministic forecasts remain exact parity-tested.
 `seasonal_factor=True` uses only the first detected period from `nns_seas`,
 matching `ARMA.seas.weighting(TRUE, ...)`; `seasonal_factor=False` uses the
 selected `best_periods` rows. `dynamic=True` with numeric seasonal factors

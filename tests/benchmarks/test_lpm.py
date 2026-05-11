@@ -351,6 +351,54 @@ def test_nns_arma_500_explicit12_nonlin(
 
 
 @pytest.mark.benchmark
+def test_nns_arma_200_explicit4_lin_predint(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    t = np.arange(1, 201, dtype=np.float64)
+    variable = np.sin(2.0 * np.pi * t / 12.0) + 0.05 * np.cos(t / 3.0) + 2.0
+
+    result = benchmark(
+        nns_arma,
+        variable,
+        5,
+        None,
+        [3, 4],
+        method="lin",
+        pred_int=0.95,
+        random_seed=123,
+    )
+
+    assert isinstance(result, dict)
+    assert result["Estimates"].shape == (5,)
+    assert isinstance(r_baseline["nns_arma_200_explicit4_lin_predint_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_arma_200_auto_nonlin_predint(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    t = np.arange(1, 201, dtype=np.float64)
+    variable = np.sin(2.0 * np.pi * t / 12.0) + 0.05 * np.cos(t / 3.0) + 2.0
+
+    result = benchmark(
+        nns_arma,
+        variable,
+        5,
+        None,
+        True,
+        method="nonlin",
+        pred_int=0.95,
+        random_seed=123,
+    )
+
+    assert isinstance(result, dict)
+    assert result["Estimates"].shape == (5,)
+    assert isinstance(r_baseline["nns_arma_200_auto_nonlin_predint_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_meboot_500_reps100(benchmark: Any, r_baseline: dict[str, object]) -> None:
     t = np.arange(1, 501, dtype=np.float64)
     x = 0.01 * t + np.sin(t / 11.0) + 0.2 * np.cos(t / 5.0)

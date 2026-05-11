@@ -150,6 +150,18 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_arma_500_explicit12_nonlin_seconds" not in cache:
         cache["nns_arma_500_explicit12_nonlin_seconds"] = _time_r_nns_arma(auto=False)
         _write_benchmark_baseline(cache)
+    if "nns_arma_200_explicit4_lin_predint_seconds" not in cache:
+        cache["nns_arma_200_explicit4_lin_predint_seconds"] = _time_r_nns_arma_pred_int(
+            auto=False,
+            method="lin",
+        )
+        _write_benchmark_baseline(cache)
+    if "nns_arma_200_auto_nonlin_predint_seconds" not in cache:
+        cache["nns_arma_200_auto_nonlin_predint_seconds"] = _time_r_nns_arma_pred_int(
+            auto=True,
+            method="nonlin",
+        )
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -667,6 +679,28 @@ def _time_r_nns_arma(*, auto: bool) -> float:
         "method = 'nonlin', plot = FALSE, seasonal.plot = FALSE)\n"
         "invisible(run())\n"
         "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_arma_pred_int(*, auto: bool, method: str) -> float:
+    seasonal_factor = "TRUE" if auto else "c(3, 4)"
+    script = (
+        "library(NNS)\n"
+        "t <- seq_len(200)\n"
+        "variable <- sin(2 * pi * t / 12) + 0.05 * cos(t / 3) + 2\n"
+        f"run <- function() NNS::NNS.ARMA(variable, h = 5, seasonal.factor = {seasonal_factor}, "
+        f"method = '{method}', pred.int = 0.95, plot = FALSE, seasonal.plot = FALSE)\n"
+        "set.seed(123); invisible(run())\n"
+        "times <- replicate(5, { set.seed(123); system.time(invisible(run()))[['elapsed']] })\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(

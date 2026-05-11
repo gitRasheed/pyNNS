@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from _r import nns
+from _r import RValue, nns, nns_arma_pred_int
 from _tolerances import COMPOUND
 
 from pynns import nns_arma
@@ -138,6 +138,78 @@ def test_nns_arma_dynamic_means_matches_r() -> None:
     np.testing.assert_allclose(actual, _array(expected), atol=COMPOUND, equal_nan=True)
 
 
+@pytest.mark.parity
+@pytest.mark.stochastic
+def test_nns_arma_pred_int_structure_matches_r() -> None:
+    variable = np.sin(np.arange(1, 41, dtype=np.float64) / 3.0) + 2.0
+
+    expected = _dict(
+        nns_arma_pred_int(
+            variable.tolist(),
+            h=5,
+            seasonal_factor=4,
+            method="nonlin",
+            pred_int=0.95,
+            seed=123,
+        )
+    )
+    actual = nns_arma(
+        variable,
+        h=5,
+        seasonal_factor=4,
+        method="nonlin",
+        pred_int=0.95,
+        random_seed=123,
+    )
+    deterministic = nns_arma(variable, h=5, seasonal_factor=4, method="nonlin")
+
+    assert isinstance(actual, dict)
+    assert list(actual) == list(expected)
+    np.testing.assert_allclose(actual["Estimates"], expected["Estimates"], atol=COMPOUND)
+    np.testing.assert_allclose(actual["Estimates"], deterministic, atol=COMPOUND)
+    for value in actual.values():
+        assert value.shape == (5,)
+
+
+@pytest.mark.parity
+@pytest.mark.stochastic
+def test_nns_arma_pred_int_statistical_summary_is_close_to_r() -> None:
+    variable = np.sin(np.arange(1, 41, dtype=np.float64) / 3.0) + 2.0
+
+    expected = _dict(
+        nns_arma_pred_int(
+            variable.tolist(),
+            h=5,
+            seasonal_factor=[3, 4],
+            method="lin",
+            pred_int=0.95,
+            seed=123,
+        )
+    )
+    actual = nns_arma(
+        variable,
+        h=5,
+        seasonal_factor=[3, 4],
+        method="lin",
+        pred_int=0.95,
+        random_seed=123,
+    )
+    assert isinstance(actual, dict)
+
+    expected_lower = expected["Lower 95% pred.int"]
+    expected_upper = expected["Upper 95% pred.int"]
+    actual_lower = actual["Lower 95% pred.int"]
+    actual_upper = actual["Upper 95% pred.int"]
+    expected_summary = np.array(
+        [np.mean(expected_lower), np.mean(expected_upper), np.mean(expected_upper - expected_lower)]
+    )
+    actual_summary = np.array(
+        [np.mean(actual_lower), np.mean(actual_upper), np.mean(actual_upper - actual_lower)]
+    )
+
+    np.testing.assert_allclose(actual_summary, expected_summary, rtol=0.6, atol=0.6)
+
+
 def test_nns_arma_known_linear_check() -> None:
     result = nns_arma(np.arange(1, 21, dtype=np.float64), h=5, seasonal_factor=4, method="lin")
 
@@ -150,3 +222,9 @@ def _array(value: object) -> np.ndarray:
     if isinstance(value, list):
         return np.asarray([np.nan if item == "NaN" else item for item in value], dtype=np.float64)
     raise AssertionError(f"Unexpected R value type: {type(value)!r}")
+
+
+def _dict(value: RValue) -> dict[str, np.ndarray]:
+    if not isinstance(value, dict):
+        raise AssertionError(f"Expected R dictionary, got {type(value)!r}")
+    return {key: _array(item) for key, item in value.items()}

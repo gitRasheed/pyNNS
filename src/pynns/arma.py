@@ -6,8 +6,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from pynns._helpers import _fast_lm
+from pynns.mc import nns_mc
 from pynns.regression import nns_reg
 from pynns.seasonality import nns_seas
+from pynns.var import lpm_var, upm_var
 
 
 def nns_arma(
@@ -26,13 +28,10 @@ def nns_arma(
     plot: bool = False,
     seasonal_plot: bool = True,
     pred_int: float | None = None,
-) -> NDArray[np.float64]:
-    """Autoregressive NNS forecast matching R's no-prediction-interval path."""
+    random_seed: int | None = None,
+) -> NDArray[np.float64] | dict[str, NDArray[np.float64]]:
+    """Autoregressive NNS forecast matching R's installed NNS.ARMA behavior."""
     del plot, seasonal_plot
-    if pred_int is not None:
-        raise NotImplementedError(
-            "NNS.ARMA prediction intervals require NNS.MC / NNS.meboot, which are not yet ported."
-        )
 
     horizon = int(h)
     if horizon < 1:
@@ -61,7 +60,12 @@ def nns_arma(
 
     estimates = np.zeros(horizon, dtype=np.float64)
     if not _is_numeric_seasonal(seasonal_factor) and np.ptp(values) == 0.0:
-        return estimates
+        return _with_prediction_intervals(
+            estimates,
+            lin_residual=0.0,
+            pred_int=pred_int,
+            random_seed=random_seed,
+        )
     lags, lag_weights = _resolve_lags_and_weights(
         values,
         seasonal_factor=seasonal_factor,
@@ -72,6 +76,8 @@ def nns_arma(
     )
 
     if method_l == "lin" and _is_numeric_seasonal(seasonal_factor) and lags.size == 1:
+        if pred_int is not None:
+            raise TypeError("non-numeric argument to binary operator")
         estimates = _linear_static_numeric_forecast(
             values,
             int(lags[0]),
@@ -84,6 +90,7 @@ def nns_arma(
         return estimates
 
     current = values
+    lin_regression_estimates = np.array([], dtype=np.float64)
     for index in range(horizon):
         if dynamic:
             lags, lag_weights = _resolve_lags_and_weights(
@@ -133,6 +140,7 @@ def nns_arma(
             lin_estimate = float(np.sum(linear_estimates * lag_weights))
             if not negative_values:
                 lin_estimate = float(np.maximum(0.0, lin_estimate))
+            lin_regression_estimates = linear_estimates
 
         if method_l == "lin":
             estimate = float(np.sum(lin_estimate * lag_weights))
@@ -146,7 +154,19 @@ def nns_arma(
         estimates[index] = estimate
         current = np.concatenate((current, np.array([estimate], dtype=np.float64)))
 
-    return estimates
+    lin_resid = 0.0
+    if pred_int is not None and method_l != "means" and lin_regression_estimates.size:
+        lin_mean = float(np.mean(lin_regression_estimates))
+        lin_resid = float(np.mean(np.abs(lin_regression_estimates - lin_mean)))
+        if not np.isfinite(lin_resid):
+            lin_resid = 0.0
+
+    return _with_prediction_intervals(
+        estimates,
+        lin_residual=lin_resid,
+        pred_int=pred_int,
+        random_seed=random_seed,
+    )
 
 
 def _as_variable(variable: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -158,6 +178,55 @@ def _as_variable(variable: NDArray[np.float64]) -> NDArray[np.float64]:
     if np.any(np.isinf(values)):
         raise ValueError("Infinite values not allowed")
     return values
+
+
+def _with_prediction_intervals(
+    estimates: NDArray[np.float64],
+    *,
+    lin_residual: float,
+    pred_int: float | None,
+    random_seed: int | None,
+) -> NDArray[np.float64] | dict[str, NDArray[np.float64]]:
+    if pred_int is None:
+        return estimates
+    if estimates.size < 2:
+        raise ValueError("incorrect number of dimensions")
+
+    mc_result = nns_mc(
+        estimates,
+        lower_rho=-1.0,
+        upper_rho=1.0,
+        by=0.2,
+        random_seed=random_seed,
+    )
+    replicates = mc_result["replicates"]
+    if not isinstance(replicates, dict):
+        raise TypeError("nns_mc returned an unexpected replicate structure.")
+    matrices = [np.asarray(matrix, dtype=np.float64) for matrix in replicates.values()]
+    if not matrices:
+        raise ValueError("NNS.MC returned no prediction-interval replicates.")
+    intervals = np.column_stack(matrices)
+
+    alpha = (1.0 - float(pred_int)) / 2.0
+    upper_pi = np.empty(estimates.size, dtype=np.float64)
+    lower_pi = np.empty(estimates.size, dtype=np.float64)
+    for row_index, row in enumerate(intervals):
+        upper_pi[row_index] = upm_var(alpha, 0.0, row) + lin_residual
+        lower_pi[row_index] = abs(lpm_var(alpha, 0.0, row)) - lin_residual
+
+    pct = round(float(pred_int) * 100.0, 2)
+    return {
+        "Estimates": estimates,
+        f"Lower {_format_r_percent(pct)}% pred.int": np.minimum(estimates, lower_pi),
+        f"Upper {_format_r_percent(pct)}% pred.int": np.maximum(estimates, upper_pi),
+    }
+
+
+def _format_r_percent(value: float) -> str:
+    if value == 0.0:
+        return "0"
+    text = f"{value:.2f}".rstrip("0").rstrip(".")
+    return text if text != "-0" else "0"
 
 
 def _is_numeric_seasonal(value: object) -> bool:
