@@ -150,7 +150,9 @@ return R's sentinel period `0`. For mean-zero data, R falls back from coefficien
 of variation to `abs(acf1) ** -1`; PyNNS follows the same fallback and
 non-finite handling. Installed R can report harmonics rather than the visually
 obvious period, so PyNNS matches R's candidate-period screening instead of a
-textbook seasonality heuristic.
+textbook seasonality heuristic. Results are cached by input content and modulo
+arguments with defensive copies on return; this preserves R semantics while
+avoiding repeated reverse-step scans for identical series.
 
 ## Normalization
 

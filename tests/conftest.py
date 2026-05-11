@@ -136,7 +136,10 @@ def r_baseline() -> BenchmarkBaseline:
         cache["nns_mode_continuous_1000_seconds"] = _time_r_nns_mode_continuous()
         _write_benchmark_baseline(cache)
     if "nns_seas_1000_seconds" not in cache:
-        cache["nns_seas_1000_seconds"] = _time_r_nns_seas()
+        cache["nns_seas_1000_seconds"] = _time_r_nns_seas(1000)
+        _write_benchmark_baseline(cache)
+    if "nns_seas_5000_seconds" not in cache:
+        cache["nns_seas_5000_seconds"] = _time_r_nns_seas(5000)
         _write_benchmark_baseline(cache)
     return cache
 
@@ -602,10 +605,10 @@ def _time_r_nns_mode_continuous() -> float:
     return float(completed.stdout)
 
 
-def _time_r_nns_seas() -> float:
+def _time_r_nns_seas(n: int) -> float:
     script = (
         "library(NNS)\n"
-        "t <- seq_len(1000)\n"
+        f"t <- seq_len({n})\n"
         "variable <- sin(2 * pi * t / 12) + 0.05 * cos(t / 3)\n"
         "invisible(NNS::NNS.seas(variable, plot = FALSE))\n"
         "times <- replicate(20, system.time(invisible(NNS::NNS.seas(variable, "

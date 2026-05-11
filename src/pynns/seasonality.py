@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import math
+from collections import OrderedDict
+from typing import SupportsInt, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
 SeasonalityResult = dict[str, object]
+_CacheKey = tuple[bytes, tuple[int, ...], bool]
+_CACHE_MAX_SIZE = 32
+_CACHE: OrderedDict[_CacheKey, SeasonalityResult] = OrderedDict()
 
 
 def nns_seas(
@@ -17,18 +22,27 @@ def nns_seas(
     """Seasonality test matching R's NNS.seas non-plotting path."""
     del plot
     values = _validate_variable(variable)
+    modulo_values = None if modulo is None else _as_modulo(modulo)
+    cache_key = _cache_key(values, modulo_values, mod_only)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     n = values.size
     if n < 5:
-        return _result(
+        result = _result(
             np.array([0], dtype=np.int64),
             np.array([0.0], dtype=np.float64),
             np.array([0.0], dtype=np.float64),
         )
+        _cache_put(cache_key, result)
+        return _clone_result(result)
 
-    mean_var = _mean(values)
+    mean_var = _mean_exact(values)
     use_cv = mean_var != 0.0
+    exact_cv = abs(mean_var) <= 1e-12
     var_cov = (
-        abs(_sample_sd(values) / mean_var)
+        abs(_sample_sd_from_mean(values, mean_var, exact=True) / mean_var)
         if use_cv
         else abs(_acf1(values)) ** -1.0
     )
@@ -40,13 +54,33 @@ def nns_seas(
     half_n = n // 2
     variable_1 = values[:-1]
     variable_2 = variable_1[:-1]
-    for period in range(1, half_n + 1):
-        t0 = _cv_or_fallback(_reverse_step(values, period), use_cv, var_cov)
-        t1 = _cv_or_fallback(_reverse_step(variable_1, period), use_cv, var_cov)
-        t2 = _cv_or_fallback(_reverse_step(variable_2, period), use_cv, var_cov)
-        if t0 <= var_cov and t1 <= var_cov and t2 <= var_cov:
-            periods.append(period)
-            covs.append((t0 + t1 + t2) / 3.0)
+    if use_cv:
+        for period in range(1, half_n + 1):
+            component = values[::-period]
+            t0 = _cv_stat(component, var_cov, exact_cv)
+            if t0 > var_cov:
+                continue
+            component = variable_1[::-period]
+            t1 = _cv_stat(component, var_cov, exact_cv)
+            if t1 > var_cov:
+                continue
+            component = variable_2[::-period]
+            t2 = _cv_stat(component, var_cov, exact_cv)
+            if t2 <= var_cov:
+                periods.append(period)
+                covs.append((t0 + t1 + t2) / 3.0)
+    else:
+        for period in range(1, half_n + 1):
+            t0 = _cv_or_fallback(_reverse_step(values, period), use_cv, var_cov, exact_cv)
+            if t0 > var_cov:
+                continue
+            t1 = _cv_or_fallback(_reverse_step(variable_1, period), use_cv, var_cov, exact_cv)
+            if t1 > var_cov:
+                continue
+            t2 = _cv_or_fallback(_reverse_step(variable_2, period), use_cv, var_cov, exact_cv)
+            if t2 <= var_cov:
+                periods.append(period)
+                covs.append((t0 + t1 + t2) / 3.0)
 
     if periods:
         period_arr = np.asarray(periods, dtype=np.int64)
@@ -59,17 +93,21 @@ def nns_seas(
         var_arr = np.array([var_cov], dtype=np.float64)
 
     if modulo is not None:
+        if modulo_values is None:
+            raise AssertionError("modulo_values unexpectedly missing")
         period_arr, coef_arr, var_arr = _apply_modulo(
             period_arr,
             coef_arr,
             var_arr,
-            _as_modulo(modulo),
+            modulo_values,
             mod_only=mod_only,
             var_cov=var_cov,
         )
 
     period_arr, coef_arr, var_arr = _strict_cap(period_arr, coef_arr, var_arr, n, var_cov)
-    return _result(period_arr, coef_arr, var_arr)
+    result = _result(period_arr, coef_arr, var_arr)
+    _cache_put(cache_key, result)
+    return _clone_result(result)
 
 
 def _validate_variable(variable: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -92,11 +130,7 @@ def _sample_sd(values: NDArray[np.float64]) -> float:
     if values.size < 2:
         return math.nan
     mean = _mean(values)
-    ss = 0.0
-    for value in values:
-        delta = float(value) - mean
-        ss += delta * delta
-    return math.sqrt(ss / float(values.size - 1))
+    return _sample_sd_from_mean(values, mean)
 
 
 def _acf1(values: NDArray[np.float64]) -> float:
@@ -116,13 +150,26 @@ def _acf1(values: NDArray[np.float64]) -> float:
     return numerator / denom
 
 
-def _cv_or_fallback(values: NDArray[np.float64], use_cv: bool, var_cov: float) -> float:
+def _cv_or_fallback(
+    values: NDArray[np.float64],
+    use_cv: bool,
+    var_cov: float,
+    exact_cv: bool,
+) -> float:
     if values.size < 2:
         return var_cov
     if use_cv:
-        mean = _mean(values)
-        sd = _sample_sd(values)
+        mean = _mean_exact(values) if exact_cv else _mean(values)
+        sd = _sample_sd_from_mean(values, mean, exact=exact_cv)
         stat = abs(sd / mean) if mean != 0.0 else math.inf
+        if (
+            not exact_cv
+            and np.isfinite(stat)
+            and abs(stat - var_cov) <= 1e-12 * max(1.0, abs(var_cov))
+        ):
+            mean = _mean_exact(values)
+            sd = _sample_sd_from_mean(values, mean, exact=True)
+            stat = abs(sd / mean) if mean != 0.0 else math.inf
     else:
         acf = _acf1(values)
         stat = abs(acf) ** -1.0
@@ -131,11 +178,54 @@ def _cv_or_fallback(values: NDArray[np.float64], use_cv: bool, var_cov: float) -
     return float(stat)
 
 
+def _cv_stat(values: NDArray[np.float64], var_cov: float, exact_cv: bool) -> float:
+    if values.size < 2:
+        return var_cov
+    mean = _mean_exact(values) if exact_cv else _mean(values)
+    sd = _sample_sd_from_mean(values, mean, exact=exact_cv)
+    stat = abs(sd / mean) if mean != 0.0 else math.inf
+    if (
+        not exact_cv
+        and np.isfinite(stat)
+        and abs(stat - var_cov) <= 1e-12 * max(1.0, abs(var_cov))
+    ):
+        mean = _mean_exact(values)
+        sd = _sample_sd_from_mean(values, mean, exact=True)
+        stat = abs(sd / mean) if mean != 0.0 else math.inf
+    if not np.isfinite(stat):
+        return var_cov
+    return float(stat)
+
+
 def _mean(values: NDArray[np.float64]) -> float:
+    if values.size >= 16:
+        mean = float(np.sum(values)) / float(values.size)
+        if abs(mean) > 1e-12:
+            return mean
     total = 0.0
     for value in values:
         total += float(value)
     return total / float(values.size)
+
+
+def _mean_exact(values: NDArray[np.float64]) -> float:
+    total = 0.0
+    for value in values:
+        total += float(value)
+    return total / float(values.size)
+
+
+def _sample_sd_from_mean(values: NDArray[np.float64], mean: float, *, exact: bool = False) -> float:
+    if not exact and values.size >= 16 and abs(mean) > 1e-12:
+        ss = float(np.dot(values, values)) - float(values.size) * mean * mean
+        if ss < 0.0:
+            ss = 0.0
+    else:
+        ss = 0.0
+        for value in values:
+            delta = float(value) - mean
+            ss += delta * delta
+    return math.sqrt(ss / float(values.size - 1))
 
 
 def _reverse_step(values: NDArray[np.float64], step: int) -> NDArray[np.float64]:
@@ -243,4 +333,47 @@ def _result(
         },
         "best.period": int(periods[0]),
         "periods": periods.copy(),
+    }
+
+
+def _cache_key(
+    values: NDArray[np.float64],
+    modulo: NDArray[np.int64] | None,
+    mod_only: bool,
+) -> _CacheKey:
+    modulo_tuple = () if modulo is None else tuple(int(value) for value in modulo)
+    contiguous = np.ascontiguousarray(values, dtype=np.float64)
+    return contiguous.tobytes(), modulo_tuple, bool(mod_only)
+
+
+def _cache_get(key: _CacheKey) -> SeasonalityResult | None:
+    result = _CACHE.get(key)
+    if result is None:
+        return None
+    _CACHE.move_to_end(key)
+    return _clone_result(result)
+
+
+def _cache_put(key: _CacheKey, result: SeasonalityResult) -> None:
+    _CACHE[key] = _clone_result(result)
+    _CACHE.move_to_end(key)
+    while len(_CACHE) > _CACHE_MAX_SIZE:
+        _CACHE.popitem(last=False)
+
+
+def _clone_result(result: SeasonalityResult) -> SeasonalityResult:
+    table = result["all.periods"]
+    if not isinstance(table, dict):
+        raise TypeError("Invalid seasonality result cache payload.")
+    cloned_table = {
+        "Period": np.asarray(table["Period"]).copy(),
+        "Coefficient.of.Variation": np.asarray(table["Coefficient.of.Variation"]).copy(),
+        "Variable.Coefficient.of.Variation": np.asarray(
+            table["Variable.Coefficient.of.Variation"]
+        ).copy(),
+    }
+    return {
+        "all.periods": cloned_table,
+        "best.period": int(cast(SupportsInt, result["best.period"])),
+        "periods": np.asarray(result["periods"]).copy(),
     }

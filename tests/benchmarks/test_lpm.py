@@ -287,3 +287,14 @@ def test_nns_seas_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert result["best.period"] == int(result["periods"][0])
     assert isinstance(r_baseline["nns_seas_1000_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_seas_5000(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    t = np.arange(1, 5001, dtype=np.float64)
+    variable = np.sin(2.0 * np.pi * t / 12.0) + 0.05 * np.cos(t / 3.0)
+
+    result = benchmark(nns_seas, variable)
+
+    assert result["best.period"] == int(result["periods"][0])
+    assert isinstance(r_baseline["nns_seas_5000_seconds"], float)
