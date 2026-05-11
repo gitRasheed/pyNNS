@@ -62,6 +62,11 @@ def nns_boost(
     rng = np.random.default_rng(random_seed)
 
     n_rows, n_cols = x_train.shape
+    if n_cols > 10:
+        raise NotImplementedError(
+            "nns_boost for n_features > 10 requires R's stochastic epoch keeper loop, "
+            "which is not yet ported. Use <=10 features or port the epoch loop first."
+        )
     feature_sets = _all_feature_sets(n_cols)
     deterministic = (len(feature_sets) < n_rows) or n_cols <= 10
     if deterministic:
@@ -73,20 +78,15 @@ def nns_boost(
 
     if threshold is None:
         cv_fraction = 0.25 if cv_size is None else float(cv_size)
-        scores = np.empty(learner_trials, dtype=np.float64)
-        for idx, features in enumerate(trial_sets, start=1):
-            train_idx, test_idx = _boost_cv_split(n_rows, idx, cv_fraction, rng)
-            aug_x, aug_y = _augmented_training(x_train[train_idx], y_train[train_idx])
-            predicted = nns_reg(
-                aug_x[:, features],
-                aug_y,
-                point_est=x_train[test_idx][:, features],
-                dim_red_method="equal",
-                order=depth,
-                point_only=False,
-            )["Point.est"]
-            pred = _fill_nan_with_gravity(np.asarray(predicted, dtype=np.float64))
-            scores[idx - 1] = objective_fn(pred, y_train[test_idx])
+        scores = _learner_scores(
+            x_train,
+            y_train,
+            trial_sets,
+            depth=depth,
+            cv_size=cv_fraction,
+            objective_fn=objective_fn,
+            rng=rng,
+        )
     else:
         scores = np.asarray([threshold], dtype=np.float64)
 
@@ -187,6 +187,44 @@ def _boost_cv_split(
     return np.flatnonzero(mask).astype(np.int64), test_idx
 
 
+def _learner_scores(
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.float64],
+    feature_sets: list[tuple[int, ...]],
+    *,
+    depth: Order,
+    cv_size: float,
+    objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float],
+    rng: np.random.Generator,
+) -> NDArray[np.float64]:
+    scores = np.empty(len(feature_sets), dtype=np.float64)
+    for idx, features in enumerate(feature_sets, start=1):
+        train_idx, test_idx = _boost_cv_split(y_train.size, idx, cv_size, rng)
+        aug_x, aug_y = _augmented_training(x_train[train_idx], y_train[train_idx])
+        train_subset = aug_x[:, features]
+        point_subset = x_train[test_idx][:, features]
+        if len(features) == 1:
+            predicted = nns_reg(
+                train_subset.reshape(-1),
+                aug_y,
+                point_est=point_subset.reshape(-1),
+                order=depth,
+                point_only=False,
+            )["Point.est"]
+        else:
+            predicted = nns_reg(
+                train_subset,
+                aug_y,
+                point_est=point_subset,
+                dim_red_method="equal",
+                order=depth,
+                point_only=False,
+            )["Point.est"]
+        pred = _fill_nan_with_gravity(np.asarray(predicted, dtype=np.float64))
+        scores[idx - 1] = objective_fn(pred, y_train[test_idx])
+    return scores
+
+
 def _augmented_training(
     x: NDArray[np.float64],
     y: NDArray[np.float64],
@@ -199,10 +237,15 @@ def _augmented_training(
 
 
 def _fivenum(values: NDArray[np.float64]) -> NDArray[np.float64]:
-    return np.asarray(
-        np.quantile(values, [0.0, 0.25, 0.5, 0.75, 1.0], method="averaged_inverted_cdf"),
-        dtype=np.float64,
-    )
+    sorted_values = np.sort(np.asarray(values, dtype=np.float64)[np.isfinite(values)])
+    n = sorted_values.size
+    if n == 0:
+        return np.full(5, np.nan, dtype=np.float64)
+    n4 = math.floor((n + 3) / 2.0) / 2.0
+    positions = np.array([1.0, n4, (n + 1) / 2.0, n + 1.0 - n4, float(n)])
+    lower = np.floor(positions).astype(np.int64) - 1
+    upper = np.ceil(positions).astype(np.int64) - 1
+    return np.asarray(0.5 * (sorted_values[lower] + sorted_values[upper]), dtype=np.float64)
 
 
 def _threshold(scores: NDArray[np.float64], objective: Objective, extreme: bool) -> float:

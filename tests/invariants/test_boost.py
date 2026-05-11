@@ -35,3 +35,15 @@ def test_nns_boost_deferred_paths_raise(path: str) -> None:
             nns_boost(variable, y, ts_test=4)
         else:
             nns_boost(variable, y, pred_int=0.95)
+
+
+def test_nns_boost_rejects_unported_stochastic_epoch_path() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    variable = np.column_stack([np.sin((idx + 1) * x) for idx in range(11)])
+    y = x + np.sin(x)
+
+    with pytest.raises(
+        NotImplementedError,
+        match="n_features > 10 requires R's stochastic epoch keeper loop",
+    ):
+        nns_boost(variable, y, variable[:3], cv_size=0.25, feature_importance=False)
