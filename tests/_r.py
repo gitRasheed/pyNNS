@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, TypeAlias, cast
@@ -277,8 +277,9 @@ def nns_distance_bulk_custom(
     rpm: dict[str, list[float]],
     x_test: dict[str, list[float]],
     k: int | str,
+    class_: object | None = None,
 ) -> RValue:
-    args = {"rpm": rpm, "x_test": x_test, "k": k}
+    args = {"rpm": rpm, "x_test": x_test, "k": k, "class": class_}
     key = _cache_key("NNS.distance.bulk.custom", (args,))
     cache, refresh = _cache_state()
     if key in cache:
@@ -312,6 +313,31 @@ def nns_diff_custom(name: str, point: float) -> RValue:
         if key in disk_cache:
             return _decode(disk_cache[key])
         result = _call_r_diff_custom(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
+def factor_dummy_custom(
+    values: Sequence[object],
+    levels: Sequence[object],
+    *,
+    full_rank: bool,
+) -> RValue:
+    args = {"values": values, "levels": levels, "full_rank": full_rank}
+    key = _cache_key("factor_2_dummy.custom", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for factor_2_dummy.custom with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_factor_dummy(args)
         disk_cache[key] = _encode(result)
         _write_cache(disk_cache)
         return result
@@ -719,8 +745,38 @@ def _call_r_distance_bulk_custom(args: dict[str, Any]) -> RValue:
         "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
         "rpm <- as.data.frame(args$rpm)\n"
         "x_test <- as.data.frame(args$x_test)\n"
-        "result <- NNS:::NNS.distance.bulk(rpm, x_test, args$k, class = NULL)\n"
+        "class_arg <- args[['class']]\n"
+        "if (length(class_arg) == 0) class_arg <- NULL\n"
+        "result <- NNS:::NNS.distance.bulk(rpm, x_test, args$k, class = class_arg)\n"
         "cat(jsonlite::toJSON(as.numeric(result), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_factor_dummy(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
+        "x <- factor(unlist(args$values, use.names = FALSE), "
+        "levels = unlist(args$levels, use.names = FALSE))\n"
+        "fn <- if (isTRUE(args$full_rank)) getFromNamespace('factor_2_dummy_FR', 'NNS') "
+        "else getFromNamespace('factor_2_dummy', 'NNS')\n"
+        "result <- fn(x)\n"
+        "if (is.null(dim(result))) {\n"
+        "  out <- list(x = as.numeric(result))\n"
+        "} else {\n"
+        "  out <- setNames(lapply(seq_len(ncol(result)), "
+        "function(i) as.numeric(result[, i])), colnames(result))\n"
+        "}\n"
+        "cat(jsonlite::toJSON(out, auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

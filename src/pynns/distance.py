@@ -66,11 +66,7 @@ def nns_distance_bulk(
         row_distances = distances[row_index, row_order]
         row_y = y_hat[row_order]
         weights = 1.0 / row_distances
-        if class_ is not None:
-            weights = weights / np.sum(weights)
-            predictions[row_index] = _weighted_mode(row_y, weights)
-        else:
-            predictions[row_index] = float(np.dot(row_y, weights) / np.sum(weights))
+        predictions[row_index] = float(np.dot(row_y, weights) / np.sum(weights))
     return predictions
 
 

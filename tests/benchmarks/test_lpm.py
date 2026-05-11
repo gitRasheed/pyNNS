@@ -164,6 +164,41 @@ def test_nns_distance_bulk_1000x3_100(
 
 
 @pytest.mark.benchmark
+def test_nns_distance_class_500x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    row = np.arange(1, 501, dtype=np.float64)
+    features = np.column_stack(
+        (np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 500.0)
+    )
+    rpm = np.column_stack((features, (row % 3.0) + 1.0))
+
+    result = benchmark(nns_distance, rpm, np.array([1.25, 2.75, 0.4]), 5, "class")
+
+    assert result in {1.0, 2.0, 3.0}
+    assert isinstance(r_baseline["nns_distance_class_500x3_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_distance_bulk_class_500x3_50(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    row = np.arange(1, 501, dtype=np.float64)
+    features = np.column_stack(
+        (np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 500.0)
+    )
+    rpm = np.column_stack((features, (row % 3.0) + 1.0))
+    test_row = np.arange(1, 51, dtype=np.float64)
+    x_test = np.column_stack(
+        (np.sin(test_row / 4.0) + 1.5, np.cos(test_row / 6.0) + 2.0, test_row / 50.0)
+    )
+
+    result = benchmark(nns_distance_bulk, rpm, x_test, 5, "class")
+
+    assert result.shape == (50,)
+    assert isinstance(r_baseline["nns_distance_bulk_class_500x3_50_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_diff_sin(benchmark: Any, r_baseline: dict[str, object]) -> None:
     result = benchmark(nns_diff, np.sin, 1.0)
 

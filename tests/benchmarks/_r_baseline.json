@@ -14,6 +14,8 @@
     "nns_diff_sin_seconds": 0.00405,
     "nns_distance_1000x3_seconds": 0.00116,
     "nns_distance_bulk_1000x3_100_seconds": 0.0092,
+    "nns_distance_bulk_class_500x3_50_seconds": 0.00226,
+    "nns_distance_class_500x3_seconds": 0.0009,
     "nns_m_reg_200x3_ci_seconds": 0.1304,
     "nns_m_reg_200x3_seconds": 0.0976,
     "nns_mc_500_reps30_by01_seconds": 1.437,

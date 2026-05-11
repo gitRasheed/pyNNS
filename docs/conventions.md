@@ -240,6 +240,26 @@ the exponential rank-weight family uses the R C API's `Rf_dexp` scale argument
 as `1 / k`. This differs from the nearby source-code comment that describes it
 as a rate.
 
+Classification distance mode returns numeric class codes, not original labels.
+For single-target `nns_distance(..., class_=...)`, installed R uses weighted
+mode with integer replication counts `ceil(100 * weight)`. PyNNS follows that
+behavior. Installed R's `NNS.distance.bulk(..., class=...)` currently ignores
+the class flag in its compiled bulk helper and returns the same inverse-distance
+numeric weighted average as non-class bulk distance; PyNNS matches the installed
+binary rather than the higher-level classification intent.
+
+## Classification
+
+R classification paths work with numeric class codes. R factors become
+1-indexed numeric codes in factor-level order and predictions are returned as
+codes rather than decoded labels. PyNNS provides `factor_2_dummy`,
+`factor_2_dummy_fr`, and `encode_factor_codes`; pass explicit `levels=` to
+reproduce R factor level order because NumPy arrays do not carry factor
+metadata. Raw string classification remains rejected in higher-level functions
+where installed R errors or produces unusable `NA` conversions. Higher-level
+classification paths in regression, stack, and boost remain deferred until the
+next classification batches.
+
 ## Differentiation
 
 `nns_diff` maps to R's scalar callable `NNS.diff` path with plotting and trace
