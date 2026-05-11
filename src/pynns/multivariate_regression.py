@@ -10,7 +10,7 @@ from pynns.central_tendencies import nns_mode
 from pynns.dependence import _gravity
 from pynns.distance import KValue, nns_distance
 from pynns.part import NoiseReduction
-from pynns.regression import Order, nns_reg
+from pynns.regression import Order, _normalize_type, _round_clamp_classes, nns_reg
 from pynns.regression import _nns_copula_matrix as _copula_matrix
 from pynns.var import upm_var
 
@@ -19,8 +19,8 @@ MRegResult = dict[str, Any]
 
 
 def nns_m_reg(
-    x: NDArray[np.float64],
-    y: NDArray[np.float64],
+    x: NDArray[Any],
+    y: NDArray[Any],
     *,
     factor_2_dummy: bool = False,
     order: Order = None,
@@ -37,18 +37,34 @@ def nns_m_reg(
     plot_regions: bool = False,
     ncores: int | None = None,
     confidence_interval: float | None = None,
+    class_levels: list[object] | None = None,
 ) -> MRegResult:
     """Multivariate numeric regression matching R's non-plotting NNS.M.reg path."""
     del plot, residual_plot, location, dist, return_values, plot_regions, ncores
-    if type is not None:
+    type_value = _normalize_type(type)
+    if type_value == "class" and confidence_interval is not None:
         raise NotImplementedError(
-            "type='class' classification for NNS.M.reg is deferred to a future batch."
+            "classification confidence intervals are deferred until class interval "
+            "parity is ported."
         )
-    x_values, y_values = _validate_inputs(x, y, factor_2_dummy)
+    x_values, y_values = _validate_inputs(
+        x,
+        y,
+        factor_2_dummy,
+        type_value=type_value,
+        class_levels=class_levels,
+    )
     point_values, point_is_matrix = _validate_point_est(point_est, x_values.shape[1])
     noise = _validate_noise(noise_reduction)
 
-    reg_points_matrix = _regression_points_matrix(x_values, y_values, order, noise, factor_2_dummy)
+    reg_points_matrix = _regression_points_matrix(
+        x_values,
+        y_values,
+        order,
+        noise,
+        factor_2_dummy,
+        type_value,
+    )
     if order is None or isinstance(order, int):
         reg_points_matrix = _unique_rows_preserve_order(reg_points_matrix)
     if order == "max" and n_best is None:
@@ -62,11 +78,17 @@ def nns_m_reg(
         nns_ids,
         noise,
         order_is_numeric=order is None or isinstance(order, int),
+        class_mode=type_value == "class",
     )
 
     k = _resolve_n_best(n_best, x_values, y_values, rpm)
     if _k_as_count(k, rpm.shape[0]) > 1 and not point_only:
-        fitted_y = np.array([nns_distance(rpm, row, k, None) for row in x_values], dtype=np.float64)
+        fitted_y = np.array(
+            [nns_distance(rpm, row, k, type_value) for row in x_values],
+            dtype=np.float64,
+        )
+        if type_value == "class":
+            fitted_y = _round_clamp_classes(fitted_y, y_values)
         residuals = fitted_y - y_values
 
     if point_values is None:
@@ -78,7 +100,10 @@ def nns_m_reg(
             x_values,
             rpm,
             k,
+            type_value,
         )
+        if type_value == "class":
+            point_predictions = _round_clamp_classes(point_predictions, y_values)
 
     if point_only:
         return {"Point.est": _point_output(point_predictions), "RPM": _rpm_dict(rpm)}
@@ -89,8 +114,9 @@ def nns_m_reg(
         point_predictions,
         confidence_interval=confidence_interval,
     )
+    r2 = _class_accuracy(y_values, fitted_y) if type_value == "class" else _r2(y_values, fitted_y)
     return {
-        "R2": _r2(y_values, fitted_y),
+        "R2": r2,
         "rhs.partitions": _rhs_partitions_dict(reg_points_matrix),
         "RPM": _rpm_dict(rpm),
         "Point.est": _point_output(point_predictions),
@@ -100,9 +126,12 @@ def nns_m_reg(
 
 
 def _validate_inputs(
-    x: NDArray[np.float64],
-    y: NDArray[np.float64],
+    x: NDArray[Any],
+    y: NDArray[Any],
     factor_2_dummy: bool,
+    *,
+    type_value: str | None,
+    class_levels: list[object] | None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     if factor_2_dummy:
         raise NotImplementedError(
@@ -114,7 +143,13 @@ def _validate_inputs(
         x_values = x_values.reshape(-1, 1)
     if x_values.ndim != 2:
         raise ValueError("x must be a 2D numeric matrix.")
-    y_values = np.asarray(y, dtype=np.float64).reshape(-1)
+    from pynns.regression import _prepare_y_values
+
+    y_values, _ = _prepare_y_values(
+        y,
+        type_value=type_value,
+        class_levels=class_levels,
+    )
     if x_values.shape[0] == 0 or x_values.shape[1] == 0:
         raise ValueError("x must be non-empty.")
     if y_values.size != x_values.shape[0]:
@@ -158,6 +193,7 @@ def _regression_points_matrix(
     order: Order,
     noise: NoiseReduction,
     factor_2_dummy: bool,
+    type_value: str | None,
 ) -> NDArray[np.float64]:
     if order == "max":
         return x.copy()
@@ -169,7 +205,7 @@ def _regression_points_matrix(
             y,
             factor_2_dummy=factor_2_dummy,
             order=order,
-            type=None,
+            type=type_value,
             noise_reduction=noise,
             plot=False,
             multivariate_call=True,
@@ -218,6 +254,7 @@ def _rpm_and_fitted(
     noise: NoiseReduction,
     *,
     order_is_numeric: bool,
+    class_mode: bool,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     obs = np.arange(y.size)
     sorted_order = np.lexsort((obs, nns_ids.astype(str)))
@@ -236,12 +273,16 @@ def _rpm_and_fitted(
 
     original_group_index = np.searchsorted(unique_ids.astype(str), nns_ids.astype(str))
     initial_yhat = group_values[original_group_index, -1].copy()
+    if class_mode:
+        initial_yhat = _round_clamp_classes(initial_yhat, y)
     residuals = initial_yhat - y
     bias = np.empty_like(residuals)
     for group_id in np.unique(nns_ids.astype(str)):
         mask = nns_ids.astype(str) == group_id
         bias[mask] = _gravity(residuals[mask])
     fitted_y = initial_yhat - bias
+    if class_mode:
+        fitted_y = _round_clamp_classes(fitted_y, y)
     residuals = fitted_y - y
 
     rpm = group_values[np.argsort(first)]
@@ -294,6 +335,7 @@ def _predict_points(
     x: NDArray[np.float64],
     rpm: NDArray[np.float64],
     k: KValue,
+    class_: str | None,
 ) -> NDArray[np.float64]:
     minimums = np.min(x, axis=0)
     maximums = np.max(x, axis=0)
@@ -303,16 +345,24 @@ def _predict_points(
     for row_index, point in enumerate(point_est):
         outsiders = (point < minimums) | (point > maximums)
         if not np.any(outsiders):
-            out[row_index] = nns_distance(rpm, point, k, None)
+            out[row_index] = nns_distance(rpm, point, k, class_)
             continue
         if point_is_matrix and outsider_rows.size == 1:
             # Installed R drops dimensions for one outsider row in the multi-point path:
             # apply(as.matrix(point.est[i, ]), 1, f) passes scalar elements to f and
             # vector assignment keeps the first result. Match that behavior.
             scalar_point = np.full(point.shape, point[0], dtype=np.float64)
-            out[row_index] = _outside_prediction(scalar_point, minimums, maximums, central, rpm, k)
+            out[row_index] = _outside_prediction(
+                scalar_point,
+                minimums,
+                maximums,
+                central,
+                rpm,
+                k,
+                class_,
+            )
             continue
-        out[row_index] = _outside_prediction(point, minimums, maximums, central, rpm, k)
+        out[row_index] = _outside_prediction(point, minimums, maximums, central, rpm, k, class_)
     return out if point_is_matrix else out[:1]
 
 
@@ -323,18 +373,19 @@ def _outside_prediction(
     central: NDArray[np.float64],
     rpm: NDArray[np.float64],
     k: KValue,
+    class_: str | None,
 ) -> float:
     boundary = np.minimum(np.maximum(point, minimums), maximums)
     mid = (boundary + central) / 2.0
     mid_2 = (boundary + mid) / 2.0
-    boundary_est = nns_distance(rpm, boundary, k, None)
+    boundary_est = nns_distance(rpm, boundary, k, class_)
     gradients = []
     for compare in (central, mid, mid_2):
         distance = float(np.sqrt(np.sum((boundary - compare) ** 2)))
         if distance == 0.0:
             gradients.append(0.0)
         else:
-            gradients.append((boundary_est - nns_distance(rpm, compare, k, None)) / distance)
+            gradients.append((boundary_est - nns_distance(rpm, compare, k, class_)) / distance)
     last_gradient = float(np.dot(np.asarray(gradients), np.array([3.0, 2.0, 1.0])) / 6.0)
     last_distance = float(np.sqrt(np.sum((point - boundary) ** 2)))
     return last_distance * last_gradient + boundary_est
@@ -400,3 +451,8 @@ def _r2(y: NDArray[np.float64], yhat: NDArray[np.float64]) -> float:
     numerator = float(np.sum((y - y_mean) * (yhat - y_mean)) ** 2)
     denominator = float(np.sum((y - y_mean) ** 2) * np.sum((yhat - y_mean) ** 2))
     return numerator / denominator if denominator > 0.0 else float("nan")
+
+
+def _class_accuracy(y: NDArray[np.float64], yhat: NDArray[np.float64]) -> float:
+    accuracy = float(np.mean(yhat == y))
+    return float(f"{accuracy:.4g}")

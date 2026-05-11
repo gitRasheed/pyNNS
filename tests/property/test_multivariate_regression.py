@@ -70,3 +70,16 @@ def test_nns_m_reg_confidence_interval_shape_invariants_hold(
     assert result["pred.int"] is not None
     assert result["pred.int"]["lower.pred.int"].shape == (3,)
     assert result["pred.int"]["upper.pred.int"].shape == (3,)
+
+
+@given(matrix_arrays, st.integers(min_value=2, max_value=4))
+def test_nns_m_reg_classification_bounds_hold(x: np.ndarray, n_classes: int) -> None:
+    assume(all(np.unique(x[:, col]).size > 1 for col in range(x.shape[1])))
+    classes = (np.arange(x.shape[0]) % n_classes + 1).astype(np.float64)
+
+    result = nns_m_reg(x, classes, order=1, n_best=1, type="class", point_est=x[:3])
+
+    assert 0.0 <= result["R2"] <= 1.0
+    assert set(result["Fitted.xy"]["y.hat"]).issubset(set(classes))
+    assert result["Point.est"] is not None
+    assert set(result["Point.est"]).issubset(set(classes))

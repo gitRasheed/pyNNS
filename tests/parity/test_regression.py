@@ -43,6 +43,15 @@ CI_REGRESSION_CASES: list[tuple[int | None, str]] = [
     (1, "median"),
     (2, "median"),
 ]
+CLASS_REGRESSION_CASES: list[tuple[str, np.ndarray, np.ndarray]] = [
+    ("binary", np.array([1, 1, 1, 2, 2, 2], dtype=np.float64), np.array([1.5, 4.5])),
+    (
+        "multiclass",
+        np.array([1, 1, 2, 2, 3, 3, 2, 1, 3], dtype=np.float64),
+        np.array([1.5, 5.5, 7.5]),
+    ),
+    ("zero_one", np.array([0, 0, 0, 1, 1, 1], dtype=np.float64), np.array([1.5, 4.5])),
+]
 
 
 @pytest.mark.parity
@@ -252,6 +261,84 @@ def test_nns_reg_below_range_point_est_pred_int_row_drop_matches_r() -> None:
     assert actual["pred.int"]["pred.int.neg"].shape == (3,)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize("order", [None, 1, 2])
+@pytest.mark.parametrize(("name", "classes", "point_est"), CLASS_REGRESSION_CASES)
+def test_nns_reg_classification_matches_r(
+    order: int | None,
+    name: str,
+    classes: np.ndarray,
+    point_est: np.ndarray,
+) -> None:
+    del name
+    x = np.linspace(0.0, float(classes.size - 1), classes.size)
+
+    expected = _r_nns_reg(
+        x,
+        classes,
+        order=order,
+        noise="off",
+        point_est=point_est,
+        type="class",
+    )
+    actual = nns_reg(x, classes, order=order, type="class", point_est=point_est)
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_reg_logical_auto_classification_matches_r() -> None:
+    x = np.linspace(0.0, 5.0, 6)
+    y = np.array([False, False, False, True, True, True])
+
+    expected = _r_nns_reg(
+        x,
+        y.astype(np.float64),
+        order=None,
+        noise="off",
+        point_est=np.array([1.5, 4.5]),
+    )
+    actual = nns_reg(x, y, point_est=np.array([1.5, 4.5]))
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_reg_factor_levels_return_numeric_codes() -> None:
+    x = np.linspace(0.0, 8.0, 9)
+    labels = np.array(["B", "B", "A", "A", "C", "C", "A", "B", "C"])
+    levels = ["A", "B", "C"]
+    encoded = np.array([2, 2, 1, 1, 3, 3, 1, 2, 3], dtype=np.float64)
+
+    expected = _r_nns_reg(
+        x,
+        encoded,
+        order=1,
+        noise="off",
+        point_est=np.array([1.5, 5.5]),
+        type="class",
+    )
+    actual = nns_reg(
+        x,
+        labels,
+        order=1,
+        type="class",
+        point_est=np.array([1.5, 5.5]),
+        class_levels=levels,
+    )
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_reg_raw_character_class_labels_raise() -> None:
+    x = np.linspace(0.0, 5.0, 6)
+    y = np.array(["A", "A", "A", "B", "B", "B"])
+
+    with pytest.raises(ValueError, match="class_levels"):
+        nns_reg(x, y, type="class")
+
+
 def _r_nns_reg(
     x: np.ndarray,
     y: np.ndarray,
@@ -260,6 +347,7 @@ def _r_nns_reg(
     noise: str,
     point_est: np.ndarray | None,
     confidence_interval: float | None = None,
+    type: str | None = None,
 ) -> Any:
     point_arg: list[float] | None = None if point_est is None else point_est.tolist()
     return nns(
@@ -270,7 +358,7 @@ def _r_nns_reg(
         order,
         None,
         None,
-        None,
+        type,
         point_arg,
         "top",
         True,

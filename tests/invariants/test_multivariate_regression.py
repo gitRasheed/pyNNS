@@ -62,11 +62,14 @@ def test_nns_m_reg_confidence_interval_shapes() -> None:
     assert result["pred.int"]["upper.pred.int"].shape == (2,)
 
 
-@pytest.mark.parametrize("kwargs", [{"type": "class"}])
-def test_nns_m_reg_deferred_paths_raise(kwargs: dict[str, object]) -> None:
+def test_nns_m_reg_classification_outputs_numeric_codes() -> None:
     x1 = np.linspace(-2.0, 2.0, 20)
     x = np.column_stack((x1, np.sin(x1)))
-    y = x1 + np.sin(x1)
+    y = np.where(x1 < 0.0, 1.0, 2.0)
 
-    with pytest.raises(NotImplementedError):
-        nns_m_reg(x, y, **kwargs)
+    result = nns_m_reg(x, y, type="class", point_est=x[:3], n_best=1)
+
+    assert 0.0 <= result["R2"] <= 1.0
+    assert set(result["Fitted.xy"]["y.hat"]).issubset(set(y))
+    assert result["Point.est"] is not None
+    assert set(result["Point.est"]).issubset(set(y))

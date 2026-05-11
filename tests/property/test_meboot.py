@@ -23,10 +23,15 @@ finite_arrays = arrays(
 )
 
 
-def _residual_sd(x: np.ndarray) -> float:
+def _valid_rho_target_input(x: np.ndarray) -> bool:
     time = np.arange(1, x.size + 1, dtype=np.float64)
     fitted = np.polyval(np.polyfit(time, x, 1), time)
-    return float(np.std(x - fitted))
+    residuals = x - fitted
+    return bool(
+        np.ptp(x) > 1e-8
+        and np.std(residuals) > 1e-8
+        and np.unique(np.round(residuals, decimals=12)).size >= 3
+    )
 
 
 @given(
@@ -41,8 +46,7 @@ def test_nns_meboot_random_inputs_have_valid_shape(
     rho: float,
     seed: int,
 ) -> None:
-    assume(np.ptp(x) > 1e-8)
-    assume(_residual_sd(x) > 1e-8)
+    assume(_valid_rho_target_input(x))
 
     result = nns_meboot(x, reps=reps, rho=rho, random_seed=seed)
 
@@ -54,8 +58,7 @@ def test_nns_meboot_random_inputs_have_valid_shape(
 
 @given(finite_arrays, st.integers(min_value=0, max_value=10000))
 def test_nns_meboot_same_seed_is_deterministic(x: np.ndarray, seed: int) -> None:
-    assume(np.ptp(x) > 1e-8)
-    assume(_residual_sd(x) > 1e-8)
+    assume(_valid_rho_target_input(x))
 
     first = nns_meboot(x, reps=3, rho=0.0, random_seed=seed)
     second = nns_meboot(x, reps=3, rho=0.0, random_seed=seed)

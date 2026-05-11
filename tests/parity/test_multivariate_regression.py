@@ -64,6 +64,15 @@ MREG_CI_CASES = [
     (2, 0.95, 1, 1, np.array([[0.0, 0.0], [3.0, 0.0]])),
     (3, 0.8, 2, 2, np.array([[0.0, 0.0, 0.0], [3.0, 0.0, 0.0]])),
 ]
+MREG_CLASS_CASES = [
+    (2, np.array([1, 1, 1, 2, 2, 2], dtype=np.float64), np.array([[1.5, 0.0], [4.5, 1.0]]), 1),
+    (
+        3,
+        np.array([1, 1, 2, 2, 3, 3, 2, 1, 3], dtype=np.float64),
+        np.array([[1.5, 0.0, 0.0], [5.5, -0.7, 0.4]]),
+        2,
+    ),
+]
 
 
 @pytest.mark.parity
@@ -147,6 +156,93 @@ def test_nns_m_reg_confidence_interval_matches_r(
     _assert_m_reg_matches(actual, expected)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize("n_best", [1, 2])
+@pytest.mark.parametrize(("n_cols", "classes", "point_est", "order"), MREG_CLASS_CASES)
+def test_nns_m_reg_classification_matches_r(
+    n_cols: int,
+    classes: np.ndarray,
+    point_est: np.ndarray,
+    order: int,
+    n_best: int,
+) -> None:
+    x, _ = _dataset(classes.size, n_cols, "mixed", np.random.default_rng(123))
+
+    expected = _r_nns_m_reg(
+        x,
+        classes,
+        order,
+        n_best,
+        point_est,
+        False,
+        "off",
+        type="class",
+    )
+    actual = nns_m_reg(
+        x,
+        classes,
+        order=order,
+        n_best=n_best,
+        type="class",
+        point_est=point_est,
+        ncores=1,
+    )
+
+    _assert_m_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_m_reg_factor_levels_return_numeric_codes() -> None:
+    x, _ = _dataset(9, 3, "mixed", np.random.default_rng(321))
+    labels = np.array(["B", "B", "A", "A", "C", "C", "A", "B", "C"])
+    levels = ["A", "B", "C"]
+    encoded = np.array([2, 2, 1, 1, 3, 3, 1, 2, 3], dtype=np.float64)
+    point_est = x[:2]
+
+    expected = _r_nns_m_reg(
+        x,
+        encoded,
+        1,
+        1,
+        point_est,
+        False,
+        "off",
+        type="class",
+    )
+    actual = nns_m_reg(
+        x,
+        labels,
+        order=1,
+        n_best=1,
+        type="class",
+        point_est=point_est,
+        class_levels=levels,
+    )
+
+    _assert_m_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_reg_matrix_classification_dispatches_to_m_reg() -> None:
+    x, _ = _dataset(9, 3, "mixed", np.random.default_rng(654))
+    y = np.array([1, 1, 2, 2, 3, 3, 2, 1, 3], dtype=np.float64)
+    point_est = np.array([[0.0, 0.0, 1.0], [1.5, 0.8, -0.2]])
+
+    expected = _r_nns_m_reg(
+        x,
+        y,
+        1,
+        1,
+        point_est,
+        False,
+        "mode_class",
+        type="class",
+    )
+    actual = nns_reg(x, y, order=1, type="class", point_est=point_est)
+
+    _assert_m_reg_matches(actual, expected)
+
+
 def _r_nns_m_reg(
     x: np.ndarray,
     y: np.ndarray,
@@ -156,6 +252,7 @@ def _r_nns_m_reg(
     point_only: bool,
     noise: str,
     confidence_interval: float | None = None,
+    type: str | None = None,
 ) -> Any:
     return nns(
         "NNS.M.reg",
@@ -164,7 +261,7 @@ def _r_nns_m_reg(
         False,
         order,
         n_best,
-        None,
+        type,
         None if point_est is None else point_est.tolist(),
         point_only,
         False,

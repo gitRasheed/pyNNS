@@ -255,10 +255,16 @@ R classification paths work with numeric class codes. R factors become
 codes rather than decoded labels. PyNNS provides `factor_2_dummy`,
 `factor_2_dummy_fr`, and `encode_factor_codes`; pass explicit `levels=` to
 reproduce R factor level order because NumPy arrays do not carry factor
-metadata. Raw string classification remains rejected in higher-level functions
-where installed R errors or produces unusable `NA` conversions. Higher-level
-classification paths in regression, stack, and boost remain deferred until the
-next classification batches.
+metadata.
+
+`nns_reg(..., type="class")` and `nns_m_reg(..., type="class")` are supported
+for numeric, logical, and factor-like targets. Use `class_levels=` when passing
+string/object labels so PyNNS can reproduce R factor codes explicitly. Raw
+string classification remains rejected where installed R errors or produces
+unusable `NA` conversions. Predictions and point estimates are numeric class
+codes, not original labels, matching installed R. Higher-level classification
+paths in stack and boost, class-specific interval tables, plus `balance=True`,
+remain deferred until the next classification batches.
 
 ## Differentiation
 

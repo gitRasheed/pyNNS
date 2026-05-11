@@ -88,7 +88,7 @@ def test_nns_reg_confidence_interval_none_output_unchanged() -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["smooth", "smooth_confidence", "class", "point_only"],
+    ["smooth", "smooth_confidence", "point_only"],
 )
 def test_nns_reg_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
@@ -99,9 +99,26 @@ def test_nns_reg_deferred_paths_raise(path: str) -> None:
             nns_reg(x, y, smooth=True)
         elif path == "smooth_confidence":
             nns_reg(x, y, smooth=True, confidence_interval=0.95)
-        elif path == "class":
-            nns_reg(x, y, type="CLASS")
         elif path == "point_only":
             nns_reg(x, y, point_only=True)
         else:
             nns_reg(x, y, multivariate_call=True)
+
+
+def test_nns_reg_classification_outputs_numeric_codes() -> None:
+    x = np.linspace(0.0, 5.0, 6)
+    y = np.array([1, 1, 1, 2, 2, 2], dtype=np.float64)
+
+    result = nns_reg(x, y, type="CLASS", point_est=np.array([1.5, 4.5]))
+
+    assert result["Prediction.Accuracy"] is not None
+    assert set(result["Fitted.xy"]["y.hat"]).issubset(set(y))
+    assert set(result["Point.est"]).issubset(set(y))
+
+
+def test_nns_reg_raw_string_class_labels_raise() -> None:
+    x = np.linspace(0.0, 5.0, 6)
+    y = np.array(["A", "A", "A", "B", "B", "B"])
+
+    with pytest.raises(ValueError, match="class_levels"):
+        nns_reg(x, y, type="class")

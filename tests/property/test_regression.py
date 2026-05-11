@@ -115,3 +115,19 @@ def test_nns_reg_confidence_interval_shape_invariants_hold(
     assert result["pred.int"] is not None
     assert set(result["pred.int"]) == {"pred.int.neg", "pred.int.pos"}
     assert result["pred.int"]["pred.int.neg"].shape == result["pred.int"]["pred.int.pos"].shape
+
+
+@given(
+    finite_arrays,
+    st.integers(min_value=2, max_value=4),
+)
+def test_nns_reg_classification_bounds_hold(x: np.ndarray, n_classes: int) -> None:
+    assume(np.unique(x).size > 1)
+    classes = (np.arange(x.size) % n_classes + 1).astype(np.float64)
+    points = np.array([float(np.min(x)), float(np.mean(x)), float(np.max(x))])
+
+    result = nns_reg(x, classes, order=1, type="class", point_est=points)
+
+    assert result["Prediction.Accuracy"] is not None
+    assert set(result["Fitted.xy"]["y.hat"]).issubset(set(classes))
+    assert set(result["Point.est"]).issubset(set(classes))

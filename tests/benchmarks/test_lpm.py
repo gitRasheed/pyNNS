@@ -254,6 +254,18 @@ def test_nns_reg_200_confidence_interval(benchmark: Any, r_baseline: dict[str, o
 
 
 @pytest.mark.benchmark
+def test_nns_reg_class_200(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 200)
+    y = (np.arange(200, dtype=np.float64) % 3.0) + 1.0
+    point_est = np.linspace(-3.0, 3.0, 20)
+
+    result = benchmark(nns_reg, x, y, point_est=point_est, type="class")
+
+    assert result["Prediction.Accuracy"] is not None
+    assert isinstance(r_baseline["nns_reg_class_200_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_reg_dimred_200x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-3.0, 3.0, 200)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))
@@ -290,6 +302,18 @@ def test_nns_m_reg_200x3_confidence_interval(
 
     assert result["pred.int"] is not None
     assert isinstance(r_baseline["nns_m_reg_200x3_ci_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_m_reg_class_200x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 200)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = (np.arange(200, dtype=np.float64) % 3.0) + 1.0
+
+    result = benchmark(nns_m_reg, variable, y, point_est=variable[:20], type="class")
+
+    assert "Fitted.xy" in result
+    assert isinstance(r_baseline["nns_m_reg_class_200x3_seconds"], float)
 
 
 @pytest.mark.benchmark

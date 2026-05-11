@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from pynns._helpers import _fast_lm, _is_fcl
+from pynns.categorical import encode_factor_codes
 from pynns.causation import _uni_caus
 from pynns.central_tendencies import nns_mode
 from pynns.copula import _target
@@ -19,8 +20,8 @@ Order = int | Literal["max"] | None
 
 
 def nns_reg(
-    x: NDArray[np.float64],
-    y: NDArray[np.float64],
+    x: NDArray[Any],
+    y: NDArray[Any],
     *,
     factor_2_dummy: bool = False,
     order: Order = None,
@@ -41,6 +42,7 @@ def nns_reg(
     ncores: int | None = None,
     point_only: bool = False,
     multivariate_call: bool = False,
+    class_levels: list[object] | None = None,
 ) -> dict[str, Any]:
     """Univariate numeric port of R's NNS.reg."""
     del return_values, plot, plot_regions, residual_plot, ncores
@@ -65,29 +67,51 @@ def nns_reg(
             multivariate_call=multivariate_call,
         )
 
+    type_value = _normalize_type(type)
+    if type_value == "class":
+        noise_reduction = "mode_class"
+
     if np.asarray(x).ndim == 2:
         from pynns.multivariate_regression import nns_m_reg
 
+        y_matrix_values, _ = _prepare_y_values(y, type_value=type_value, class_levels=class_levels)
+        dispatch_n_best = n_best
+        if type_value == "class" and dispatch_n_best is None:
+            dispatch_n_best = 1
         return nns_m_reg(
             np.asarray(x, dtype=np.float64),
-            np.asarray(y, dtype=np.float64),
+            y_matrix_values,
             factor_2_dummy=factor_2_dummy,
             order=order,
-            n_best=cast(Any, n_best),
-            type=type,
+            n_best=cast(Any, dispatch_n_best),
+            type=type_value,
             point_est=None if point_est is None else np.asarray(point_est, dtype=np.float64),
             point_only=point_only,
             noise_reduction=noise_reduction,
             dist=dist,
             confidence_interval=confidence_interval,
+            class_levels=class_levels,
         )
 
     del tau, threshold, n_best, dist
-    x_values, y_values = _validate_univariate_inputs(x, y, factor_2_dummy)
+    x_values, y_values = _validate_univariate_inputs(
+        x,
+        y,
+        factor_2_dummy,
+        type_value=type_value,
+        class_levels=class_levels,
+    )
+    class_mode = type_value == "class" or _should_auto_classify(y_values)
+    if class_mode:
+        noise_reduction = "mode_class"
+        if type_value == "class" and confidence_interval is not None:
+            raise NotImplementedError(
+                "classification confidence intervals are deferred until class interval parity "
+                "is ported."
+            )
     _reject_deferred_paths(
         x_values,
         dim_red_method=dim_red_method,
-        type=type,
         point_est=point_est,
         confidence_interval=confidence_interval,
         smooth=smooth,
@@ -104,6 +128,7 @@ def nns_reg(
         point_values=point_values,
         confidence_interval=confidence_interval,
         multivariate_call=multivariate_call,
+        class_mode=class_mode,
         equation=None,
         x_star=None,
     )
@@ -118,6 +143,7 @@ def _nns_reg_univariate_core(
     point_values: NDArray[np.float64] | None,
     confidence_interval: float | None,
     multivariate_call: bool,
+    class_mode: bool,
     equation: dict[str, NDArray[np.float64] | NDArray[np.str_]] | None,
     x_star: dict[str, NDArray[np.float64]] | None,
 ) -> dict[str, Any]:
@@ -129,21 +155,36 @@ def _nns_reg_univariate_core(
 
     rp = part_map["regression.points"]
     rp_x, rp_y = _initial_regression_points(rp["x"], rp["y"], x_values)
-    rp_x, rp_y = _add_central_point(rp_x, rp_y, x_values, y_values)
-    rp_x, rp_y = _add_endpoint_points(rp_x, rp_y, x_values, y_values, dependence)
+    if not class_mode:
+        rp_x, rp_y = _add_central_point(rp_x, rp_y, x_values, y_values)
+    rp_x, rp_y = _add_endpoint_points(
+        rp_x,
+        rp_y,
+        x_values,
+        y_values,
+        dependence,
+        class_mode=class_mode,
+    )
     rp_x = np.minimum(np.max(x_values), np.maximum(np.min(x_values), rp_x))
     rp_y = np.minimum(np.max(y_values), np.maximum(np.min(y_values), rp_y))
+    rp_y_for_coeff = rp_y.copy()
+    if class_mode:
+        rp_y = _round_clamp_classes(rp_y, y_values)
 
     if multivariate_call:
         return {"x": rp_x, "y": rp_y}
 
-    coeff = _coefficients(rp_x, rp_y, x_values, y_values)
+    coeff = _coefficients(rp_x, rp_y_for_coeff, x_values, y_values)
     estimate = _fitted_values(x_values, y_values, rp_x, rp_y, coeff, order)
+    if class_mode:
+        estimate = _round_clamp_classes(estimate, y_values)
 
     if point_values is None:
         point_est_y = np.array([], dtype=np.float64)
     else:
         point_est_y = _predict_points(point_values, x_values, y_values, rp_x, rp_y, coeff)
+        if class_mode:
+            point_est_y = _round_clamp_classes(point_est_y, y_values)
 
     if isinstance(order, str):
         rp_out_x, rp_out_y = _consolidate_points(part_map["dt"]["x"], part_map["dt"]["y"])
@@ -158,11 +199,16 @@ def _nns_reg_univariate_core(
     )
     se = float(math.sqrt(float(np.sum((estimate - y_values) ** 2)) / (y_values.size - 1)))
     r2 = _r2(y_values, estimate)
+    prediction_accuracy = (
+        float((y_values.size - np.sum(np.abs(np.round(estimate) - y_values) > 0.0)) / y_values.size)
+        if class_mode
+        else None
+    )
 
     return {
         "R2": r2,
         "SE": se,
-        "Prediction.Accuracy": None,
+        "Prediction.Accuracy": prediction_accuracy,
         "equation": equation,
         "x.star": x_star,
         "derivative": {
@@ -178,9 +224,12 @@ def _nns_reg_univariate_core(
 
 
 def _validate_univariate_inputs(
-    x: NDArray[np.float64],
-    y: NDArray[np.float64],
+    x: NDArray[Any],
+    y: NDArray[Any],
     factor_2_dummy: bool,
+    *,
+    type_value: str | None,
+    class_levels: list[object] | None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     if factor_2_dummy and (_is_fcl(x) or _is_fcl(y)):
         raise NotImplementedError(
@@ -188,7 +237,7 @@ def _validate_univariate_inputs(
             "the factor path is ported."
         )
     x_values = np.asarray(x, dtype=np.float64)
-    y_values = np.asarray(y, dtype=np.float64)
+    y_values, _ = _prepare_y_values(y, type_value=type_value, class_levels=class_levels)
     if x_values.ndim != 1 or y_values.ndim != 1:
         raise NotImplementedError("matrix x input requires NNS.M.reg, which is not yet ported.")
     if x_values.size == 0:
@@ -198,6 +247,50 @@ def _validate_univariate_inputs(
     if not np.all(np.isfinite(x_values)) or not np.all(np.isfinite(y_values)):
         raise ValueError("x and y must contain only finite values.")
     return x_values, y_values
+
+
+def _normalize_type(type_value: str | None) -> str | None:
+    if type_value is None:
+        return None
+    normalized = type_value.lower()
+    if normalized != "class":
+        raise ValueError("type must be 'class' when provided.")
+    return normalized
+
+
+def _prepare_y_values(
+    y: NDArray[Any],
+    *,
+    type_value: str | None,
+    class_levels: list[object] | None,
+) -> tuple[NDArray[np.float64], list[object] | None]:
+    y_array = np.asarray(y)
+    if y_array.ndim != 1:
+        y_array = y_array.reshape(-1)
+    if class_levels is not None:
+        return encode_factor_codes(y_array, levels=class_levels)
+    if y_array.dtype.kind in {"U", "S", "O"}:
+        if type_value == "class":
+            raise ValueError(
+                "raw string/object class labels require class_levels to reproduce R factor codes."
+            )
+    return np.asarray(y_array, dtype=np.float64).reshape(-1), None
+
+
+def _should_auto_classify(y: NDArray[np.float64]) -> bool:
+    if y.size == 0:
+        return False
+    if not np.all(np.isclose(y, np.round(y), rtol=0.0, atol=1e-12)):
+        return False
+    return np.unique(y).size < math.sqrt(y.size)
+
+
+def _round_clamp_classes(
+    values: NDArray[np.float64],
+    y: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    rounded = np.where(values % 1.0 < 0.5, np.floor(values), np.ceil(values))
+    return np.minimum(float(np.max(y)), np.maximum(float(np.min(y)), rounded)).astype(np.float64)
 
 
 def _nns_reg_dimred(
@@ -263,6 +356,7 @@ def _nns_reg_dimred(
         point_values=projection.point_est,
         confidence_interval=confidence_interval,
         multivariate_call=False,
+        class_mode=False,
         equation=projection.equation,
         x_star={"x": projection.x_star},
     )
@@ -496,7 +590,6 @@ def _reject_deferred_paths(
     x: NDArray[np.float64],
     *,
     dim_red_method: object | None,
-    type: str | None,
     point_est: NDArray[np.float64] | float | None,
     confidence_interval: float | None,
     smooth: bool,
@@ -517,10 +610,6 @@ def _reject_deferred_paths(
             )
         raise NotImplementedError(
             "smooth=True requires the smoothing-spline path, deferred to a later batch."
-        )
-    if type is not None:
-        raise NotImplementedError(
-            "classification type paths are deferred to a later regression batch."
         )
     if point_only:
         raise NotImplementedError(
@@ -697,13 +786,15 @@ def _add_endpoint_points(
     x: NDArray[np.float64],
     y: NDArray[np.float64],
     dependence: float,
+    *,
+    class_mode: bool,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    if dependence >= 1.0:
+    if dependence >= 1.0 and not class_mode:
         min_y = float(y[np.flatnonzero(x == np.min(x))[0]])
         max_y = float(y[np.flatnonzero(x == np.max(x))[0]])
     else:
-        min_y = _endpoint_y(x, y, rp_x, low=True, dependence=dependence)
-        max_y = _endpoint_y(x, y, rp_x, low=False, dependence=dependence)
+        min_y = _endpoint_y(x, y, rp_x, low=True, dependence=dependence, class_mode=class_mode)
+        max_y = _endpoint_y(x, y, rp_x, low=False, dependence=dependence, class_mode=class_mode)
     return _consolidate_points(
         np.concatenate((rp_x, np.array([float(np.min(x)), float(np.max(x))]))),
         np.concatenate((rp_y, np.array([min_y, max_y]))),
@@ -717,6 +808,7 @@ def _endpoint_y(
     *,
     low: bool,
     dependence: float,
+    class_mode: bool,
 ) -> float:
     boundary = float(np.min(x) if low else np.max(x))
     reg_range = float(np.min(rp_x) if low else np.max(rp_x))
@@ -724,6 +816,8 @@ def _endpoint_y(
     boundary_mask = x <= reg_range if low else x >= reg_range
     mid_mask = x <= mid_range if low else x >= mid_range
     y_boundary = y[boundary_mask]
+    if class_mode:
+        return float(nns_mode(y_boundary, discrete=True))
     y_mid = y[mid_mask]
     x_mid = x[mid_mask]
     unique_x_mid = np.unique(x_mid).size
