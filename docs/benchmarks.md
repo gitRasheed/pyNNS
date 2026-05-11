@@ -31,5 +31,5 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_seas`, T_obs=5000 | 0.026 ms | 4.000 ms | 0.01x |
 | `nns_arma`, T_obs=500, h=12, seasonal_factor=True, method=nonlin | 17.355 ms | 313.333 ms | 0.06x |
 | `nns_arma`, T_obs=500, h=12, seasonal_factor=12, method=nonlin | 86.596 ms | 318.333 ms | 0.27x |
-| `nns_meboot`, T_obs=500, reps=100, rho=0 | 819.077 ms | 78.000 ms | 10.50x |
-| `nns_meboot`, T_obs=1000, reps=100, rho=0 | 1032.490 ms | 108.000 ms | 9.56x |
+| `nns_meboot`, T_obs=500, reps=100, rho=0 | 74.937 ms | 78.000 ms | 0.96x |
+| `nns_meboot`, T_obs=1000, reps=100, rho=0 | 115.564 ms | 108.000 ms | 1.07x |

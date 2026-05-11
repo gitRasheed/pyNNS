@@ -267,14 +267,18 @@ def _target_rho(
     rho: float,
     type_: str,
 ) -> NDArray[np.float64]:
-    from scipy.optimize import minimize  # type: ignore[import-untyped]
-    from scipy.stats import rankdata  # type: ignore[import-untyped]
+    from scipy.optimize import minimize_scalar  # type: ignore[import-untyped]
 
-    r_o = np.asarray(rankdata(orig_res, method="average"), dtype=np.float64)
+    r_o = _rank_average(orig_res)
     r_anti = float(np.max(r_o)) + 1.0 - r_o
     r_o_idx = np.clip(np.floor(r_o).astype(np.int64) - 1, 0, orig_res.size - 1)
     r_anti_idx = np.clip(np.floor(r_anti).astype(np.int64) - 1, 0, orig_res.size - 1)
     out = res_mat.copy()
+    target_values = _rank_average(orig_res) if type_ == "spearman" else orig_res
+    target_centered = target_values - float(np.mean(target_values))
+    target_norm = float(np.sqrt(np.sum(target_centered * target_centered)))
+    if target_norm == 0.0 or not np.isfinite(target_norm):
+        raise ValueError("function cannot be evaluated at initial parameters")
 
     for j in range(out.shape[1]):
         res_sorted = np.sort(out[:, j])
@@ -282,16 +286,13 @@ def _target_rho(
         m_values = res_sorted[r_anti_idx]
 
         def objective(
-            ab: NDArray[np.float64],
+            t: float,
             e_: NDArray[np.float64] = e_values,
             m_: NDArray[np.float64] = m_values,
         ) -> float:
-            denom = ab[0] + ab[1]
-            if denom == 0.0:
-                return np.inf
-            comb = (ab[0] * m_ + ab[1] * e_) / denom
+            comb = t * m_ + (1.0 - t) * e_
             if type_ in {"spearman", "pearson"}:
-                corr = _cor(comb, orig_res, type_)
+                corr = _fast_corr(comb, target_centered, target_norm, type_)
             elif type_ == "nnsdep":
                 corr = nns_dep(comb, orig_res)["Dependence"]
             else:
@@ -300,19 +301,18 @@ def _target_rho(
                 return np.inf
             return abs(float(corr) - rho)
 
-        initial = np.array([0.5, 0.5], dtype=np.float64)
-        if not np.isfinite(objective(initial)):
+        if not np.isfinite(objective(0.5)):
             raise ValueError("function cannot be evaluated at initial parameters")
-        opt = minimize(
+        opt = minimize_scalar(
             objective,
-            initial,
-            method="Nelder-Mead",
-            options={"xatol": 0.01, "fatol": 0.01},
+            bounds=(0.0, 1.0),
+            method="bounded",
+            options={"xatol": 0.01, "maxiter": 20},
         )
-        denom = float(np.sum(np.abs(opt.x)))
-        if denom == 0.0 or not np.isfinite(denom):
+        if not np.isfinite(opt.fun):
             raise ValueError("function cannot be evaluated at initial parameters")
-        out[:, j] = (opt.x[0] * m_values + opt.x[1] * e_values) / denom
+        t = float(opt.x)
+        out[:, j] = t * m_values + (1.0 - t) * e_values
 
     return out
 
@@ -344,7 +344,7 @@ def _meboot_expand_sd(
 
 
 def _force_clt(x: NDArray[np.float64], ensemble: NDArray[np.float64]) -> NDArray[np.float64]:
-    from scipy.stats import norm
+    from scipy.stats import norm  # type: ignore[import-untyped]
 
     out = ensemble.copy()
     n_reps = out.shape[1]
@@ -398,19 +398,29 @@ def _linear_interp(
     return y0 + (x - x0) * (y1 - y0) / (x1 - x0)
 
 
-def _cor(x: NDArray[np.float64], y: NDArray[np.float64], method: str) -> float:
-    from scipy.stats import rankdata
-
-    x_values = (
-        np.asarray(rankdata(x, method="average"), dtype=np.float64)
-        if method == "spearman"
-        else x
-    )
-    y_values = (
-        np.asarray(rankdata(y, method="average"), dtype=np.float64)
-        if method == "spearman"
-        else y
-    )
-    if np.std(x_values) == 0.0 or np.std(y_values) == 0.0:
+def _fast_corr(
+    x: NDArray[np.float64],
+    target_centered: NDArray[np.float64],
+    target_norm: float,
+    method: str,
+) -> float:
+    x_values = _rank_average(x) if method == "spearman" else x
+    x_centered = x_values - float(np.mean(x_values))
+    x_norm = float(np.sqrt(np.sum(x_centered * x_centered)))
+    if x_norm == 0.0 or target_norm == 0.0:
         return float("nan")
-    return float(np.corrcoef(x_values, y_values)[0, 1])
+    return float(np.sum(x_centered * target_centered) / (x_norm * target_norm))
+
+
+def _rank_average(x: NDArray[np.float64]) -> NDArray[np.float64]:
+    order = np.argsort(x, kind="mergesort")
+    sorted_x = x[order]
+    ranks = np.empty(x.size, dtype=np.float64)
+    if x.size == 0:
+        return ranks
+    group_start = np.concatenate(([0], np.flatnonzero(sorted_x[1:] != sorted_x[:-1]) + 1))
+    group_end = np.concatenate((group_start[1:], [x.size]))
+    group_size = group_end - group_start
+    group_rank = 0.5 * (group_start + 1 + group_end)
+    ranks[order] = np.repeat(group_rank, group_size)
+    return ranks
