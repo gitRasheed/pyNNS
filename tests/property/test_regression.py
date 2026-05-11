@@ -23,6 +23,18 @@ finite_arrays = arrays(
     ),
 )
 
+finite_matrices = arrays(
+    dtype=np.float64,
+    shape=st.tuples(st.integers(min_value=12, max_value=60), st.integers(min_value=2, max_value=4)),
+    elements=st.floats(
+        min_value=-1e3,
+        max_value=1e3,
+        allow_nan=False,
+        allow_infinity=False,
+        width=64,
+    ),
+)
+
 
 @given(
     finite_arrays,
@@ -53,3 +65,27 @@ def test_nns_reg_univariate_shape_invariants_hold(
     assert result["derivative"]["Coefficient"].size == result["derivative"]["X.Lower.Range"].size
     assert result["derivative"]["Coefficient"].size == result["derivative"]["X.Upper.Range"].size
     assert result["regression.points"]["x"].size == result["regression.points"]["y"].size
+
+
+@given(
+    finite_matrices,
+    st.sampled_from(["cor", "NNS.dep", "equal", [1.0, 0.5, 0.25, 0.125]]),
+)
+def test_nns_reg_dim_red_shape_invariants_hold(
+    x: np.ndarray,
+    method: str | list[float],
+) -> None:
+    y = 0.5 * x[:, 0] - 0.25 * x[:, 1]
+    assume(np.unique(y).size > 1)
+    assume(all(np.unique(x[:, col]).size > 1 for col in range(x.shape[1])))
+    if isinstance(method, list):
+        method = method[: x.shape[1]]
+        assume(len(method) == x.shape[1])
+
+    result = nns_reg(x, y, dim_red_method=method)
+
+    assert np.isnan(result["R2"]) or -1e-12 <= result["R2"] <= 1.0 + 1e-12
+    assert result["x.star"]["x"].shape == (x.shape[0],)
+    assert result["equation"]["Variable"].shape == (x.shape[1] + 1,)
+    assert result["equation"]["Coefficient"].shape == (x.shape[1] + 1,)
+    assert result["Fitted.xy"]["x"].shape == (x.shape[0],)

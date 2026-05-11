@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from pynns._helpers import _fast_lm, _is_fcl
+from pynns.causation import _uni_caus
 from pynns.central_tendencies import nns_mode
 from pynns.copula import _target
 from pynns.dependence import _dpm_nd, _gravity, nns_dep
@@ -41,8 +42,46 @@ def nns_reg(
     multivariate_call: bool = False,
 ) -> dict[str, Any]:
     """Univariate numeric port of R's NNS.reg."""
-    del tau, return_values, plot, plot_regions, residual_plot, threshold, n_best, dist, ncores
+    del return_values, plot, plot_regions, residual_plot, ncores
 
+    if dim_red_method is not None:
+        return _nns_reg_dimred(
+            x,
+            y,
+            factor_2_dummy=factor_2_dummy,
+            order=order,
+            dim_red_method=dim_red_method,
+            tau=tau,
+            type=type,
+            point_est=point_est,
+            confidence_interval=confidence_interval,
+            threshold=threshold,
+            n_best=n_best,
+            smooth=smooth,
+            noise_reduction=noise_reduction,
+            dist=dist,
+            point_only=point_only,
+            multivariate_call=multivariate_call,
+        )
+
+    if np.asarray(x).ndim == 2:
+        from pynns.multivariate_regression import nns_m_reg
+
+        return nns_m_reg(
+            np.asarray(x, dtype=np.float64),
+            np.asarray(y, dtype=np.float64),
+            factor_2_dummy=factor_2_dummy,
+            order=order,
+            n_best=cast(Any, n_best),
+            type=type,
+            point_est=None if point_est is None else np.asarray(point_est, dtype=np.float64),
+            point_only=point_only,
+            noise_reduction=noise_reduction,
+            dist=dist,
+            confidence_interval=confidence_interval,
+        )
+
+    del tau, threshold, n_best, dist
     x_values, y_values = _validate_univariate_inputs(x, y, factor_2_dummy)
     _reject_deferred_paths(
         x_values,
@@ -56,6 +95,29 @@ def nns_reg(
     )
     noise = _validate_noise_reduction(noise_reduction)
     point_values = _as_point_est(point_est)
+    return _nns_reg_univariate_core(
+        x_values,
+        y_values,
+        order=order,
+        noise=noise,
+        point_values=point_values,
+        multivariate_call=multivariate_call,
+        equation=None,
+        x_star=None,
+    )
+
+
+def _nns_reg_univariate_core(
+    x_values: NDArray[np.float64],
+    y_values: NDArray[np.float64],
+    *,
+    order: Order,
+    noise: NoiseReduction,
+    point_values: NDArray[np.float64] | None,
+    multivariate_call: bool,
+    equation: dict[str, NDArray[np.float64] | NDArray[np.str_]] | None,
+    x_star: dict[str, NDArray[np.float64]] | None,
+) -> dict[str, Any]:
 
     dependence = _regression_dependence(x_values, y_values)
     dep_order = _dep_reduced_order(dependence, order, y_values.size)
@@ -93,8 +155,8 @@ def nns_reg(
         "R2": r2,
         "SE": se,
         "Prediction.Accuracy": None,
-        "equation": None,
-        "x.star": None,
+        "equation": equation,
+        "x.star": x_star,
         "derivative": {
             "Coefficient": coeff["Coefficient"],
             "X.Lower.Range": coeff["X.Lower.Range"],
@@ -128,6 +190,296 @@ def _validate_univariate_inputs(
     if not np.all(np.isfinite(x_values)) or not np.all(np.isfinite(y_values)):
         raise ValueError("x and y must contain only finite values.")
     return x_values, y_values
+
+
+def _nns_reg_dimred(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    *,
+    factor_2_dummy: bool,
+    order: Order,
+    dim_red_method: object,
+    tau: object | None,
+    type: str | None,
+    point_est: NDArray[np.float64] | float | None,
+    confidence_interval: float | None,
+    threshold: float,
+    n_best: object | None,
+    smooth: bool,
+    noise_reduction: NoiseReduction,
+    dist: str,
+    point_only: bool,
+    multivariate_call: bool,
+) -> dict[str, Any]:
+    del n_best
+    if factor_2_dummy:
+        raise NotImplementedError(
+            "factor_2_dummy=True is deferred until the factor dimension-reduction path is ported."
+        )
+    if type is not None:
+        raise NotImplementedError(
+            "classification type paths are deferred to a later regression batch."
+        )
+    if smooth:
+        raise NotImplementedError(
+            "smooth=True requires the smoothing-spline path, deferred to a later batch."
+        )
+    if confidence_interval is not None:
+        raise NotImplementedError(
+            "confidence_interval output is deferred until the regression interval path is ported."
+        )
+    if multivariate_call:
+        raise NotImplementedError(
+            "multivariate_call with dim_red_method is not used by R and is not supported."
+        )
+
+    x_matrix, y_values = _validate_dimred_inputs(x, y)
+    point_matrix = _as_dimred_point_est(point_est, x_matrix.shape[1])
+    noise = _validate_noise_reduction(noise_reduction)
+    projection = _dimred_projection(
+        x_matrix,
+        y_values,
+        dim_red_method=dim_red_method,
+        tau=tau,
+        threshold=threshold,
+        point_est=point_matrix,
+        dist=dist,
+    )
+    dimred_order = _dimred_order(projection.x_star, y_values, order)
+    result = _nns_reg_univariate_core(
+        projection.x_star,
+        y_values,
+        order=dimred_order,
+        noise=noise,
+        point_values=projection.point_est,
+        multivariate_call=False,
+        equation=projection.equation,
+        x_star={"x": projection.x_star},
+    )
+    if point_only:
+        return result
+    return result
+
+
+class _DimredProjection:
+    def __init__(
+        self,
+        x_star: NDArray[np.float64],
+        point_est: NDArray[np.float64] | None,
+        equation: dict[str, NDArray[np.float64] | NDArray[np.str_]],
+    ) -> None:
+        self.x_star = x_star
+        self.point_est = point_est
+        self.equation = equation
+
+
+def _validate_dimred_inputs(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    x_values = np.asarray(x, dtype=np.float64)
+    y_values = np.asarray(y, dtype=np.float64).reshape(-1)
+    if x_values.ndim != 2:
+        raise ValueError("dim_red_method requires a 2D numeric x matrix.")
+    if x_values.shape[0] == 0 or x_values.shape[1] == 0:
+        raise ValueError("x must be non-empty.")
+    if x_values.shape[0] != y_values.size:
+        raise ValueError("x and y must have the same row count.")
+    if not np.all(np.isfinite(x_values)) or not np.all(np.isfinite(y_values)):
+        raise ValueError("x and y must contain only finite values.")
+    return x_values, y_values
+
+
+def _as_dimred_point_est(
+    point_est: NDArray[np.float64] | float | None,
+    n_cols: int,
+) -> NDArray[np.float64] | None:
+    if point_est is None:
+        return None
+    values = np.asarray(point_est, dtype=np.float64)
+    if values.ndim == 0:
+        values = values.reshape(1, 1)
+    elif values.ndim == 1:
+        values = values.reshape(1, -1)
+    if values.ndim != 2:
+        raise ValueError("point_est must be a vector or 2D matrix.")
+    if values.shape[1] != n_cols:
+        raise ValueError("point_est must have the same column count as x.")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("point_est must contain only finite values.")
+    return values
+
+
+def _dimred_projection(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    *,
+    dim_red_method: object,
+    tau: object | None,
+    threshold: float,
+    point_est: NDArray[np.float64] | None,
+    dist: str,
+) -> _DimredProjection:
+    coef = _dimred_coefficients(x, y, dim_red_method=dim_red_method, tau=tau)
+    if coef.size != x.shape[1]:
+        raise ValueError("numeric dim_red_method must have one coefficient per x column.")
+    preserved = coef.copy()
+    coef = coef.copy()
+    coef[np.abs(coef) < threshold] = 0.0
+
+    norm_x = _r_minmax_columns(x, zero_guard=False)
+    x_star_matrix = norm_x * coef[np.newaxis, :]
+    x_star_matrix[~np.isfinite(x_star_matrix)] = 0.0
+    if np.all(x_star_matrix == 0.0):
+        x_star_matrix = x.copy()
+        coef[coef == 0.0] = preserved[coef == 0.0]
+
+    active_count = int(np.sum(np.abs(coef) > 0.0))
+    if active_count == 0:
+        active_count = 1
+    x_star = np.sum(x_star_matrix / active_count, axis=1)
+    point_star = (
+        None
+        if point_est is None
+        else _project_dimred_points(point_est, x, coef, active_count, dist=dist)
+    )
+    denominator = float(np.sum(dim_red_method)) if isinstance(dim_red_method, np.ndarray) else None
+    if denominator is None and isinstance(dim_red_method, (list, tuple)):
+        try:
+            denominator = float(np.sum(np.asarray(dim_red_method, dtype=np.float64)))
+        except (TypeError, ValueError):
+            denominator = None
+    if denominator is None:
+        denominator = float(active_count)
+    equation = {
+        "Variable": np.asarray([f"X{index + 1}" for index in range(x.shape[1])] + ["DENOMINATOR"]),
+        "Coefficient": np.concatenate((coef, np.array([denominator], dtype=np.float64))),
+    }
+    return _DimredProjection(x_star=x_star, point_est=point_star, equation=equation)
+
+
+def _dimred_coefficients(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    *,
+    dim_red_method: object,
+    tau: object | None,
+) -> NDArray[np.float64]:
+    if isinstance(dim_red_method, str):
+        method = dim_red_method.lower()
+        if method == "cor":
+            return _spearman_coefficients(x, y)
+        if method == "nns.dep":
+            return np.asarray(
+                [nns_dep(x[:, col], y, asym=True)["Dependence"] for col in range(x.shape[1])]
+            )
+        if method == "nns.caus":
+            tau_value = _dimred_tau(tau)
+            return np.asarray([_uni_caus(y, x[:, col], tau_value) for col in range(x.shape[1])])
+        if method == "all":
+            tau_value = _dimred_tau(tau)
+            caus = np.asarray([_uni_caus(y, x[:, col], tau_value) for col in range(x.shape[1])])
+            dep = np.asarray(
+                [nns_dep(x[:, col], y, asym=True)["Dependence"] for col in range(x.shape[1])]
+            )
+            cor = _spearman_coefficients(x, y)
+            equal = np.ones(x.shape[1], dtype=np.float64)
+            stacked = np.column_stack((caus, dep, cor, equal))
+            return np.asarray([float(nns_mode(row)) for row in stacked], dtype=np.float64)
+        if method == "equal":
+            return np.ones(x.shape[1], dtype=np.float64)
+        raise ValueError(
+            "dim_red_method must be one of 'cor', 'NNS.dep', 'NNS.caus', 'all', 'equal', "
+            "or a numeric vector."
+        )
+    coef = np.asarray(dim_red_method, dtype=np.float64).reshape(-1)
+    coef[~np.isfinite(coef)] = 0.0
+    return coef
+
+
+def _dimred_tau(tau: object | None) -> int:
+    if tau is None or tau == "cs":
+        return 0
+    if tau == "ts":
+        raise NotImplementedError(
+            "tau='ts' requires NNS.seas (seasonality detection), which is not yet ported in PyNNS. "
+            "Use tau='cs' or a numeric lag instead."
+        )
+    tau_value = int(cast(Any, tau))
+    if tau_value < 0:
+        raise ValueError("tau must be non-negative.")
+    return tau_value
+
+
+def _spearman_coefficients(x: NDArray[np.float64], y: NDArray[np.float64]) -> NDArray[np.float64]:
+    y_rank = _rank_average(y)
+    out = np.empty(x.shape[1], dtype=np.float64)
+    for col in range(x.shape[1]):
+        out[col] = _pearson(_rank_average(x[:, col]), y_rank)
+    out[~np.isfinite(out)] = 0.0
+    return out
+
+
+def _rank_average(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    order = np.argsort(values, kind="mergesort")
+    sorted_values = values[order]
+    ranks = np.empty(values.size, dtype=np.float64)
+    start = 0
+    while start < values.size:
+        end = start + 1
+        while end < values.size and sorted_values[end] == sorted_values[start]:
+            end += 1
+        ranks[order[start:end]] = (start + 1 + end) / 2.0
+        start = end
+    return ranks
+
+
+def _pearson(x: NDArray[np.float64], y: NDArray[np.float64]) -> float:
+    x_centered = x - float(np.mean(x))
+    y_centered = y - float(np.mean(y))
+    denom = math.sqrt(float(np.sum(x_centered**2) * np.sum(y_centered**2)))
+    if denom == 0.0:
+        return 0.0
+    return float(np.sum(x_centered * y_centered) / denom)
+
+
+def _r_minmax_columns(values: NDArray[np.float64], *, zero_guard: bool) -> NDArray[np.float64]:
+    vmin = np.min(values, axis=0)
+    vmax = np.max(values, axis=0)
+    denom = vmax - vmin
+    if zero_guard:
+        denom = np.where(denom == 0.0, 1.0, denom)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        scaled = (values - vmin[np.newaxis, :]) / denom[np.newaxis, :]
+    return np.asarray(scaled, dtype=np.float64)
+
+
+def _project_dimred_points(
+    point_est: NDArray[np.float64],
+    x: NDArray[np.float64],
+    coef: NDArray[np.float64],
+    active_count: int,
+    *,
+    dist: str,
+) -> NDArray[np.float64]:
+    joint = np.vstack((point_est, x))
+    if dist.lower() != "factor":
+        joint = _r_minmax_columns(joint, zero_guard=True)
+    point_norm = joint[: point_est.shape[0]]
+    return np.asarray(point_norm @ coef / active_count, dtype=np.float64)
+
+
+def _dimred_order(x_star: NDArray[np.float64], y: NDArray[np.float64], order: Order) -> Order:
+    if order == "max":
+        return "max"
+    if order is None:
+        dependence = _regression_dependence(x_star, y)
+        computed = max(1, math.floor(dependence * 10.0))
+    else:
+        computed = max(1, _round_half_up(float(order)))
+    if y.size < 100:
+        computed = _round_half_up(max(1.0, computed / 2.0))
+    return max(1, computed)
 
 
 def _reject_deferred_paths(

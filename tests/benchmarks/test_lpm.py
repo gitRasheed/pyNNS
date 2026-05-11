@@ -201,6 +201,18 @@ def test_nns_reg_500(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
 
 @pytest.mark.benchmark
+def test_nns_reg_dimred_200x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 200)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+
+    result = benchmark(nns_reg, variable, y, dim_red_method="cor")
+
+    assert result["x.star"]["x"].shape == (200,)
+    assert isinstance(r_baseline["nns_reg_dimred_200x3_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_m_reg_200x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-3.0, 3.0, 200)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))

@@ -81,9 +81,17 @@ supported: `"off"`, `"mean"`, `"median"`, `"mode"`, and `"mode_class"`.
 smoothing. Return keys match R's list names, but data.table outputs are plain
 dictionaries of NumPy arrays. `multivariate_call=True` returns R's internal
 two-column regression-point structure as `{"x": ..., "y": ...}` for
-`nns_m_reg`. Matrix `x`, dimension reduction, classification, smooth splines,
-and confidence intervals are explicit future batches and raise
-`NotImplementedError`.
+`nns_m_reg`. Matrix `x` without dimension reduction dispatches to `nns_m_reg`.
+Classification, smooth splines, factor dummy expansion, and confidence intervals
+are explicit future batches and raise `NotImplementedError`.
+
+Numeric dimension reduction is supported for `"cor"`, `"NNS.dep"`,
+`"NNS.caus"`, `"all"`, `"equal"`, and numeric coefficient vectors. The
+synthetic `x.star` projection follows R's min-max normalization and denominator
+conventions, including joint normalization for `point_est`. `tau="ts"` is not
+implemented; it requires `NNS.seas`. The `"NNS.caus"` branch uses the ported
+`Uni.caus` internals and may differ from installed R at small asymmetric
+dependence granularity.
 
 `order="max"` follows installed R's univariate convention: fitted values are the
 observed `y` values and `regression.points` is the sorted observed `(x, y)` map.

@@ -43,18 +43,32 @@ def test_nns_reg_increasing_order_does_not_reduce_r2_for_smooth_curve() -> None:
     assert r3 >= r2 - 1e-12
 
 
+def test_nns_reg_dim_red_shapes_and_equation() -> None:
+    x1 = np.linspace(-2.0, 2.0, 80)
+    x = np.column_stack((x1, np.sin(x1), np.cos(x1)))
+    y = x[:, 0] + x[:, 1] + 0.25 * x[:, 2]
+    point_est = np.array([[0.0, 0.0, 1.0], [3.0, 0.0, 1.0]])
+
+    result = nns_reg(x, y, dim_red_method="equal", point_est=point_est, point_only=True)
+
+    assert np.isnan(result["R2"]) or 0.0 <= result["R2"] <= 1.0
+    assert result["x.star"]["x"].shape == y.shape
+    assert result["equation"]["Variable"].shape == (x.shape[1] + 1,)
+    assert result["equation"]["Coefficient"].shape == (x.shape[1] + 1,)
+    assert result["Point.est"].shape == (2,)
+    assert result["Fitted.xy"]["x"].shape == y.shape
+
+
 @pytest.mark.parametrize(
     "path",
-    ["dim_red", "smooth", "confidence", "class", "point_only"],
+    ["smooth", "confidence", "class", "point_only"],
 )
 def test_nns_reg_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
     y = np.sin(x)
 
     with pytest.raises(NotImplementedError):
-        if path == "dim_red":
-            nns_reg(x, y, dim_red_method="cor")
-        elif path == "smooth":
+        if path == "smooth":
             nns_reg(x, y, smooth=True)
         elif path == "confidence":
             nns_reg(x, y, confidence_interval=0.95)
