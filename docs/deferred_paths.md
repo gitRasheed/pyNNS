@@ -11,7 +11,6 @@ limits stay visible.
 | Boost | `ts_test` | Time-series boost evaluation not ported | Port after ARMA/time-series stack paths |
 | Boost | `pred_int` | Requires regression interval/bootstrap logic | Port interval stack |
 | Stack | `type="class"`, `balance=True` | Classification path not ported | Port factor/classification stack path |
-| Stack | `ts_test` | Time-series stack path not ported | Port after ARMA workflows |
 | Stack | `pred_int` | Requires regression interval/bootstrap logic | Port interval stack |
 | Regression | `confidence_interval` | Requires interval/bootstrap logic | Port after `NNS.MC` / `NNS.meboot` or direct R interval path |
 | Regression | `smooth=True` | Requires R `smooth.spline` equivalent | Decide SciPy `UnivariateSpline` parity strategy |

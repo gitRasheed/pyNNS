@@ -31,3 +31,16 @@ def test_nns_stack_numeric_bounds_hold(x: np.ndarray, method: list[int]) -> None
     assert result["stack"].shape == (3,)
     assert np.all(np.isfinite(result["stack"]))
     assert result["probability.threshold"] == 0.5
+
+
+@given(finite_matrices, st.integers(min_value=2, max_value=10))
+def test_nns_stack_ts_test_method1_shape(x: np.ndarray, ts_test: int) -> None:
+    assume(ts_test <= x.shape[0] - 2)
+    y = 0.5 * x[:, 0] - 0.25 * x[:, 1]
+    assume(np.unique(y).size > 1)
+    assume(all(np.unique(x[:, col]).size > 1 for col in range(x.shape[1])))
+
+    result = nns_stack(x, y, x[:3], cv_size=0.25, folds=1, method=1, ts_test=ts_test)
+
+    assert result["stack"].shape == (3,)
+    assert np.all(np.isfinite(result["stack"]))

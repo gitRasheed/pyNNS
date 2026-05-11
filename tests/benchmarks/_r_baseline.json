@@ -21,6 +21,7 @@
     "nns_seas_1000_seconds": 0.0011,
     "nns_seas_5000_seconds": 0.004,
     "nns_stack_100x3_seconds": 0.3696667,
+    "nns_stack_100x3_ts_test_seconds": 0.3003333,
     "pm_matrix_100x500_seconds": 0.0168,
     "pm_matrix_10x500_seconds": 0.0004,
     "pm_matrix_50x500_seconds": 0.0038,

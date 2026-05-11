@@ -126,11 +126,14 @@ the regression-point matrix and defaulting `n.best` to 1.
 
 `nns_stack` maps to R's numeric `NNS.stack` path using the real `nns_reg`
 dimension-reduction and multivariate-regression internals. Classification
-(`type="class"`), class balancing, prediction intervals, and `ts_test` are
-deferred and raise `NotImplementedError` because they depend on the unported
-classification/interval/time-series branches. R's `CV.size = NULL` samples a
-random value between 0.2 and 1/3; PyNNS uses a deterministic default of `0.25`.
-Pass `cv_size` explicitly for exact R parity.
+(`type="class"`), class balancing, and prediction intervals are deferred and
+raise `NotImplementedError` because they depend on the unported
+classification/interval branches. `ts_test` is supported and follows installed
+R's split exactly: CV training uses the tail `ts_test` rows, while CV testing
+uses the earlier rows `1:(n - ts_test)`. This is intentionally not changed even
+though it is counterintuitive. R's `CV.size = NULL` samples a random value
+between 0.2 and 1/3; PyNNS uses a deterministic default of `0.25`. Pass
+`cv_size` explicitly for exact R parity.
 
 ## Boost
 

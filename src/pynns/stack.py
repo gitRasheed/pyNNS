@@ -44,8 +44,6 @@ def nns_stack(
         raise NotImplementedError("type='class' classification for NNS.stack is deferred.")
     if balance:
         raise NotImplementedError("balance=True requires the classification path, deferred.")
-    if ts_test is not None:
-        raise NotImplementedError("ts_test requires the time-series stack path, deferred.")
     if pred_int is not None:
         raise NotImplementedError("pred_int requires regression interval paths, deferred.")
 
@@ -70,6 +68,7 @@ def nns_stack(
         raise ValueError("cv_size must be in (0, 1].")
     if folds < 1:
         raise ValueError("folds must be >= 1.")
+    ts_test_value = None if ts_test is None else int(ts_test)
 
     method2_state = _evaluate_method2(
         x_train,
@@ -84,6 +83,7 @@ def nns_stack(
         stack=stack,
         dim_red_method=dim_red_method,
         dist=dist,
+        ts_test=ts_test_value,
     )
     method1_state = _evaluate_method1(
         x_train,
@@ -99,6 +99,7 @@ def nns_stack(
         dim_red_method=dim_red_method,
         dist=dist,
         method2_state=method2_state,
+        ts_test=ts_test_value,
     )
 
     reg = method1_state.prediction
@@ -163,6 +164,7 @@ def _evaluate_method2(
     stack: bool,
     dim_red_method: object,
     dist: str,
+    ts_test: int | None,
 ) -> _MethodState:
     n_rows, n_cols = x_train.shape
     if 2 not in methods or n_cols <= 1:
@@ -176,7 +178,7 @@ def _evaluate_method2(
     relevant_vars = np.arange(n_cols, dtype=np.int64)
 
     for fold in range(1, folds + 1):
-        train_idx, test_idx = _cv_split(n_rows, fold, cv_size)
+        train_idx, test_idx = _cv_split(n_rows, fold, cv_size, ts_test)
         cv_x_train = x_train[train_idx]
         cv_y_train = y_train[train_idx]
         cv_x_test = x_train[test_idx]
@@ -264,6 +266,7 @@ def _evaluate_method1(
     dim_red_method: object,
     dist: str,
     method2_state: _MethodState,
+    ts_test: int | None,
 ) -> _MethodState:
     if 1 not in methods:
         obj = math.inf if objective == "min" else -math.inf
@@ -276,7 +279,7 @@ def _evaluate_method1(
     fold_scores: list[float] = []
 
     for fold in range(1, folds + 1):
-        train_idx, test_idx = _cv_split(n_rows, fold, cv_size)
+        train_idx, test_idx = _cv_split(n_rows, fold, cv_size, ts_test)
         cv_x_train = x_train[train_idx]
         cv_y_train = y_train[train_idx]
         cv_x_test = x_train[test_idx]
@@ -548,7 +551,17 @@ def _cv_split(
     n_rows: int,
     fold: int,
     cv_size: float,
+    ts_test: int | None = None,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    if ts_test is not None:
+        if ts_test < 1 or ts_test > n_rows:
+            raise ValueError("ts_test must be in [1, n_rows].")
+        test_idx = np.arange(0, n_rows - ts_test, dtype=np.int64)
+        train_idx = np.arange(n_rows - ts_test, n_rows, dtype=np.int64)
+        if train_idx.size < 2:
+            raise ValueError("ts_test leaves too few training rows.")
+        return train_idx, test_idx
+
     test_count = int(cv_size * n_rows)
     if test_count < 1:
         test_count = 1

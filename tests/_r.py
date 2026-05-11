@@ -53,6 +53,7 @@ def nns_stack_numeric(
     order: int | str | None,
     stack: bool,
     dim_red_method: str | list[float],
+    ts_test: int | None = None,
 ) -> RValue:
     args = {
         "x": x,
@@ -64,6 +65,7 @@ def nns_stack_numeric(
         "order": order,
         "stack": stack,
         "dim_red_method": dim_red_method,
+        "ts_test": ts_test,
     }
     key = _cache_key("NNS.stack.numeric", (args,))
     cache, refresh = _cache_state()
@@ -258,12 +260,14 @@ def _call_r_stack_numeric(args: dict[str, Any]) -> RValue:
         "if (length(order_arg) == 0) order_arg <- NULL\n"
         "dim_arg <- args$dim_red_method\n"
         "if (is.list(dim_arg)) dim_arg <- as.numeric(unlist(dim_arg))\n"
+        "ts_arg <- args$ts_test\n"
+        "if (length(ts_arg) == 0) ts_arg <- NULL else ts_arg <- as.integer(ts_arg)\n"
         "result <- NNS::NNS.stack("
         "mat(args$x), as.numeric(unlist(args$y)), IVs.test = mat(args$x_test), "
         "CV.size = as.numeric(args$cv_size), folds = as.integer(args$folds), "
         "method = as.numeric(unlist(args$method)), order = order_arg, "
         "stack = isTRUE(as.logical(unlist(args$stack))), "
-        "dim.red.method = dim_arg, status = FALSE, ncores = 1)\n"
+        "dim.red.method = dim_arg, ts.test = ts_arg, status = FALSE, ncores = 1)\n"
         "encode <- function(x) {\n"
         "  if (is.null(x)) return(NULL)\n"
         "  if (is.matrix(x)) {\n"

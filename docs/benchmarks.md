@@ -25,6 +25,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_reg`, dim-red cor, N=3, T_obs=200 | 31.526 ms | 42.600 ms | 0.74x |
 | `nns_m_reg`, N=3, T_obs=200 | 84.356 ms | 97.600 ms | 0.86x |
 | `nns_stack`, N=3, T_obs=100, T_test=20 | 197.228 ms | 369.667 ms | 0.53x |
+| `nns_stack`, N=3, T_obs=100, T_test=20, ts_test=20 | 159.132 ms | 300.333 ms | 0.53x |
 | `nns_boost`, N=3, T_obs=50, T_test=10 | 180.320 ms | 2919.500 ms | 0.06x |
 | `nns_seas`, T_obs=1000 | 0.011 ms | 1.100 ms | 0.01x |
 | `nns_seas`, T_obs=5000 | 0.026 ms | 4.000 ms | 0.01x |

@@ -77,6 +77,80 @@ def test_nns_stack_equal_dim_red_matches_r() -> None:
     _assert_stack_matches(actual, expected)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize(
+    ("method", "ts_test"),
+    [([1], 5), ([1], 10), ([2], 5), ([2], 10), ([1, 2], 10)],
+)
+def test_nns_stack_ts_test_matches_r(method: list[int], ts_test: int) -> None:
+    x = np.linspace(-2.0, 2.0, 40)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+    point = variable[:5]
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+        ts_test=ts_test,
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        stack=True,
+        dim_red_method="cor",
+        ts_test=ts_test,
+    )
+
+    _assert_stack_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_stack_var_like_ts_test_matches_r() -> None:
+    h = 5
+    x = np.linspace(-2.0, 2.0, 40)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+    point = variable[-h:]
+    ts_test = max(2 * h, int(0.2 * y.size))
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=[1, 2],
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+        ts_test=ts_test,
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        stack=True,
+        dim_red_method="cor",
+        ts_test=ts_test,
+    )
+
+    _assert_stack_matches(actual, expected)
+
+
 def _assert_stack_matches(actual: dict[str, Any], expected: Any) -> None:
     assert isinstance(expected, dict)
     assert set(actual) == set(expected)

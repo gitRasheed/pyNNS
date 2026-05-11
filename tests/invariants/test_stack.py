@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from pynns import nns_stack
+from pynns.stack import _cv_split
 
 
 def test_nns_stack_numeric_shapes_and_keys() -> None:
@@ -34,7 +35,7 @@ def test_nns_stack_numeric_shapes_and_keys() -> None:
     assert np.all(np.isfinite(result["stack"]))
 
 
-@pytest.mark.parametrize("path", ["class", "balance", "ts", "interval"])
+@pytest.mark.parametrize("path", ["class", "balance", "interval"])
 def test_nns_stack_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
@@ -45,7 +46,39 @@ def test_nns_stack_deferred_paths_raise(path: str) -> None:
             nns_stack(variable, y, type="class")
         elif path == "balance":
             nns_stack(variable, y, balance=True)
-        elif path == "ts":
-            nns_stack(variable, y, ts_test=4)
         else:
             nns_stack(variable, y, pred_int=0.95)
+
+
+@pytest.mark.parametrize("method", [(1,), (2,), (1, 2)])
+def test_nns_stack_ts_test_shape_and_determinism(method: tuple[int, ...]) -> None:
+    x = np.linspace(-2.0, 2.0, 40)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x)
+    point = variable[:7]
+
+    first = nns_stack(variable, y, point, cv_size=0.25, folds=1, method=method, ts_test=10)
+    second = nns_stack(variable, y, point, cv_size=0.25, folds=1, method=method, ts_test=10)
+
+    assert first["stack"].shape == (7,)
+    assert set(first) == set(second)
+    np.testing.assert_allclose(first["stack"], second["stack"])
+
+
+def test_nns_stack_ts_test_split_matches_r_sizes() -> None:
+    train_idx, test_idx = _cv_split(40, fold=1, cv_size=0.25, ts_test=10)
+
+    assert train_idx.shape == (10,)
+    assert test_idx.shape == (30,)
+    np.testing.assert_array_equal(train_idx, np.arange(30, 40))
+    np.testing.assert_array_equal(test_idx, np.arange(0, 30))
+
+
+@pytest.mark.parametrize("ts_test", [0, 1, 41])
+def test_nns_stack_invalid_ts_test_raises(ts_test: int) -> None:
+    x = np.linspace(-2.0, 2.0, 40)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x)
+
+    with pytest.raises(ValueError):
+        nns_stack(variable, y, variable[:3], cv_size=0.25, folds=1, method=1, ts_test=ts_test)
