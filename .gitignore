@@ -2,6 +2,7 @@ reference/
 docs/*
 !docs/benchmarks.md
 !docs/conventions.md
+!docs/deferred_paths.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

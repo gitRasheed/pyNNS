@@ -28,3 +28,5 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_boost`, N=3, T_obs=50, T_test=10 | 180.320 ms | 2919.500 ms | 0.06x |
 | `nns_seas`, T_obs=1000 | 0.011 ms | 1.100 ms | 0.01x |
 | `nns_seas`, T_obs=5000 | 0.026 ms | 4.000 ms | 0.01x |
+| `nns_arma`, T_obs=500, h=12, seasonal_factor=True, method=nonlin | 17.355 ms | 313.333 ms | 0.06x |
+| `nns_arma`, T_obs=500, h=12, seasonal_factor=12, method=nonlin | 86.596 ms | 318.333 ms | 0.27x |

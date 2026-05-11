@@ -141,6 +141,12 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_seas_5000_seconds" not in cache:
         cache["nns_seas_5000_seconds"] = _time_r_nns_seas(5000)
         _write_benchmark_baseline(cache)
+    if "nns_arma_500_auto_nonlin_seconds" not in cache:
+        cache["nns_arma_500_auto_nonlin_seconds"] = _time_r_nns_arma(auto=True)
+        _write_benchmark_baseline(cache)
+    if "nns_arma_500_explicit12_nonlin_seconds" not in cache:
+        cache["nns_arma_500_explicit12_nonlin_seconds"] = _time_r_nns_arma(auto=False)
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -613,6 +619,28 @@ def _time_r_nns_seas(n: int) -> float:
         "invisible(NNS::NNS.seas(variable, plot = FALSE))\n"
         "times <- replicate(20, system.time(invisible(NNS::NNS.seas(variable, "
         "plot = FALSE)))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_arma(*, auto: bool) -> float:
+    seasonal_factor = "TRUE" if auto else "12"
+    script = (
+        "library(NNS)\n"
+        "t <- seq_len(500)\n"
+        "variable <- sin(2 * pi * t / 12) + 0.05 * cos(t / 3) + 2\n"
+        f"run <- function() NNS::NNS.ARMA(variable, h = 12, seasonal.factor = {seasonal_factor}, "
+        "method = 'nonlin', plot = FALSE, seasonal.plot = FALSE)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(

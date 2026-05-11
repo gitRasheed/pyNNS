@@ -18,6 +18,7 @@ _EXPORTS = {
     "lpm_var": ("pynns.var", "lpm_var"),
     "mean_pm": ("pynns.classical", "mean_pm"),
     "nns_anova": ("pynns.anova", "nns_anova"),
+    "nns_arma": ("pynns.arma", "nns_arma"),
     "nns_boost": ("pynns.boost", "nns_boost"),
     "nns_causation": ("pynns.causation", "nns_causation"),
     "nns_copula": ("pynns.copula", "nns_copula"),

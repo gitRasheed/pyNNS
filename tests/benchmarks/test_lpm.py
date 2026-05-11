@@ -8,6 +8,7 @@ import pytest
 from pynns import (
     lpm,
     nns_anova,
+    nns_arma,
     nns_boost,
     nns_causation,
     nns_copula,
@@ -298,3 +299,28 @@ def test_nns_seas_5000(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert result["best.period"] == int(result["periods"][0])
     assert isinstance(r_baseline["nns_seas_5000_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_arma_500_auto_nonlin(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    t = np.arange(1, 501, dtype=np.float64)
+    variable = np.sin(2.0 * np.pi * t / 12.0) + 0.05 * np.cos(t / 3.0) + 2.0
+
+    result = benchmark(nns_arma, variable, h=12, seasonal_factor=True, method="nonlin")
+
+    assert result.shape == (12,)
+    assert isinstance(r_baseline["nns_arma_500_auto_nonlin_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_arma_500_explicit12_nonlin(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    t = np.arange(1, 501, dtype=np.float64)
+    variable = np.sin(2.0 * np.pi * t / 12.0) + 0.05 * np.cos(t / 3.0) + 2.0
+
+    result = benchmark(nns_arma, variable, h=12, seasonal_factor=12, method="nonlin")
+
+    assert result.shape == (12,)
+    assert isinstance(r_baseline["nns_arma_500_explicit12_nonlin_seconds"], float)

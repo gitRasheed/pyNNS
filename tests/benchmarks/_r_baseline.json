@@ -2,6 +2,8 @@
   "entries": {
     "lpm_small_seconds": 7.5e-05,
     "nns_anova_100x2_seconds": 0.0044,
+    "nns_arma_500_auto_nonlin_seconds": 0.3133333,
+    "nns_arma_500_explicit12_nonlin_seconds": 0.3183333,
     "nns_boost_50x3_seconds": 2.9195,
     "nns_causation_1000_seconds": 0.0976,
     "nns_copula_1000_seconds": 0.0048,

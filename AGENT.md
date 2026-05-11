@@ -51,6 +51,8 @@ If an ignored docs file exists locally, read it but do not assume it is tracked.
 - Watch R C-API distribution functions (`Rf_dexp`, `Rf_dnorm`, `Rf_dbinom`, etc.); verify at least one numeric case against the installed binary before trusting source-level parameter meaning.
 - If a function being ported depends on another NNS function not yet implemented in PyNNS, stop and report; do not substitute a different algorithm or mirror the workflow with different internals.
 - Before implementing, list the R function's dependencies, including other NNS functions, internal C++ kernels, and R helpers; report any unported NNS dependency before writing code.
+- Any new `NotImplementedError` path must be added to `docs/deferred_paths.md` in the same commit.
+- Do not accept fake paths. Either faithfully port, reject explicitly, or stop and report.
 
 ## Tolerances
 

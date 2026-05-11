@@ -156,6 +156,21 @@ textbook seasonality heuristic. Results are cached by input content and modulo
 arguments with defensive copies on return; this preserves R semantics while
 avoiding repeated reverse-step scans for identical series.
 
+## ARMA
+
+`nns_arma` maps to R's no-prediction-interval `NNS.ARMA` forecast path and
+returns a NumPy forecast vector of length `h`. Forecasts are recursive: each
+estimate is appended before the next horizon step. Plot arguments are ignored.
+`pred_int` is deferred because it requires `NNS.MC` / `NNS.meboot`.
+`seasonal_factor=True` uses only the first detected period from `nns_seas`,
+matching `ARMA.seas.weighting(TRUE, ...)`; `seasonal_factor=False` uses the
+selected `best_periods` rows. `dynamic=True` with numeric seasonal factors
+raises with R's static-seasonality error. Constant-series behavior follows
+installed R, including zero forecasts for automatic seasonality paths and `NaN`
+forecasts for some explicit numeric-lag paths. Character `weights` with numeric
+multi-lag seasonal factors is rejected because installed R errors during numeric
+multiplication on that path.
+
 ## Normalization
 
 `nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with
