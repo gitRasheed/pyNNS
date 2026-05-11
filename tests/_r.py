@@ -191,6 +191,67 @@ def nns_meboot_stat_summary(
         return result
 
 
+def nns_mc_grid(
+    *,
+    lower_rho: float,
+    upper_rho: float,
+    by: float,
+    exp: float,
+) -> RValue:
+    args = {"lower_rho": lower_rho, "upper_rho": upper_rho, "by": by, "exp": exp}
+    key = _cache_key("NNS.MC.grid", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.MC.grid with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_mc_grid(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
+def nns_mc_stat_summary(
+    x: list[float],
+    *,
+    reps: int,
+    lower_rho: float,
+    upper_rho: float,
+    by: float,
+    seed: int,
+) -> RValue:
+    args = {
+        "x": x,
+        "reps": reps,
+        "lower_rho": lower_rho,
+        "upper_rho": upper_rho,
+        "by": by,
+        "seed": seed,
+    }
+    key = _cache_key("NNS.MC.stat_summary", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.MC.stat_summary with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_mc_stat_summary(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def _uncached_nns(
     function: str,
     args: tuple[Any, ...],
@@ -446,6 +507,57 @@ def _call_r_meboot_stat_summary(args: dict[str, Any]) -> RValue:
         "summary <- c(mean_ensemble = mean(result$ensemble), sd_ensemble = sd(result$ensemble), "
         "median_rep_means = median(colMeans(replicates)), "
         "median_rep_sds = median(apply(replicates, 2, sd)))\n"
+        "cat(jsonlite::toJSON(as.numeric(summary), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_mc_grid(args: dict[str, Any]) -> RValue:
+    script = (
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "rhos <- seq(as.numeric(args$lower_rho), as.numeric(args$upper_rho), "
+        "as.numeric(args$by))\n"
+        "neg_rhos <- abs(rhos[rhos <= 0])\n"
+        "pos_rhos <- rhos[rhos > 0]\n"
+        "exp_rhos <- rev(c((neg_rhos^as.numeric(args$exp)) * -1, "
+        "pos_rhos^(1/as.numeric(args$exp))))\n"
+        "result <- list(values = as.numeric(exp_rhos), names = paste0('rho = ', exp_rhos))\n"
+        "cat(jsonlite::toJSON(result, auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_mc_stat_summary(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "set.seed(as.integer(args$seed))\n"
+        "result <- NNS::NNS.MC("
+        "x = as.numeric(unlist(args$x)), reps = as.integer(args$reps), "
+        "lower_rho = as.numeric(args$lower_rho), upper_rho = as.numeric(args$upper_rho), "
+        "by = as.numeric(args$by))\n"
+        "replicates <- result$replicates\n"
+        "block_sds <- vapply(replicates, function(m) median(apply(m, 2, sd)), numeric(1))\n"
+        "summary <- c(mean_ensemble = mean(result$ensemble), sd_ensemble = sd(result$ensemble), "
+        "median_block_sd = median(block_sds))\n"
         "cat(jsonlite::toJSON(as.numeric(summary), auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(

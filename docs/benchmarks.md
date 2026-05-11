@@ -33,3 +33,5 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_arma`, T_obs=500, h=12, seasonal_factor=12, method=nonlin | 86.596 ms | 318.333 ms | 0.27x |
 | `nns_meboot`, T_obs=500, reps=100, rho=0 | 74.937 ms | 78.000 ms | 0.96x |
 | `nns_meboot`, T_obs=1000, reps=100, rho=0 | 115.564 ms | 108.000 ms | 1.07x |
+| `nns_mc`, T_obs=500, reps=30, by=0.2 | 319.045 ms | 736.000 ms | 0.43x |
+| `nns_mc`, T_obs=500, reps=30, by=0.1 | 608.958 ms | 1437.000 ms | 0.42x |

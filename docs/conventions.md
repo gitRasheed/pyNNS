@@ -189,6 +189,19 @@ number generator and SciPy's optimizer while R uses its global RNG and
 outputs are tested structurally and statistically. `random_seed` is a PyNNS-only
 convenience for reproducible bootstrap draws.
 
+## Monte Carlo
+
+`nns_mc` maps to R's `NNS.MC` wrapper around `NNS.meboot`. The rho grid and
+exponential rho transformation are parity-tested exactly against installed R.
+As with `nns_meboot`, exact stochastic replicate parity is not expected because
+R and PyNNS use different RNG streams and optimizer implementations.
+`random_seed` is a PyNNS-only convenience passed through to `nns_meboot`.
+
+PyNNS returns `{"ensemble": array, "replicates": dict}`. The `replicates`
+mapping preserves R's names, such as `"rho = 1"` and `"rho = -0.5"`, with each
+value containing that rho block's replicate matrix. Sampling-vignette examples
+are covered as smoke tests, but installed R behavior remains the parity source.
+
 ## Normalization
 
 `nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with

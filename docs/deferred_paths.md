@@ -5,7 +5,7 @@ limits stay visible.
 
 | Area | Deferred path | Reason | Dependency / next action |
 |---|---|---|---|
-| ARMA | `pred_int` | Requires Monte Carlo/bootstrap prediction intervals | Port `NNS.MC` and `NNS.meboot`, then enable |
+| ARMA | `pred_int` | Requires Monte Carlo/bootstrap prediction interval wiring | `NNS.MC` and `NNS.meboot` are ported; enable the ARMA prediction-interval branch in a follow-up |
 | ARMA.optim | default optimizer path | Default optimizer evaluates `nns_reg(..., smooth=True)`, so it cannot be faithfully ported until smooth regression is real | Port `smooth=True` first, then `NNS.ARMA.optim` |
 | Boost | `n_features > 10` stochastic epoch keeper loop | R uses stochastic epoch loop not yet ported | Port stochastic boost epoch loop |
 | Boost | `type="class"`, `balance=True` | Classification path not ported | Port factor/classification boost path |
@@ -13,7 +13,7 @@ limits stay visible.
 | Boost | `pred_int` | Requires regression interval/bootstrap logic | Port interval stack |
 | Stack | `type="class"`, `balance=True` | Classification path not ported | Port factor/classification stack path |
 | Stack | `pred_int` | Requires regression interval/bootstrap logic | Port interval stack |
-| Regression | `confidence_interval` | Requires interval/bootstrap logic | Port after `NNS.MC` / `NNS.meboot` or direct R interval path |
+| Regression | `confidence_interval` | Requires interval output wiring | `NNS.MC` and `NNS.meboot` are ported; compare against the direct R interval path before enabling |
 | Regression | `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility; SciPy smoothers are not parity-compatible | Port a minimal R-compatible fixed-spar smoothing spline backend, then enable `nns_reg(smooth=True)` |
 | Regression | classification `type` paths | Classification path not ported | Port class mode parity |
 | Regression | factor/dummy paths | Factor and dummy expansion path not ported | Port `factor_2_dummy` and factor regression paths |
