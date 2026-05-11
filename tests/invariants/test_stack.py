@@ -35,17 +35,32 @@ def test_nns_stack_numeric_shapes_and_keys() -> None:
     assert np.all(np.isfinite(result["stack"]))
 
 
-@pytest.mark.parametrize("path", ["class", "balance"])
+def test_nns_stack_classification_shapes_and_codes() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x < -0.5, 1.0, np.where(x > 0.75, 3.0, 2.0))
+    point = variable[:6]
+
+    first = nns_stack(variable, y, point, type="class", cv_size=0.25, folds=1, method=(1, 2))
+    second = nns_stack(variable, y, point, type="class", cv_size=0.25, folds=1, method=(1, 2))
+
+    assert first["stack"].shape == (6,)
+    assert np.all(np.isin(first["stack"], np.unique(y)))
+    np.testing.assert_allclose(first["stack"], second["stack"])
+    assert first["pred.int"] is None
+
+
+@pytest.mark.parametrize("path", ["balance", "class_pred_int"])
 def test_nns_stack_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
     y = x + np.sin(x)
 
     with pytest.raises(NotImplementedError):
-        if path == "class":
-            nns_stack(variable, y, type="class")
-        else:
+        if path == "balance":
             nns_stack(variable, y, balance=True)
+        else:
+            nns_stack(variable, np.where(x > 0.0, 2.0, 1.0), type="class", pred_int=0.95)
 
 
 @pytest.mark.parametrize("method", [(1,), (2,), (1, 2)])

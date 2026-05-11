@@ -9,7 +9,14 @@ from numpy.typing import NDArray
 
 from pynns.central_tendencies import nns_mode
 from pynns.dependence import _gravity
-from pynns.regression import Order, _r_minmax_columns, nns_reg
+from pynns.regression import (
+    Order,
+    _normalize_type,
+    _prepare_y_values,
+    _r_minmax_columns,
+    _round_clamp_classes,
+    nns_reg,
+)
 
 Objective = Literal["min", "max"]
 Method = int | Sequence[int]
@@ -37,16 +44,27 @@ def nns_stack(
     pred_int: float | None = None,
     status: bool = False,
     ncores: int | None = None,
+    class_levels: list[object] | None = None,
 ) -> StackResult:
-    """Numeric port of R's NNS.stack orchestration."""
+    """Port of R's deterministic numeric/classification NNS.stack orchestration."""
     del optimize_threshold, status, ncores
-    if type is not None:
-        raise NotImplementedError("type='class' classification for NNS.stack is deferred.")
+    type_value = _normalize_type(type)
     if balance:
-        raise NotImplementedError("balance=True requires the classification path, deferred.")
+        raise NotImplementedError(
+            "nns_stack balance=True requires R down/up sampling helpers, which are not yet ported."
+        )
+    if type_value == "class" and pred_int is not None:
+        raise NotImplementedError("nns_stack pred_int for classification is not yet ported.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
-    y_train = _as_vector(dv_train, "dv_train")
+    if type_value == "class":
+        y_train, _ = _prepare_y_values(
+            dv_train,
+            type_value=type_value,
+            class_levels=class_levels,
+        )
+    else:
+        y_train = _as_vector(dv_train, "dv_train")
     if x_train.shape[0] != y_train.size:
         raise ValueError("ivs_train and dv_train must have the same row count.")
     x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
@@ -55,7 +73,11 @@ def nns_stack(
     if objective_l not in {"min", "max"}:
         raise ValueError("objective must be 'min' or 'max'.")
     objective_value = cast(Objective, objective_l)
-    objective_fn = _sse if obj_fn is None else obj_fn
+    if type_value == "class" and obj_fn is None:
+        objective_value = "max"
+        objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float] = _accuracy
+    else:
+        objective_fn = _sse if obj_fn is None else obj_fn
 
     if x_train.shape[1] == 1:
         methods = (1,)
@@ -83,6 +105,7 @@ def nns_stack(
         dist=dist,
         ts_test=ts_test_value,
         pred_int=pred_int,
+        type_value=type_value,
     )
     method1_state = _evaluate_method1(
         x_train,
@@ -100,6 +123,7 @@ def nns_stack(
         method2_state=method2_state,
         ts_test=ts_test_value,
         pred_int=pred_int,
+        type_value=type_value,
     )
 
     reg = method1_state.prediction
@@ -123,11 +147,18 @@ def nns_stack(
     else:
         estimates = dimred
         stacked_pred_int = method2_state.pred_int
+    probability_threshold = _probability_threshold(
+        method1_state.class_threshold,
+        method2_state.class_threshold,
+        type_value=type_value,
+    )
+    if type_value == "class":
+        estimates = _class_threshold_round(estimates, probability_threshold, y_train)
 
     return {
         "OBJfn.reg": reg_obj,
         "NNS.reg.n.best": method1_state.parameter,
-        "probability.threshold": 0.5,
+        "probability.threshold": probability_threshold,
         "OBJfn.dim.red": dimred_obj,
         "NNS.dim.red.threshold": method2_state.parameter,
         "reg": reg,
@@ -149,6 +180,7 @@ class _MethodState:
         test_star: NDArray[np.float64] | None = None,
         relevant_vars: NDArray[np.int64] | None = None,
         pred_int: dict[str, NDArray[np.float64]] | None = None,
+        class_threshold: float | None = None,
     ) -> None:
         self.prediction = prediction
         self.objective = objective
@@ -157,6 +189,7 @@ class _MethodState:
         self.test_star = test_star
         self.relevant_vars = relevant_vars
         self.pred_int = pred_int
+        self.class_threshold = class_threshold
 
 
 def _evaluate_method2(
@@ -175,6 +208,7 @@ def _evaluate_method2(
     dist: str,
     ts_test: int | None,
     pred_int: float | None,
+    type_value: str | None,
 ) -> _MethodState:
     n_rows, n_cols = x_train.shape
     if 2 not in methods or n_cols <= 1:
@@ -183,6 +217,7 @@ def _evaluate_method2(
 
     thresholds: list[float] = []
     fold_scores: list[float] = []
+    threshold_results: list[float] = []
     train_star: NDArray[np.float64] | None = None
     test_star: NDArray[np.float64] | None = None
     relevant_vars = np.arange(n_cols, dtype=np.int64)
@@ -196,6 +231,7 @@ def _evaluate_method2(
 
         cutoffs = _threshold_grid(cv_x_train, cv_y_train, dim_red_method, order, dist)
         scores = np.empty(cutoffs.size, dtype=np.float64)
+        class_thresholds = np.empty(cutoffs.size, dtype=np.float64)
         for idx, cutoff in enumerate(cutoffs):
             predicted = _reg_point_est(
                 cv_x_train,
@@ -207,6 +243,12 @@ def _evaluate_method2(
                 dist=dist,
             )
             predicted = _fill_nan_with_gravity(predicted)
+            if type_value == "class":
+                class_thresholds[idx] = _classification_threshold(predicted, cv_y_test)
+                predicted = _class_threshold_round(predicted, class_thresholds[idx], cv_y_train)
+                threshold_results.append(float(class_thresholds[idx]))
+            else:
+                class_thresholds[idx] = math.nan
             scores[idx] = objective_fn(predicted, cv_y_test)
         best_index = int(np.nanargmin(scores) if objective == "min" else np.nanargmax(scores))
         best_threshold = float(cutoffs[best_index])
@@ -228,6 +270,9 @@ def _evaluate_method2(
             test_star = _xstar_for_points(fit, cv_x_train, cv_x_test)
 
     final_threshold = _threshold_mode(thresholds)
+    final_class_threshold = (
+        _threshold_mode(threshold_results) if type_value == "class" else math.nan
+    )
     final_fit = nns_reg(
         x_train,
         y_train,
@@ -238,10 +283,17 @@ def _evaluate_method2(
         dist=dist,
         point_only=False,
         confidence_interval=pred_int,
+        type=type_value,
     )
     fitted = cast(dict[str, NDArray[np.float64]], final_fit["Fitted.xy"])
-    final_obj = objective_fn(fitted["y.hat"], fitted["y"])
+    fitted_yhat = fitted["y.hat"]
     prediction = _as_prediction(final_fit["Point.est"], x_test.shape[0])
+    if type_value == "class":
+        if not np.isfinite(final_class_threshold):
+            final_class_threshold = _classification_threshold(fitted_yhat, y_train)
+        fitted_yhat = _class_threshold_round(fitted_yhat, final_class_threshold, y_train)
+        prediction = _class_threshold_round(prediction, final_class_threshold, y_train)
+    final_obj = objective_fn(fitted_yhat, fitted["y"])
     final_pred_int = cast(dict[str, NDArray[np.float64]] | None, final_fit["pred.int"])
 
     if stack and methods == (1, 2):
@@ -261,6 +313,7 @@ def _evaluate_method2(
         test_star=test_star,
         relevant_vars=relevant_vars,
         pred_int=final_pred_int,
+        class_threshold=final_class_threshold if type_value == "class" else None,
     )
 
 
@@ -281,6 +334,7 @@ def _evaluate_method1(
     method2_state: _MethodState,
     ts_test: int | None,
     pred_int: float | None,
+    type_value: str | None,
 ) -> _MethodState:
     if 1 not in methods:
         obj = math.inf if objective == "min" else -math.inf
@@ -291,6 +345,7 @@ def _evaluate_method1(
     k_candidates = [*list(range(1, l_value + 1)), n_rows]
     best_ks: list[int] = []
     fold_scores: list[float] = []
+    threshold_results: list[float] = []
 
     for fold in range(1, folds + 1):
         train_idx, test_idx = _cv_split(n_rows, fold, cv_size, ts_test)
@@ -310,6 +365,7 @@ def _evaluate_method1(
                 order=order,
                 dim_red_method=dim_red_method,
                 dist=dist,
+                type_value=type_value,
             )
             cv_x_train = np.column_stack((fold_train_star, fold_train_star))
             cv_x_test = np.column_stack((fold_test_star, fold_test_star))
@@ -325,6 +381,7 @@ def _evaluate_method1(
             order=order,
             dist=dist,
             point_only=False,
+            type=type_value,
         )
         fitted = cast(dict[str, NDArray[np.float64]], setup["Fitted.xy"])
         yhat_vec = fitted["y.hat"]
@@ -344,16 +401,31 @@ def _evaluate_method1(
 
         scores: list[float] = []
         tested_ks: list[int] = []
+        class_thresholds: list[float] = []
         for k_value in k_candidates:
             if k_value == 1:
                 predicted = setup_prediction
+                if type_value == "class" and np.any(np.isnan(predicted)):
+                    predicted = predicted.copy()
+                    predicted[np.isnan(predicted)] = float(np.nanmean(predicted))
             elif k_value <= path_predictions.shape[1]:
                 predicted = path_predictions[:, k_value - 1]
             else:
                 predicted = all_prediction
+            if type_value == "class":
+                threshold_value = _classification_threshold(
+                    predicted,
+                    cv_y_test,
+                    tie="first" if k_value == 1 else "median",
+                )
+                predicted = _class_threshold_round(predicted, threshold_value, cv_y_train)
+                threshold_results.append(threshold_value)
+            else:
+                threshold_value = math.nan
             score = objective_fn(predicted, cv_y_test)
             scores.append(float(score))
             tested_ks.append(k_value)
+            class_thresholds.append(threshold_value)
             if len(scores) > 3:
                 if objective == "min" and scores[-1] >= scores[-2] and scores[-1] >= scores[-3]:
                     break
@@ -367,6 +439,9 @@ def _evaluate_method1(
         fold_scores.append(float(scores_arr[best_index]))
 
     best_k = int(_round_k_mode(np.asarray(best_ks, dtype=np.float64)))
+    final_class_threshold = (
+        _threshold_mode(threshold_results) if type_value == "class" else math.nan
+    )
 
     if stack and methods == (1, 2) and method2_state.train_star is not None:
         if method2_state.test_star is None:
@@ -389,16 +464,24 @@ def _evaluate_method1(
         dist=dist,
         point_only=False,
         confidence_interval=pred_int,
+        type=type_value,
     )
     fitted = cast(dict[str, NDArray[np.float64]], final_fit["Fitted.xy"])
-    final_obj = objective_fn(fitted["y.hat"], fitted["y"])
     prediction = _as_prediction(final_fit["Point.est"], x_test.shape[0])
+    fitted_yhat = fitted["y.hat"]
+    if type_value == "class":
+        if not np.isfinite(final_class_threshold):
+            final_class_threshold = _classification_threshold(fitted_yhat, y_train)
+        fitted_yhat = _class_threshold_round(fitted_yhat, final_class_threshold, y_train)
+        prediction = _class_threshold_round(prediction, final_class_threshold, y_train)
+    final_obj = objective_fn(fitted_yhat, fitted["y"])
     final_pred_int = cast(dict[str, NDArray[np.float64]] | None, final_fit["pred.int"])
     return _MethodState(
         prediction=prediction,
         objective=final_obj,
         parameter=float(best_k),
         pred_int=final_pred_int,
+        class_threshold=final_class_threshold if type_value == "class" else None,
     )
 
 
@@ -413,6 +496,7 @@ def _fold_xstar(
     order: Order,
     dim_red_method: object,
     dist: str,
+    type_value: str | None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     cutoffs = _threshold_grid(cv_x_train, cv_y_train, dim_red_method, order, dist)
     scores = np.empty(cutoffs.size, dtype=np.float64)
@@ -426,7 +510,11 @@ def _fold_xstar(
             threshold=float(cutoff),
             dist=dist,
         )
-        scores[idx] = objective_fn(_fill_nan_with_gravity(predicted), cv_y_test)
+        predicted = _fill_nan_with_gravity(predicted)
+        if type_value == "class":
+            threshold = _classification_threshold(predicted, cv_y_test)
+            predicted = _class_threshold_round(predicted, threshold, cv_y_train)
+        scores[idx] = objective_fn(predicted, cv_y_test)
     best_index = int(np.nanargmin(scores) if objective == "min" else np.nanargmax(scores))
     fit = nns_reg(
         cv_x_train,
@@ -715,6 +803,55 @@ def _as_prediction(value: object, length: int) -> NDArray[np.float64]:
 
 def _sse(predicted: NDArray[np.float64], actual: NDArray[np.float64]) -> float:
     return float(np.sum((predicted - actual) ** 2))
+
+
+def _accuracy(predicted: NDArray[np.float64], actual: NDArray[np.float64]) -> float:
+    return float(np.mean(np.asarray(predicted, dtype=np.float64) == actual))
+
+
+def _classification_threshold(
+    predicted: NDArray[np.float64],
+    actual: NDArray[np.float64],
+    *,
+    tie: Literal["first", "median"] = "median",
+) -> float:
+    values = np.asarray(predicted, dtype=np.float64)
+    if np.unique(values).size == 1:
+        return 0.01 if tie == "first" else 0.5
+    grid = np.round(np.arange(0.01, 1.0, 0.01), 2)
+    scores = np.empty(grid.size, dtype=np.float64)
+    for index, threshold in enumerate(grid):
+        rounded = np.where(values % 1.0 < threshold, np.floor(values), np.ceil(values))
+        scores[index] = np.mean(rounded == actual)
+    best = np.flatnonzero(scores == float(np.max(scores)))
+    return float(grid[int(best[0] if tie == "first" else np.median(best))])
+
+
+def _class_threshold_round(
+    values: NDArray[np.float64],
+    threshold: float,
+    y_train: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    threshold_value = 0.5 if not np.isfinite(threshold) else float(threshold)
+    rounded = np.where(values % 1.0 < threshold_value, np.floor(values), np.ceil(values))
+    return _round_clamp_classes(rounded, y_train)
+
+
+def _probability_threshold(
+    method1: float | None,
+    method2: float | None,
+    *,
+    type_value: str | None,
+) -> float:
+    if type_value != "class":
+        return 0.5
+    values = np.asarray(
+        [value for value in (method1, method2) if value is not None and np.isfinite(value)],
+        dtype=np.float64,
+    )
+    if values.size == 0:
+        return 0.5
+    return float(np.mean(values))
 
 
 def _methods(method: Method) -> tuple[int, ...]:

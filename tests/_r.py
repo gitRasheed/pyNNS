@@ -55,6 +55,8 @@ def nns_stack_numeric(
     dim_red_method: str | list[float],
     ts_test: int | None = None,
     pred_int: float | None = None,
+    type: str | None = None,
+    class_levels: Sequence[object] | None = None,
 ) -> RValue:
     args = {
         "x": x,
@@ -68,6 +70,8 @@ def nns_stack_numeric(
         "dim_red_method": dim_red_method,
         "ts_test": ts_test,
         "pred_int": pred_int,
+        "type": type,
+        "class_levels": class_levels,
     }
     key = _cache_key("NNS.stack.numeric", (args,))
     cache, refresh = _cache_state()
@@ -520,12 +524,21 @@ def _call_r_stack_numeric(args: dict[str, Any]) -> RValue:
         "if (length(ts_arg) == 0) ts_arg <- NULL else ts_arg <- as.integer(ts_arg)\n"
         "pred_arg <- args$pred_int\n"
         "if (length(pred_arg) == 0) pred_arg <- NULL else pred_arg <- as.numeric(pred_arg)\n"
+        "type_arg <- args$type\n"
+        "if (length(type_arg) == 0) type_arg <- NULL else type_arg <- as.character(type_arg)\n"
+        "levels_arg <- args$class_levels\n"
+        "if (length(levels_arg) == 0) levels_arg <- NULL else "
+        "levels_arg <- as.character(unlist(levels_arg))\n"
+        "dv <- unlist(args$y)\n"
+        "if (!is.null(levels_arg)) dv <- factor(as.character(dv), levels = levels_arg) "
+        "else dv <- as.numeric(dv)\n"
         "result <- NNS::NNS.stack("
-        "mat(args$x), as.numeric(unlist(args$y)), IVs.test = mat(args$x_test), "
+        "mat(args$x), dv, IVs.test = mat(args$x_test), "
         "CV.size = as.numeric(args$cv_size), folds = as.integer(args$folds), "
         "method = as.numeric(unlist(args$method)), order = order_arg, "
         "stack = isTRUE(as.logical(unlist(args$stack))), "
         "dim.red.method = dim_arg, pred.int = pred_arg, ts.test = ts_arg, "
+        "type = type_arg, "
         "status = FALSE, ncores = 1)\n"
         "encode <- function(x) {\n"
         "  if (is.null(x)) return(NULL)\n"

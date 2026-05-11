@@ -126,8 +126,9 @@ Outputs use R's keys (`R2`, `rhs.partitions`, `RPM`, `Point.est`, `pred.int`,
 and `Fitted.xy`) with data.table objects represented as dictionaries of NumPy
 arrays. Numeric confidence intervals are deterministic and use the global
 residual `UPM.VaR(..., degree = 1)` offset from installed R. Classification mode
-(`type="class"`) and factor dummy expansion are deferred and raise
-`NotImplementedError`.
+(`type="class"`) is supported for numeric/logical/factor-like targets and
+returns numeric class codes. Factor predictor dummy expansion is deferred and
+raises `NotImplementedError`.
 
 Point estimates match installed R, including the one-row outsider behavior in
 the multi-point path where R drops matrix dimensions before extrapolating.
@@ -136,17 +137,20 @@ the regression-point matrix and defaulting `n.best` to 1.
 
 ## Stack
 
-`nns_stack` maps to R's numeric `NNS.stack` path using the real `nns_reg`
-dimension-reduction and multivariate-regression internals. Classification
-(`type="class"`) and class balancing are deferred and raise
-`NotImplementedError` because they depend on the unported classification
-branches. Numeric prediction intervals are supported and are combined by
-installed R's weighted data.table arithmetic. `ts_test` is supported and follows installed
-R's split exactly: CV training uses the tail `ts_test` rows, while CV testing
-uses the earlier rows `1:(n - ts_test)`. This is intentionally not changed even
-though it is counterintuitive. R's `CV.size = NULL` samples a random value
-between 0.2 and 1/3; PyNNS uses a deterministic default of `0.25`. Pass
-`cv_size` explicitly for exact R parity.
+`nns_stack` maps to R's numeric and deterministic classification `NNS.stack`
+paths using the real `nns_reg` dimension-reduction and multivariate-regression
+internals. `type="class"` is supported for numeric/logical/factor-like targets
+and returns numeric class codes, not labels. Use `class_levels=` to reproduce R
+factor level ordering. Raw string labels remain rejected unless explicit levels
+are supplied. Class balancing and classification prediction intervals remain
+deferred and raise `NotImplementedError`. Numeric prediction intervals are
+supported and are combined by installed R's weighted data.table arithmetic.
+`ts_test` is supported and follows installed R's split exactly: CV training uses
+the tail `ts_test` rows, while CV testing uses the earlier rows
+`1:(n - ts_test)`. This is intentionally not changed even though it is
+counterintuitive. R's `CV.size = NULL` samples a random value between 0.2 and
+1/3; PyNNS uses a deterministic default of `0.25`. Pass `cv_size` explicitly for
+exact R parity.
 
 ## Boost
 
@@ -257,14 +261,14 @@ codes rather than decoded labels. PyNNS provides `factor_2_dummy`,
 reproduce R factor level order because NumPy arrays do not carry factor
 metadata.
 
-`nns_reg(..., type="class")` and `nns_m_reg(..., type="class")` are supported
-for numeric, logical, and factor-like targets. Use `class_levels=` when passing
-string/object labels so PyNNS can reproduce R factor codes explicitly. Raw
-string classification remains rejected where installed R errors or produces
-unusable `NA` conversions. Predictions and point estimates are numeric class
-codes, not original labels, matching installed R. Higher-level classification
-paths in stack and boost, class-specific interval tables, plus `balance=True`,
-remain deferred until the next classification batches.
+`nns_reg(..., type="class")`, `nns_m_reg(..., type="class")`, and
+`nns_stack(..., type="class")` are supported for numeric, logical, and
+factor-like targets. Use `class_levels=` when passing string/object labels so
+PyNNS can reproduce R factor codes explicitly. Raw string classification remains
+rejected where installed R errors or produces unusable `NA` conversions.
+Predictions and point estimates are numeric class codes, not original labels,
+matching installed R. Boost classification, class-specific interval tables, and
+`balance=True` remain deferred until the next classification batches.
 
 ## Differentiation
 

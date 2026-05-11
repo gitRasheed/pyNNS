@@ -65,6 +65,7 @@ def nns_reg(
             dist=dist,
             point_only=point_only,
             multivariate_call=multivariate_call,
+            class_levels=class_levels,
         )
 
     type_value = _normalize_type(type)
@@ -311,16 +312,14 @@ def _nns_reg_dimred(
     dist: str,
     point_only: bool,
     multivariate_call: bool,
+    class_levels: list[object] | None = None,
 ) -> dict[str, Any]:
     del n_best
     if factor_2_dummy:
         raise NotImplementedError(
             "factor_2_dummy=True is deferred until the factor dimension-reduction path is ported."
         )
-    if type is not None:
-        raise NotImplementedError(
-            "classification type paths are deferred to a later regression batch."
-        )
+    type_value = _normalize_type(type)
     if smooth:
         if confidence_interval is not None:
             raise NotImplementedError(
@@ -335,7 +334,20 @@ def _nns_reg_dimred(
             "multivariate_call with dim_red_method is not used by R and is not supported."
         )
 
-    x_matrix, y_values = _validate_dimred_inputs(x, y)
+    x_matrix, y_values = _validate_dimred_inputs(
+        x,
+        y,
+        type_value=type_value,
+        class_levels=class_levels,
+    )
+    class_mode = type_value == "class" or _should_auto_classify(y_values)
+    if class_mode:
+        noise_reduction = "mode_class"
+        if confidence_interval is not None:
+            raise NotImplementedError(
+                "classification confidence intervals are deferred until class interval parity "
+                "is ported."
+            )
     point_matrix = _as_dimred_point_est(point_est, x_matrix.shape[1])
     noise = _validate_noise_reduction(noise_reduction)
     projection = _dimred_projection(
@@ -356,7 +368,7 @@ def _nns_reg_dimred(
         point_values=projection.point_est,
         confidence_interval=confidence_interval,
         multivariate_call=False,
-        class_mode=False,
+        class_mode=class_mode,
         equation=projection.equation,
         x_star={"x": projection.x_star},
     )
@@ -379,10 +391,13 @@ class _DimredProjection:
 
 def _validate_dimred_inputs(
     x: NDArray[np.float64],
-    y: NDArray[np.float64],
+    y: NDArray[Any],
+    *,
+    type_value: str | None = None,
+    class_levels: list[object] | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     x_values = np.asarray(x, dtype=np.float64)
-    y_values = np.asarray(y, dtype=np.float64).reshape(-1)
+    y_values, _ = _prepare_y_values(y, type_value=type_value, class_levels=class_levels)
     if x_values.ndim != 2:
         raise ValueError("dim_red_method requires a 2D numeric x matrix.")
     if x_values.shape[0] == 0 or x_values.shape[1] == 0:

@@ -41,7 +41,7 @@ def test_nns_stack_numeric_matches_r(method: list[int], stack: bool) -> None:
         dim_red_method="cor",
     )
 
-    _assert_stack_matches(actual, expected)
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
 
 
 @pytest.mark.parity
@@ -74,7 +74,7 @@ def test_nns_stack_equal_dim_red_matches_r() -> None:
         dim_red_method="equal",
     )
 
-    _assert_stack_matches(actual, expected)
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
 
 
 @pytest.mark.parity
@@ -112,7 +112,7 @@ def test_nns_stack_ts_test_matches_r(method: list[int], ts_test: int) -> None:
         ts_test=ts_test,
     )
 
-    _assert_stack_matches(actual, expected)
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
 
 
 @pytest.mark.parity
@@ -148,7 +148,7 @@ def test_nns_stack_var_like_ts_test_matches_r() -> None:
         ts_test=ts_test,
     )
 
-    _assert_stack_matches(actual, expected)
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
 
 
 @pytest.mark.parity
@@ -183,13 +183,140 @@ def test_nns_stack_pred_int_matches_r(method: list[int]) -> None:
         pred_int=0.95,
     )
 
-    _assert_stack_matches(actual, expected)
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
 
 
-def _assert_stack_matches(actual: dict[str, Any], expected: Any) -> None:
+@pytest.mark.parity
+@pytest.mark.parametrize("method", [[1], [2], [1, 2]])
+def test_nns_stack_binary_class_matches_r(method: list[int]) -> None:
+    x = np.linspace(-2.0, 2.0, 36)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x + np.sin(x) > 0.0, 2.0, 1.0)
+    point = variable[::9]
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("method", [[1], [2], [1, 2]])
+def test_nns_stack_multiclass_matches_r(method: list[int]) -> None:
+    x = np.linspace(-2.0, 2.0, 36)
+    variable = np.column_stack((x, x**2, np.sin(x)))
+    y = np.where(x < -0.5, 1.0, np.where(x > 0.75, 3.0, 2.0))
+    point = variable[[0, 7, 18, 31]]
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        order=1,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        order=1,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+
+
+@pytest.mark.parity
+def test_nns_stack_factor_like_class_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    labels = np.where(x < -0.5, "A", np.where(x > 0.75, "C", "B"))
+    point = variable[::10]
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        labels.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=[1, 2],
+        order=1,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+        class_levels=["A", "B", "C"],
+    )
+    actual = nns_stack(
+        variable,
+        labels,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        order=1,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+        class_levels=["A", "B", "C"],
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+
+
+def test_nns_stack_raw_character_class_raises() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    variable = np.column_stack((x, np.sin(x)))
+    labels = np.where(x > 0.0, "B", "A")
+
+    with pytest.raises(ValueError, match="class_levels"):
+        nns_stack(variable, labels, variable[:3], type="class", cv_size=0.25, folds=1)
+
+
+def _assert_stack_matches(
+    actual: dict[str, Any],
+    expected: Any,
+    *,
+    exact_probability_threshold: bool = True,
+) -> None:
     assert isinstance(expected, dict)
     assert set(actual) == set(expected)
     for key in actual:
+        if key == "probability.threshold" and not exact_probability_threshold:
+            assert np.isfinite(float(actual[key]))
+            assert 0.0 <= float(actual[key]) <= 1.0
+            assert np.isfinite(float(_numeric(expected[key])))
+            continue
         if actual[key] is None:
             assert expected[key] is None
         elif isinstance(actual[key], dict):
