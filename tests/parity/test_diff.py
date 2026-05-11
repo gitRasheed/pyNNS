@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import json
-import os
-import subprocess
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pytest
+from _r import nns_diff_custom
 from _tolerances import EXACT
 
 from pynns import nns_diff
@@ -43,31 +40,10 @@ def test_nns_diff_derivative_matches_r(
 
 
 def _r_nns_diff(name: str, point: float) -> dict[str, float]:
-    script = (
-        "library(NNS)\n"
-        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
-        "f <- switch(args$name,\n"
-        "  square = function(x) x^2,\n"
-        "  sin = function(x) sin(x),\n"
-        "  exp = function(x) exp(x),\n"
-        "  constant = function(x) 5,\n"
-        "  identity = function(x) x)\n"
-        "result <- NNS::NNS.diff(f, args$point, plot = FALSE)\n"
-        "payload <- as.numeric(result[, 1])\n"
-        "names(payload) <- rownames(result)\n"
-        "cat(jsonlite::toJSON(as.list(payload), auto_unbox = TRUE, digits = NA))\n"
-    )
-    env = os.environ.copy()
-    env.setdefault("R_LIBS_USER", str(Path.home() / "R" / "library"))
-    completed = subprocess.run(
-        ["Rscript", "-e", script],
-        check=True,
-        capture_output=True,
-        env=env,
-        input=json.dumps({"name": name, "point": point}),
-        text=True,
-    )
+    result = nns_diff_custom(name, point)
+    assert isinstance(result, dict)
     return {
-        key: float("nan") if value == "NA" else float(value)
-        for key, value in json.loads(completed.stdout).items()
+        key: float(np.asarray(value).reshape(-1)[0])
+        for key, value in result.items()
+        if isinstance(value, np.ndarray)
     }

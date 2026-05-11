@@ -86,6 +86,7 @@ def test_nns_meboot_errors_match_r_categories() -> None:
 
 
 @pytest.mark.parity
+@pytest.mark.stochastic
 def test_nns_meboot_statistical_summary_is_close_to_r() -> None:
     x = (np.linspace(-3.0, 4.0, 30) + 0.2 * np.sin(np.arange(30, dtype=np.float64))).tolist()
 

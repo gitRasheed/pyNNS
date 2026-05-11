@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
 from pynns import nns_mc
+
+pytestmark = pytest.mark.stochastic
 
 finite_arrays = arrays(
     dtype=np.float64,
@@ -20,10 +23,19 @@ finite_arrays = arrays(
 )
 
 
-def _residual_sd(x: np.ndarray) -> float:
+def _is_valid_rho_target_input(x: np.ndarray) -> bool:
+    if not np.all(np.isfinite(x)) or np.ptp(x) <= 1e-8:
+        return False
     time = np.arange(1, x.size + 1, dtype=np.float64)
     fitted = np.polyval(np.polyfit(time, x, 1), time)
-    return float(np.std(x - fitted))
+    residuals = x - fitted
+    if np.ptp(residuals) <= 1e-8 or np.std(residuals) <= 1e-8:
+        return False
+    rounded = np.round(residuals, decimals=12)
+    if np.unique(rounded).size < 4:
+        return False
+    ranks = np.argsort(np.argsort(rounded, kind="stable"), kind="stable").astype(np.float64)
+    return bool(np.std(ranks) > 1e-8)
 
 
 @given(
@@ -40,8 +52,7 @@ def test_nns_mc_random_inputs_have_valid_shape(
     exp: float,
     seed: int,
 ) -> None:
-    assume(np.ptp(x) > 1e-8)
-    assume(_residual_sd(x) > 1e-8)
+    assume(_is_valid_rho_target_input(x))
 
     result = nns_mc(x, reps=reps, lower_rho=-1.0, upper_rho=1.0, by=by, exp=exp, random_seed=seed)
 
@@ -55,11 +66,9 @@ def test_nns_mc_random_inputs_have_valid_shape(
 
 @given(finite_arrays, st.integers(min_value=0, max_value=10000))
 def test_nns_mc_same_seed_is_deterministic(x: np.ndarray, seed: int) -> None:
-    assume(np.ptp(x) > 1e-8)
-    assume(_residual_sd(x) > 1e-8)
+    assume(_is_valid_rho_target_input(x))
 
     first = nns_mc(x, reps=2, lower_rho=-1.0, upper_rho=1.0, by=1.0, random_seed=seed)
     second = nns_mc(x, reps=2, lower_rho=-1.0, upper_rho=1.0, by=1.0, random_seed=seed)
 
     np.testing.assert_array_equal(first["ensemble"], second["ensemble"])
-

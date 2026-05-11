@@ -252,6 +252,69 @@ def nns_mc_stat_summary(
         return result
 
 
+def nns_anova_custom(payload: dict[str, Any]) -> RValue:
+    key = _cache_key("NNS.ANOVA.custom", (payload,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.ANOVA.custom with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_anova_custom(payload)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
+def nns_distance_bulk_custom(
+    rpm: dict[str, list[float]],
+    x_test: dict[str, list[float]],
+    k: int | str,
+) -> RValue:
+    args = {"rpm": rpm, "x_test": x_test, "k": k}
+    key = _cache_key("NNS.distance.bulk.custom", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.distance.bulk.custom with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_distance_bulk_custom(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
+def nns_diff_custom(name: str, point: float) -> RValue:
+    args = {"name": name, "point": point}
+    key = _cache_key("NNS.diff.custom", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.diff.custom with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_diff_custom(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def _uncached_nns(
     function: str,
     args: tuple[Any, ...],
@@ -559,6 +622,91 @@ def _call_r_mc_stat_summary(args: dict[str, Any]) -> RValue:
         "summary <- c(mean_ensemble = mean(result$ensemble), sd_ensemble = sd(result$ensemble), "
         "median_block_sd = median(block_sds))\n"
         "cat(jsonlite::toJSON(as.numeric(summary), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_anova_custom(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "if (args$mode == 'binary') {\n"
+        "  ci <- if (isTRUE(args$robust)) 0.95 else NULL\n"
+        "  result <- NNS::NNS.ANOVA(as.numeric(unlist(args$control)), "
+        "as.numeric(unlist(args$treatment)), means.only = args$means_only, "
+        "medians = args$medians, confidence.interval = ci, robust = args$robust, "
+        "plot = FALSE)\n"
+        "} else {\n"
+        "  groups <- lapply(args$groups, function(x) as.numeric(unlist(x)))\n"
+        "  result <- NNS::NNS.ANOVA(groups, means.only = args$means_only, "
+        "medians = args$medians, confidence.interval = NULL, "
+        "pairwise = args$pairwise, plot = FALSE)\n"
+        "}\n"
+        "encode <- function(x) {\n"
+        "  if (is.null(x)) return(NULL)\n"
+        "  if (is.matrix(x)) {\n"
+        "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"
+        "  }\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA, null = 'null'))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_distance_bulk_custom(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
+        "rpm <- as.data.frame(args$rpm)\n"
+        "x_test <- as.data.frame(args$x_test)\n"
+        "result <- NNS:::NNS.distance.bulk(rpm, x_test, args$k, class = NULL)\n"
+        "cat(jsonlite::toJSON(as.numeric(result), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_diff_custom(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
+        "f <- switch(args$name,\n"
+        "  square = function(x) x^2,\n"
+        "  sin = function(x) sin(x),\n"
+        "  exp = function(x) exp(x),\n"
+        "  constant = function(x) 5,\n"
+        "  identity = function(x) x)\n"
+        "result <- NNS::NNS.diff(f, args$point, plot = FALSE)\n"
+        "payload <- as.numeric(result[, 1])\n"
+        "names(payload) <- rownames(result)\n"
+        "cat(jsonlite::toJSON(as.list(payload), auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

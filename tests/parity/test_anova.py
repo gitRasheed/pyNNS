@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-import json
-import os
-import subprocess
-from pathlib import Path
-from typing import Any, cast
-
 import numpy as np
 import pytest
+from _r import RValue, nns_anova_custom
 
 from pynns import nns_anova
 
@@ -78,6 +73,7 @@ def test_nns_anova_pairwise_matches_r() -> None:
 
 
 @pytest.mark.parity
+@pytest.mark.stochastic
 def test_nns_anova_robust_structure_matches_r_shape() -> None:
     control, treatment = _groups(30)
 
@@ -139,7 +135,7 @@ def _r_anova_binary(
         }
     )
     assert isinstance(result, dict)
-    return result
+    return _scalar_dict(result)
 
 
 def _r_anova_groups(groups: list[np.ndarray], *, pairwise: bool) -> float | np.ndarray:
@@ -152,52 +148,17 @@ def _r_anova_groups(groups: list[np.ndarray], *, pairwise: bool) -> float | np.n
             "pairwise": pairwise,
         }
     )
-    assert isinstance(result, float | np.ndarray)
+    if isinstance(result, dict):
+        raise AssertionError(f"Unexpected R ANOVA group result: {result!r}")
+    if isinstance(result, np.ndarray) and result.ndim == 0:
+        return float(result)
+    assert isinstance(result, np.ndarray)
     return result
 
 
-def _r_anova(payload: dict[str, Any]) -> dict[str, float] | np.ndarray | float:
-    script = (
-        "library(NNS)\n"
-        "args <- jsonlite::fromJSON("
-        "paste(readLines('stdin'), collapse = '\\n'), simplifyVector = FALSE)\n"
-        "if (args$mode == 'binary') {\n"
-        "  ci <- if (isTRUE(args$robust)) 0.95 else NULL\n"
-        "  result <- NNS::NNS.ANOVA(unlist(args$control), unlist(args$treatment), "
-        "means.only = args$means_only, medians = args$medians, "
-        "confidence.interval = ci, robust = args$robust, plot = FALSE)\n"
-        "} else {\n"
-        "  groups <- lapply(args$groups, unlist)\n"
-        "  result <- NNS::NNS.ANOVA(groups, means.only = args$means_only, "
-        "medians = args$medians, confidence.interval = NULL, "
-        "pairwise = args$pairwise, plot = FALSE)\n"
-        "}\n"
-        "encode <- function(x) {\n"
-        "  if (is.matrix(x)) return(list(type = 'matrix', value = unname(lapply("
-        "seq_len(nrow(x)), function(i) as.numeric(x[i, ])))))\n"
-        "  if (is.list(x)) return(list(type = 'list', value = lapply(x, encode)))\n"
-        "  list(type = 'numeric', value = as.numeric(x))\n"
-        "}\n"
-        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA))\n"
-    )
-    env = os.environ.copy()
-    env.setdefault("R_LIBS_USER", str(Path.home() / "R" / "library"))
-    completed = subprocess.run(
-        ["Rscript", "-e", script],
-        check=True,
-        capture_output=True,
-        env=env,
-        input=json.dumps(payload),
-        text=True,
-    )
-    return cast(dict[str, float] | np.ndarray | float, _decode_r(json.loads(completed.stdout)))
+def _r_anova(payload: dict[str, object]) -> RValue:
+    return nns_anova_custom(payload)
 
 
-def _decode_r(value: dict[str, Any]) -> Any:
-    if value["type"] == "matrix":
-        return np.asarray(value["value"], dtype=np.float64)
-    if value["type"] == "numeric":
-        numeric = np.asarray(value["value"], dtype=np.float64)
-        return float(numeric.reshape(-1)[0]) if numeric.size == 1 else numeric
-    decoded = {key: _decode_r(item) for key, item in value["value"].items()}
-    return {key: float(item) for key, item in decoded.items()}
+def _scalar_dict(value: dict[str, RValue]) -> dict[str, float]:
+    return {key: float(np.asarray(item).reshape(-1)[0]) for key, item in value.items()}

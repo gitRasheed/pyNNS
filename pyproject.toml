@@ -41,6 +41,7 @@ markers = [
     "parity: tests comparing pynns behavior to the reference R NNS package",
     "invariant: tests for mathematical or API invariants",
     "property: property-based tests",
+    "stochastic: stochastic structural/statistical tests",
 ]
 
 [tool.ruff]

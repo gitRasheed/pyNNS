@@ -5,6 +5,8 @@ import pytest
 
 from pynns import nns_mc
 
+pytestmark = pytest.mark.stochastic
+
 
 def test_nns_mc_shapes_and_finite_outputs() -> None:
     x = np.linspace(-2.0, 4.0, 30) + 0.1 * np.sin(np.arange(30, dtype=np.float64))
@@ -63,4 +65,3 @@ def test_nns_mc_zero_by_errors() -> None:
 
     with pytest.raises(ValueError, match="by"):
         nns_mc(x, by=0.0)
-

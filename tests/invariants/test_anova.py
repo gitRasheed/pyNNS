@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from pynns import nns_anova
 
@@ -44,6 +45,7 @@ def test_nns_anova_pairwise_matrix_is_symmetric_with_unit_diagonal() -> None:
     assert np.all((0.0 <= result) & (result <= 1.0))
 
 
+@pytest.mark.stochastic
 def test_nns_anova_robust_degenerate_inputs_do_not_crash() -> None:
     x = np.ones(20)
 
@@ -54,6 +56,7 @@ def test_nns_anova_robust_degenerate_inputs_do_not_crash() -> None:
     assert np.isnan(result["Robust Certainty Estimate"])
 
 
+@pytest.mark.stochastic
 def test_nns_anova_robust_reproducible_with_seed() -> None:
     x = np.linspace(-2.0, 2.0, 40)
     y = x + 0.25

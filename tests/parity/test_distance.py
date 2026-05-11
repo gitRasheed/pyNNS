@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import json
-import os
-import subprocess
-from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import pytest
-from _r import nns
+from _r import nns, nns_distance_bulk_custom
 from _tolerances import EXACT
 
 from pynns import nns_distance, nns_distance_bulk
@@ -61,31 +57,14 @@ def _rpm_dict(rpm: np.ndarray) -> dict[str, list[float]]:
 
 
 def _r_distance_bulk(rpm: np.ndarray, x_test: np.ndarray, k: int | str) -> np.ndarray:
-    script = (
-        "library(NNS)\n"
-        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
-        "rpm <- as.data.frame(args$rpm)\n"
-        "x_test <- as.data.frame(args$x_test)\n"
-        "result <- NNS:::NNS.distance.bulk(rpm, x_test, args$k, class = NULL)\n"
-        "cat(jsonlite::toJSON(as.numeric(result), auto_unbox = TRUE, digits = NA))\n"
-    )
-    payload = {
-        "rpm": _rpm_dict(rpm),
-        "x_test": {
+    expected = nns_distance_bulk_custom(
+        _rpm_dict(rpm),
+        {
             "x1": x_test[:, 0].tolist(),
             "x2": x_test[:, 1].tolist(),
             "x3": x_test[:, 2].tolist(),
         },
-        "k": k,
-    }
-    env = os.environ.copy()
-    env.setdefault("R_LIBS_USER", str(Path.home() / "R" / "library"))
-    completed = subprocess.run(
-        ["Rscript", "-e", script],
-        check=True,
-        capture_output=True,
-        env=env,
-        input=json.dumps(payload),
-        text=True,
+        k,
     )
-    return np.asarray(json.loads(completed.stdout), dtype=np.float64)
+    assert isinstance(expected, np.ndarray)
+    return expected

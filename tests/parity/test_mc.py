@@ -80,6 +80,7 @@ def test_nns_mc_sampling_vignette_target_drift_smoke() -> None:
 
 
 @pytest.mark.parity
+@pytest.mark.stochastic
 def test_nns_mc_statistical_summary_is_close_to_r() -> None:
     x = (np.linspace(-2.0, 3.0, 25) + 0.2 * np.sin(np.arange(25, dtype=np.float64))).tolist()
 
@@ -112,4 +113,3 @@ def _array(value: RValue) -> np.ndarray:
     if not isinstance(value, np.ndarray):
         raise AssertionError(f"Expected R array, got {type(value)!r}")
     return value
-

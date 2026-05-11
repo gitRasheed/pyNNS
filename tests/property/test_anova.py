@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
@@ -91,6 +92,7 @@ def test_nns_anova_pairwise_bounds(x: np.ndarray) -> None:
         ),
     ),
 )
+@pytest.mark.stochastic
 def test_nns_anova_robust_bounds(x: np.ndarray, y: np.ndarray) -> None:
     assume(np.ptp(x) > MIN_MEANINGFUL_RANGE)
     assume(np.ptp(y) > MIN_MEANINGFUL_RANGE)

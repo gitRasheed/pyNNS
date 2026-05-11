@@ -5,6 +5,8 @@ import pytest
 
 from pynns import nns_meboot
 
+pytestmark = pytest.mark.stochastic
+
 
 def test_nns_meboot_replicate_and_ensemble_shapes() -> None:
     x = np.linspace(-2.0, 3.0, 25) + 0.1 * np.sin(np.arange(25, dtype=np.float64))
