@@ -26,3 +26,4 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_m_reg`, N=3, T_obs=200 | 84.356 ms | 97.600 ms | 0.86x |
 | `nns_stack`, N=3, T_obs=100, T_test=20 | 197.228 ms | 369.667 ms | 0.53x |
 | `nns_boost`, N=3, T_obs=50, T_test=10 | 180.320 ms | 2919.500 ms | 0.06x |
+| `nns_seas`, T_obs=1000 | 7.787 ms | 1.100 ms | 7.08x |

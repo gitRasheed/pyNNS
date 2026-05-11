@@ -142,6 +142,16 @@ usable column names for matrix inputs; PyNNS uses positional numeric columns. As
 with `nns_stack`, R samples a random CV size when `CV.size = NULL`; PyNNS uses
 deterministic `cv_size=0.25` unless specified.
 
+## Seasonality
+
+`nns_seas` maps to installed R's non-plotting `NNS.seas` path and ignores
+`plot`, consistent with other PyNNS ports. Inputs shorter than five observations
+return R's sentinel period `0`. For mean-zero data, R falls back from coefficient
+of variation to `abs(acf1) ** -1`; PyNNS follows the same fallback and
+non-finite handling. Installed R can report harmonics rather than the visually
+obvious period, so PyNNS matches R's candidate-period screening instead of a
+textbook seasonality heuristic.
+
 ## Normalization
 
 `nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with

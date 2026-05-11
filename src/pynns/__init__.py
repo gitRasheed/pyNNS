@@ -32,6 +32,7 @@ _EXPORTS = {
     "nns_part": ("pynns.part", "nns_part"),
     "nns_reg": ("pynns.regression", "nns_reg"),
     "nns_rescale": ("pynns.central_tendencies", "nns_rescale"),
+    "nns_seas": ("pynns.seasonality", "nns_seas"),
     "nns_stack": ("pynns.stack", "nns_stack"),
     "sd_efficient_set": ("pynns.stochastic_dominance", "sd_efficient_set"),
     "skew_pm": ("pynns.classical", "skew_pm"),

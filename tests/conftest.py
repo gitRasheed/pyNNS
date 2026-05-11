@@ -135,6 +135,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_mode_continuous_1000_seconds" not in cache:
         cache["nns_mode_continuous_1000_seconds"] = _time_r_nns_mode_continuous()
         _write_benchmark_baseline(cache)
+    if "nns_seas_1000_seconds" not in cache:
+        cache["nns_seas_1000_seconds"] = _time_r_nns_seas()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -588,6 +591,26 @@ def _time_r_nns_mode_continuous() -> float:
         "for (i in seq_len(200)) invisible(NNS::NNS.mode(x, discrete = FALSE, multi = FALSE))\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 200)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_seas() -> float:
+    script = (
+        "library(NNS)\n"
+        "t <- seq_len(1000)\n"
+        "variable <- sin(2 * pi * t / 12) + 0.05 * cos(t / 3)\n"
+        "invisible(NNS::NNS.seas(variable, plot = FALSE))\n"
+        "times <- replicate(20, system.time(invisible(NNS::NNS.seas(variable, "
+        "plot = FALSE)))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

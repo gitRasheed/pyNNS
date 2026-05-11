@@ -16,6 +16,7 @@
     "nns_part_500_seconds": 0.00375,
     "nns_reg_500_seconds": 0.0372,
     "nns_reg_dimred_200x3_seconds": 0.0426,
+    "nns_seas_1000_seconds": 0.0011,
     "nns_stack_100x3_seconds": 0.3696667,
     "pm_matrix_100x500_seconds": 0.0168,
     "pm_matrix_10x500_seconds": 0.0004,

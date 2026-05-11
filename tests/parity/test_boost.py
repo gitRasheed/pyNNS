@@ -89,6 +89,7 @@ def test_nns_boost_deterministic_wider_feature_set_matches_r() -> None:
         learner_trials=100,
         cv_size=0.25,
         feature_importance=False,
+        random_seed=4,
     )
 
     _assert_boost_matches(actual, expected)
