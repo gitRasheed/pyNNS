@@ -154,15 +154,18 @@ exact R parity.
 
 ## Boost
 
-`nns_boost` maps to R's numeric deterministic `NNS.boost` path and uses the
-real `nns_reg` and `nns_stack` implementations. The small-feature path
-(`n_features <= 10`, where R evaluates all feature combinations) is supported.
-The stochastic epoch keeper path for `n_features > 10` is not yet ported and
-raises `NotImplementedError`. Classification, balancing, prediction intervals,
-and `ts_test` are also deferred and raise `NotImplementedError`. R requires
-usable column names for matrix inputs; PyNNS uses positional numeric columns. As
-with `nns_stack`, R samples a random CV size when `CV.size = NULL`; PyNNS uses
-deterministic `cv_size=0.25` unless specified.
+`nns_boost` maps to R's numeric and deterministic classification `NNS.boost`
+paths and uses the real `nns_reg` and `nns_stack` implementations. The
+small-feature path (`n_features <= 10`, where R evaluates all feature
+combinations) is supported. `type="class"` returns numeric class codes, not
+labels; use `class_levels=` to reproduce R factor level ordering. Raw string
+labels remain rejected unless explicit levels are supplied. The stochastic epoch
+keeper path for `n_features > 10` is not yet ported and raises
+`NotImplementedError`. Class balancing, prediction intervals, and `ts_test` are
+also deferred and raise `NotImplementedError`. R requires usable column names
+for matrix inputs; PyNNS uses positional numeric columns. As with `nns_stack`, R
+samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
+`cv_size=0.25` unless specified.
 
 ## Seasonality
 
@@ -267,8 +270,8 @@ factor-like targets. Use `class_levels=` when passing string/object labels so
 PyNNS can reproduce R factor codes explicitly. Raw string classification remains
 rejected where installed R errors or produces unusable `NA` conversions.
 Predictions and point estimates are numeric class codes, not original labels,
-matching installed R. Boost classification, class-specific interval tables, and
-`balance=True` remain deferred until the next classification batches.
+matching installed R. Class-specific interval tables and `balance=True` remain
+deferred until the next classification batches.
 
 ## Differentiation
 

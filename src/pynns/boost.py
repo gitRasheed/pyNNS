@@ -9,7 +9,14 @@ import numpy as np
 from numpy.typing import NDArray
 
 from pynns.dependence import _gravity
-from pynns.regression import Order, _r_minmax_columns, nns_reg
+from pynns.regression import (
+    Order,
+    _normalize_type,
+    _prepare_y_values,
+    _r_minmax_columns,
+    _round_clamp_classes,
+    nns_reg,
+)
 from pynns.stack import nns_stack
 
 Objective = Literal["min", "max"]
@@ -37,20 +44,31 @@ def nns_boost(
     pred_int: float | None = None,
     status: bool = False,
     random_seed: int | None = None,
+    class_levels: list[object] | None = None,
 ) -> BoostResult:
-    """Numeric NNS.boost port using real NNS.reg and NNS.stack internals."""
-    del feature_importance, status
-    if type is not None:
-        raise NotImplementedError("type='class' classification for NNS.boost is deferred.")
+    """Deterministic NNS.boost port using real NNS.reg and NNS.stack internals."""
+    del status
+    type_value = _normalize_type(type)
     if balance:
-        raise NotImplementedError("balance=True requires the classification path, deferred.")
+        raise NotImplementedError(
+            "nns_boost balance=True requires R down/up sampling helpers, which are not yet ported."
+        )
     if ts_test is not None:
         raise NotImplementedError("ts_test requires the time-series boost path, deferred.")
     if pred_int is not None:
+        if type_value == "class":
+            raise NotImplementedError("nns_boost pred_int for classification is not yet ported.")
         raise NotImplementedError("pred_int requires regression interval paths, deferred.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
-    y_train = _as_vector(dv_train, "dv_train")
+    if type_value == "class":
+        y_train, _ = _prepare_y_values(
+            dv_train,
+            type_value=type_value,
+            class_levels=class_levels,
+        )
+    else:
+        y_train = _as_vector(dv_train, "dv_train")
     if x_train.shape[0] != y_train.size:
         raise ValueError("ivs_train and dv_train must have the same row count.")
     x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
@@ -58,7 +76,11 @@ def nns_boost(
     if objective_l not in {"min", "max"}:
         raise ValueError("objective must be 'min' or 'max'.")
     objective_value: Objective = "min" if objective_l == "min" else "max"
-    objective_fn = _sse if obj_fn is None else obj_fn
+    if type_value == "class" and obj_fn is None:
+        objective_value = "max"
+        objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float] = _accuracy
+    else:
+        objective_fn = _sse if obj_fn is None else obj_fn
     rng = np.random.default_rng(random_seed)
 
     n_rows, n_cols = x_train.shape
@@ -86,6 +108,7 @@ def nns_boost(
             cv_size=cv_fraction,
             objective_fn=objective_fn,
             rng=rng,
+            type_value=type_value,
         )
     else:
         scores = np.asarray([threshold], dtype=np.float64)
@@ -108,7 +131,8 @@ def nns_boost(
         counts[:] = 1.0
     weights = counts / float(np.sum(counts))
     order_idx = np.flatnonzero(counts > 0.0)
-    order_idx = order_idx[np.argsort(-counts[order_idx], kind="mergesort")]
+    if features_only or feature_importance:
+        order_idx = order_idx[np.argsort(-counts[order_idx], kind="mergesort")]
 
     if features_only:
         return {
@@ -136,11 +160,14 @@ def nns_boost(
         method=1,
         objective=objective_value,
         cv_size=0.25 if cv_size is None else cv_size,
+        type=type_value,
     )
     estimates = np.asarray(final_fit["stack"], dtype=np.float64)
     if estimates.size == 0 or np.any(np.isnan(estimates)):
         estimates = np.asarray(final_fit["reg"], dtype=np.float64)
     estimates = _fill_nan_with_gravity(estimates)
+    if type_value == "class":
+        estimates = _round_clamp_classes(estimates, y_train)
 
     return {
         "results": estimates,
@@ -196,6 +223,7 @@ def _learner_scores(
     cv_size: float,
     objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float],
     rng: np.random.Generator,
+    type_value: str | None = None,
 ) -> NDArray[np.float64]:
     scores = np.empty(len(feature_sets), dtype=np.float64)
     for idx, features in enumerate(feature_sets, start=1):
@@ -210,6 +238,7 @@ def _learner_scores(
                 point_est=point_subset.reshape(-1),
                 order=depth,
                 point_only=False,
+                type=type_value,
             )["Point.est"]
         else:
             predicted = nns_reg(
@@ -219,8 +248,11 @@ def _learner_scores(
                 dim_red_method="equal",
                 order=depth,
                 point_only=False,
+                type=type_value,
             )["Point.est"]
         pred = _fill_nan_with_gravity(np.asarray(predicted, dtype=np.float64))
+        if type_value == "class":
+            pred = _round_clamp_classes(pred, y_train)
         scores[idx - 1] = objective_fn(pred, y_train[test_idx])
     return scores
 
@@ -309,6 +341,10 @@ def _fill_nan_with_gravity(values: NDArray[np.float64]) -> NDArray[np.float64]:
 
 def _sse(predicted: NDArray[np.float64], actual: NDArray[np.float64]) -> float:
     return float(np.sum((predicted - actual) ** 2))
+
+
+def _accuracy(predicted: NDArray[np.float64], actual: NDArray[np.float64]) -> float:
+    return float(np.mean(predicted == actual))
 
 
 def _as_matrix(x: NDArray[np.float64], name: str) -> NDArray[np.float64]:

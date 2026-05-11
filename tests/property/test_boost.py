@@ -32,3 +32,23 @@ def test_nns_boost_numeric_bounds_hold(x: np.ndarray) -> None:
     assert result["results"].shape == (3,)
     assert np.all(np.isfinite(result["results"]))
     assert np.sum(result["feature.weights"]) > 0.0
+
+
+@given(finite_matrices, st.integers(min_value=2, max_value=4), st.sampled_from([1, 2]))
+def test_nns_boost_class_shape_and_codes_hold(
+    x: np.ndarray,
+    n_classes: int,
+    depth: int,
+) -> None:
+    row_jitter = np.arange(x.shape[0], dtype=np.float64)[:, np.newaxis] * 1e-6
+    col_jitter = np.arange(x.shape[1], dtype=np.float64)[np.newaxis, :] * 1e-7
+    x = x + row_jitter + col_jitter
+    score = x[:, 0] + 0.25 * x[:, 1]
+    quantiles = np.quantile(score, np.linspace(0.0, 1.0, n_classes + 1)[1:-1])
+    y = np.searchsorted(quantiles, score, side="right").astype(np.float64) + 1.0
+
+    result = nns_boost(x, y, x[:3], cv_size=0.25, depth=depth, type="class")
+
+    assert result["results"].shape == (3,)
+    assert np.all(np.isin(result["results"], np.unique(y)))
+    assert np.sum(result["feature.weights"]) > 0.0

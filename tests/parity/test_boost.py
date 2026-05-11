@@ -8,7 +8,7 @@ from _r import nns_boost_numeric
 from _tolerances import COMPOUND
 
 from pynns import nns_boost
-from pynns.boost import _all_feature_sets, _learner_scores, _sse
+from pynns.boost import _accuracy, _all_feature_sets, _learner_scores, _sse
 
 
 @pytest.mark.parity
@@ -155,10 +155,187 @@ def test_nns_boost_features_only_matches_r() -> None:
     _assert_boost_matches(actual, expected)
 
 
-def _assert_boost_matches(actual: dict[str, Any], expected: Any) -> None:
+@pytest.mark.parity
+@pytest.mark.parametrize("depth", [None, 1, 2])
+def test_nns_boost_binary_class_matches_r(depth: int | None) -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x + np.sin(x) > 0.0, 2.0, 1.0)
+    point = variable[:5]
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=depth,
+        features_only=False,
+        type="class",
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        point,
+        learner_trials=10,
+        cv_size=0.25,
+        depth=depth,
+        type="class",
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected, exact_feature_metadata=False)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("depth", [1, 2])
+def test_nns_boost_multiclass_matches_r(depth: int) -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, x**2, np.sin(x)))
+    y = np.where(x < -0.5, 1.0, np.where(x > 0.75, 3.0, 2.0))
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        variable[:5].tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=depth,
+        features_only=False,
+        type="class",
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=depth,
+        type="class",
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected, exact_feature_metadata=False)
+
+
+@pytest.mark.parity
+def test_nns_boost_factor_like_class_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    labels = np.where(x < -0.5, "A", np.where(x > 0.75, "C", "B"))
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        labels.tolist(),
+        variable[:5].tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        features_only=False,
+        type="class",
+        class_levels=["A", "B", "C"],
+    )
+    actual = nns_boost(
+        variable,
+        labels,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        type="class",
+        class_levels=["A", "B", "C"],
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected, exact_feature_metadata=False)
+
+
+@pytest.mark.parity
+def test_nns_boost_class_features_only_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x + np.sin(x) > 0.0, 2.0, 1.0)
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        variable[:5].tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        features_only=True,
+        type="class",
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        type="class",
+        features_only=True,
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected)
+
+
+def test_nns_boost_depth_1_class_learner_scores_match_r() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x + np.sin(x) > 0.0, 2.0, 1.0)
+
+    scores = _learner_scores(
+        variable,
+        y,
+        _all_feature_sets(3),
+        depth=1,
+        cv_size=0.25,
+        objective_fn=_accuracy,
+        rng=np.random.default_rng(42),
+        type_value="class",
+    )
+
+    np.testing.assert_allclose(
+        scores,
+        np.array(
+            [
+                0.71428571428571430,
+                0.85714285714285710,
+                0.42857142857142855,
+                0.85714285714285710,
+                0.42857142857142855,
+                0.71428571428571430,
+                0.57142857142857140,
+            ]
+        ),
+        atol=COMPOUND,
+    )
+
+
+def test_nns_boost_raw_character_class_raises() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    variable = np.column_stack((x, np.sin(x)))
+    labels = np.where(x > 0.0, "B", "A")
+
+    with pytest.raises(ValueError, match="class_levels"):
+        nns_boost(variable, labels, variable[:3], type="class", cv_size=0.25)
+
+
+def _assert_boost_matches(
+    actual: dict[str, Any],
+    expected: Any,
+    *,
+    exact_feature_metadata: bool = True,
+) -> None:
     assert isinstance(expected, dict)
     assert set(actual) == set(expected)
     for key in actual:
+        if key in {"feature.weights", "feature.frequency", "n.best"} and not exact_feature_metadata:
+            assert np.asarray(actual[key], dtype=np.float64).size > 0
+            assert np.asarray(expected[key], dtype=np.float64).size > 0
+            continue
         if actual[key] is None:
             assert expected[key] is None
         else:

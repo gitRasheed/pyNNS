@@ -100,6 +100,8 @@ def nns_boost_numeric(
     cv_size: float,
     depth: int | str | None,
     features_only: bool,
+    type: str | None = None,
+    class_levels: Sequence[object] | None = None,
 ) -> RValue:
     args = {
         "x": x,
@@ -109,6 +111,8 @@ def nns_boost_numeric(
         "cv_size": cv_size,
         "depth": depth,
         "features_only": features_only,
+        "type": type,
+        "class_levels": class_levels,
     }
     key = _cache_key("NNS.boost.numeric", (args,))
     cache, refresh = _cache_state()
@@ -574,10 +578,19 @@ def _call_r_boost_numeric(args: dict[str, Any]) -> RValue:
         "}\n"
         "depth_arg <- args$depth\n"
         "if (length(depth_arg) == 0) depth_arg <- NULL\n"
+        "type_arg <- args$type\n"
+        "if (length(type_arg) == 0) type_arg <- NULL else type_arg <- as.character(type_arg)\n"
+        "levels_arg <- args$class_levels\n"
+        "if (length(levels_arg) == 0) levels_arg <- NULL else "
+        "levels_arg <- as.character(unlist(levels_arg))\n"
+        "dv <- unlist(args$y)\n"
+        "if (!is.null(levels_arg)) dv <- factor(as.character(dv), levels = levels_arg) "
+        "else dv <- as.numeric(dv)\n"
         "result <- NNS::NNS.boost("
-        "mat(args$x), as.numeric(unlist(args$y)), IVs.test = mat(args$x_test), "
+        "mat(args$x), dv, IVs.test = mat(args$x_test), "
         "learner.trials = as.integer(args$learner_trials), "
         "CV.size = as.numeric(args$cv_size), depth = depth_arg, "
+        "type = type_arg, "
         "features.only = isTRUE(as.logical(unlist(args$features_only))), "
         "feature.importance = FALSE, status = FALSE)\n"
         "encode <- function(x) {\n"
