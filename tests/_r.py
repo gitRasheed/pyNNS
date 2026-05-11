@@ -18,8 +18,8 @@ _LOCK_PATH = _CACHE_PATH.with_suffix(".lock")
 _SCHEMA_VERSION = 1
 _NNS_VERSION = "12.0"
 
-JsonValue: TypeAlias = str | float | list["JsonValue"] | dict[str, "JsonValue"]
-RValue: TypeAlias = str | list[str] | NDArray[np.float64] | dict[str, "RValue"]
+JsonValue: TypeAlias = None | str | float | list["JsonValue"] | dict[str, "JsonValue"]
+RValue: TypeAlias = None | str | list[str] | NDArray[np.float64] | dict[str, "RValue"]
 Cache: TypeAlias = dict[str, JsonValue]
 
 _CACHE: Cache | None = None
@@ -40,6 +40,47 @@ def nns(function: str, *args: Any) -> RValue:
         )
 
     return _uncached_nns(function, args, key, refresh)
+
+
+def nns_stack_numeric(
+    x: list[list[float]],
+    y: list[float],
+    x_test: list[list[float]],
+    *,
+    cv_size: float,
+    folds: int,
+    method: list[int],
+    order: int | str | None,
+    stack: bool,
+    dim_red_method: str | list[float],
+) -> RValue:
+    args = {
+        "x": x,
+        "y": y,
+        "x_test": x_test,
+        "cv_size": cv_size,
+        "folds": folds,
+        "method": method,
+        "order": order,
+        "stack": stack,
+        "dim_red_method": dim_red_method,
+    }
+    key = _cache_key("NNS.stack.numeric", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.stack.numeric with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_stack_numeric(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
 
 
 def _uncached_nns(
@@ -170,6 +211,44 @@ def _call_r(function: str, args: tuple[Any, ...]) -> RValue:
     return _decode(json.loads(completed.stdout))
 
 
+def _call_r_stack_numeric(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "mat <- function(z) do.call(rbind, lapply(z, as.numeric))\n"
+        "order_arg <- args$order\n"
+        "if (length(order_arg) == 0) order_arg <- NULL\n"
+        "dim_arg <- args$dim_red_method\n"
+        "if (is.list(dim_arg)) dim_arg <- as.numeric(unlist(dim_arg))\n"
+        "result <- NNS::NNS.stack("
+        "mat(args$x), as.numeric(unlist(args$y)), IVs.test = mat(args$x_test), "
+        "CV.size = as.numeric(args$cv_size), folds = as.integer(args$folds), "
+        "method = as.numeric(unlist(args$method)), order = order_arg, "
+        "stack = isTRUE(as.logical(unlist(args$stack))), "
+        "dim.red.method = dim_arg, status = FALSE, ncores = 1)\n"
+        "encode <- function(x) {\n"
+        "  if (is.null(x)) return(NULL)\n"
+        "  if (is.matrix(x)) {\n"
+        "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"
+        "  }\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA, null = 'null'))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
 def _r_env() -> dict[str, str]:
     env = os.environ.copy()
     env.setdefault("R_LIBS_USER", str(Path.home() / "R" / "library"))
@@ -177,6 +256,8 @@ def _r_env() -> dict[str, str]:
 
 
 def _decode(value: JsonValue) -> RValue:
+    if value is None:
+        return None
     if isinstance(value, dict):
         return {key: _decode(item) for key, item in value.items()}
     if isinstance(value, str):
@@ -187,6 +268,8 @@ def _decode(value: JsonValue) -> RValue:
 
 
 def _encode(value: RValue) -> JsonValue:
+    if value is None:
+        return None
     if isinstance(value, dict):
         return {key: _encode(item) for key, item in value.items()}
     if isinstance(value, str):

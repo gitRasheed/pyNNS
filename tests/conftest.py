@@ -126,6 +126,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_m_reg_200x3_seconds" not in cache:
         cache["nns_m_reg_200x3_seconds"] = _time_r_nns_m_reg()
         _write_benchmark_baseline(cache)
+    if "nns_stack_100x3_seconds" not in cache:
+        cache["nns_stack_100x3_seconds"] = _time_r_nns_stack()
+        _write_benchmark_baseline(cache)
     if "nns_mode_continuous_1000_seconds" not in cache:
         cache["nns_mode_continuous_1000_seconds"] = _time_r_nns_mode_continuous()
         _write_benchmark_baseline(cache)
@@ -515,6 +518,29 @@ def _time_r_nns_m_reg() -> float:
         "times <- replicate(5, system.time(invisible(NNS:::NNS.M.reg(X, y, "
         "factor.2.dummy = FALSE, plot = FALSE, residual.plot = FALSE, "
         "ncores = 1, confidence.interval = NULL)))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_stack() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-2, 2, length.out = 100)\n"
+        "X <- cbind(x, sin(x), cos(x))\n"
+        "y <- x + sin(x) + 0.25 * cos(x)\n"
+        "run <- function() NNS::NNS.stack(X, y, IVs.test = X[1:20,], "
+        "CV.size = 0.25, folds = 2, method = c(1, 2), stack = TRUE, "
+        "dim.red.method = 'cor', status = FALSE, ncores = 1)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(

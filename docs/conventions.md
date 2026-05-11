@@ -120,6 +120,16 @@ the multi-point path where R drops matrix dimensions before extrapolating.
 `order="max"` follows R's convention of using the original regressor matrix as
 the regression-point matrix and defaulting `n.best` to 1.
 
+## Stack
+
+`nns_stack` maps to R's numeric `NNS.stack` path using the real `nns_reg`
+dimension-reduction and multivariate-regression internals. Classification
+(`type="class"`), class balancing, prediction intervals, and `ts_test` are
+deferred and raise `NotImplementedError` because they depend on the unported
+classification/interval/time-series branches. R's `CV.size = NULL` samples a
+random value between 0.2 and 1/3; PyNNS uses a deterministic default of `0.25`.
+Pass `cv_size` explicitly for exact R parity.
+
 ## Normalization
 
 `nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with
