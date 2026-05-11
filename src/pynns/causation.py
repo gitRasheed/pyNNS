@@ -18,6 +18,7 @@ from pynns.dependence import (
     _xonly_partition,
 )
 from pynns.norm import nns_norm
+from pynns.seasonality import nns_seas
 
 CausationResult = dict[str, float]
 
@@ -29,10 +30,14 @@ def nns_causation(
 ) -> CausationResult:
     """Return R's default bivariate NNS.caus vector as a dict."""
     x_values, y_values = _as_pair(x, y)
-    tau_value = _tau_value(tau)
-
-    causation_x_given_y = _uni_caus(x_values, y_values, tau_value)
-    causation_y_given_x = _uni_caus(y_values, x_values, tau_value)
+    if tau == "ts":
+        x_tau, y_tau = _ts_tau_values(x_values, y_values)
+        causation_x_given_y = _uni_caus(x_values, y_values, y_tau)
+        causation_y_given_x = _uni_caus(y_values, x_values, x_tau)
+    else:
+        tau_value = _tau_value(tau)
+        causation_x_given_y = _uni_caus(x_values, y_values, tau_value)
+        causation_y_given_x = _uni_caus(y_values, x_values, tau_value)
     if not math.isfinite(causation_x_given_y):
         causation_x_given_y = 0.0
     if not math.isfinite(causation_y_given_x):
@@ -64,13 +69,14 @@ def causal_matrix(
 ) -> NDArray[np.float64]:
     """Return R's NNS.caus.matrix antisymmetric net-causation matrix."""
     values = _as_matrix(x)
-    tau_value = _tau_value(tau)
+    if tau != "ts":
+        tau = _tau_value(tau)
     n_variables = values.shape[1]
     causes = np.zeros((n_variables, n_variables), dtype=np.float64)
 
     for i in range(n_variables - 1):
         for j in range(i + 1, n_variables):
-            cp = nns_causation(values[:, i], values[:, j], tau=tau_value)
+            cp = nns_causation(values[:, i], values[:, j], tau=tau)
             third_key = next(key for key in cp if key.startswith("C("))
             net_value = cp[third_key]
             if third_key == "C(x--->y)":
@@ -142,15 +148,25 @@ def _asym_dep(x: NDArray[np.float64], y: NDArray[np.float64]) -> float:
 def _tau_value(tau: int | str) -> int:
     if tau == "cs":
         return 0
-    if tau == "ts":
-        raise NotImplementedError(
-            "tau='ts' requires NNS.seas (seasonality detection), which is not yet ported in PyNNS. "
-            "Use a numeric tau (lag) value instead."
-        )
     tau_value = int(tau)
     if tau_value < 0:
         raise ValueError("tau must be non-negative.")
     return tau_value
+
+
+def _ts_tau_values(x: NDArray[np.float64], y: NDArray[np.float64]) -> tuple[int, int]:
+    limit = math.sqrt(float(x.size))
+    x_tau = _first_period_at_or_below_limit(x, limit)
+    y_tau = _first_period_at_or_below_limit(y, limit)
+    return x_tau, y_tau
+
+
+def _first_period_at_or_below_limit(values: NDArray[np.float64], limit: float) -> int:
+    periods = np.asarray(nns_seas(values, plot=False)["periods"], dtype=np.int64)
+    eligible = periods[periods <= limit]
+    if eligible.size == 0:
+        raise ValueError("tau='ts' did not find an eligible seasonal period.")
+    return int(eligible[0])
 
 
 def _cap_inf100(value: float, cap: float = 100.0) -> float:

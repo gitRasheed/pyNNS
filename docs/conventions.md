@@ -58,9 +58,11 @@ The `target_x` and `target_y` arguments map to R's two-element target vector.
 numeric-vector path. It returns the two directional components and the named
 signed net log-ratio key selected by R, either `C(x--->y)` or `C(y--->x)`.
 `causal_matrix` maps to R's `NNS.caus.matrix` antisymmetric matrix convention.
-`tau='ts'` is not implemented because it requires R's `NNS.seas` seasonality
-detection, which will be ported with the time-series toolkit. Numeric `tau`
-lag values are fully supported.
+`tau='ts'` uses `nns_seas(... )["periods"]` exactly like installed R: the first
+period not exceeding `sqrt(length(x))` is selected per variable, including
+harmonics when R selects them. Inputs with no eligible selected period follow
+R's failure convention and raise. Numeric `tau` lag values remain fully
+supported.
 
 ## Partition
 
@@ -88,8 +90,8 @@ are explicit future batches and raise `NotImplementedError`.
 Numeric dimension reduction is supported for `"cor"`, `"NNS.dep"`,
 `"NNS.caus"`, `"all"`, `"equal"`, and numeric coefficient vectors. The
 synthetic `x.star` projection follows R's min-max normalization and denominator
-conventions, including joint normalization for `point_est`. `tau="ts"` is not
-implemented; it requires `NNS.seas`. The `"NNS.caus"` branch uses the ported
+conventions, including joint normalization for `point_est`. `tau="ts"` remains
+deferred in the dim-red regression path. The `"NNS.caus"` branch uses the ported
 `Uni.caus` internals and may differ from installed R at small asymmetric
 dependence granularity.
 

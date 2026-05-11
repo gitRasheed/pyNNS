@@ -47,16 +47,28 @@ def test_causal_matrix_is_antisymmetric() -> None:
     np.testing.assert_allclose(result, -result.T)
 
 
-def test_nns_causation_rejects_ts_tau_until_nns_seas_is_ported() -> None:
+def test_nns_causation_ts_tau_no_longer_raises() -> None:
     x = np.linspace(-2.0, 2.0, 100)
 
-    with pytest.raises(NotImplementedError, match="requires NNS\\.seas"):
-        nns_causation(x, np.sin(x), tau="ts")
+    result = nns_causation(x, np.sin(x), tau="ts")
+
+    assert set(result) in (
+        {"Causation.x.given.y", "Causation.y.given.x", "C(x--->y)"},
+        {"Causation.x.given.y", "Causation.y.given.x", "C(y--->x)"},
+    )
 
 
-def test_causal_matrix_rejects_ts_tau_until_nns_seas_is_ported() -> None:
-    x = np.linspace(-2.0, 2.0, 100)
-    variable = np.column_stack((x, x**2, np.sin(x)))
+def test_causal_matrix_ts_tau_no_longer_raises() -> None:
+    t = np.arange(1, 61, dtype=np.float64)
+    variable = np.column_stack(
+        (
+            np.sin(2.0 * np.pi * t / 7.0),
+            np.cos(2.0 * np.pi * t / 7.0),
+            np.sin(2.0 * np.pi * t / 5.0),
+        )
+    )
 
-    with pytest.raises(NotImplementedError, match="requires NNS\\.seas"):
-        causal_matrix(variable, tau="ts")
+    result = causal_matrix(variable, tau="ts")
+
+    assert result.shape == (3, 3)
+    np.testing.assert_allclose(np.diag(result), 0.0)
