@@ -6,6 +6,7 @@ limits stay visible.
 | Area | Deferred path | Reason | Dependency / next action |
 |---|---|---|---|
 | ARMA | `pred_int` | Requires Monte Carlo/bootstrap prediction intervals | Port `NNS.MC` and `NNS.meboot`, then enable |
+| ARMA.optim | default optimizer path | Default optimizer evaluates `nns_reg(..., smooth=True)`, so it cannot be faithfully ported until smooth regression is real | Port `smooth=True` first, then `NNS.ARMA.optim` |
 | Boost | `n_features > 10` stochastic epoch keeper loop | R uses stochastic epoch loop not yet ported | Port stochastic boost epoch loop |
 | Boost | `type="class"`, `balance=True` | Classification path not ported | Port factor/classification boost path |
 | Boost | `ts_test` | Time-series boost evaluation not ported | Port after ARMA/time-series stack paths |
@@ -13,7 +14,7 @@ limits stay visible.
 | Stack | `type="class"`, `balance=True` | Classification path not ported | Port factor/classification stack path |
 | Stack | `pred_int` | Requires regression interval/bootstrap logic | Port interval stack |
 | Regression | `confidence_interval` | Requires interval/bootstrap logic | Port after `NNS.MC` / `NNS.meboot` or direct R interval path |
-| Regression | `smooth=True` | Requires R `smooth.spline` equivalent | Decide SciPy `UnivariateSpline` parity strategy |
+| Regression | `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility; SciPy smoothers are not parity-compatible | Port a minimal R-compatible fixed-spar smoothing spline backend, then enable `nns_reg(smooth=True)` |
 | Regression | classification `type` paths | Classification path not ported | Port class mode parity |
 | Regression | factor/dummy paths | Factor and dummy expansion path not ported | Port `factor_2_dummy` and factor regression paths |
 | Regression | `tau="ts"` in dimension reduction | Time-series causation branch in dim-red regression not wired | Reuse `nns_seas` period selection in dim-red path |
@@ -22,3 +23,4 @@ limits stay visible.
 | Multivariate regression | `type="class"` | Classification mode deferred | Port class mode parity |
 | Multivariate regression | `confidence_interval` | Multivariate interval path not ported | Port interval/bootstrap logic |
 | Multivariate regression | `factor_2_dummy=True` | Factor/dummy expansion not ported | Port `factor_2_dummy` and class distance paths |
+| VAR | default VAR path | Depends on `NNS.ARMA.optim` and `nns_stack(ts_test)`; `ts_test` is done, but `NNS.ARMA.optim` remains blocked by smooth regression | Port `smooth=True`, then `NNS.ARMA.optim`, then `NNS.VAR` |
