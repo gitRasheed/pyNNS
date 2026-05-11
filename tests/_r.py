@@ -148,7 +148,7 @@ def _call_r(function: str, args: tuple[Any, ...]) -> RValue:
     script = (
         "library(NNS)\n"
         "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
-        f"result <- do.call(NNS::{function}, args)\n"
+        f"result <- do.call(getFromNamespace('{function}', 'NNS'), args)\n"
         "encode <- function(x) {\n"
         "  if (is.matrix(x)) {\n"
         "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"

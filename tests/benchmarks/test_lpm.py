@@ -14,6 +14,7 @@ from pynns import (
     nns_diff,
     nns_distance,
     nns_distance_bulk,
+    nns_m_reg,
     nns_mode,
     nns_norm,
     nns_part,
@@ -197,6 +198,18 @@ def test_nns_reg_500(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert "Fitted.xy" in result
     assert isinstance(r_baseline["nns_reg_500_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_m_reg_200x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 200)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+
+    result = benchmark(nns_m_reg, variable, y)
+
+    assert "Fitted.xy" in result
+    assert isinstance(r_baseline["nns_m_reg_200x3_seconds"], float)
 
 
 @pytest.mark.benchmark

@@ -69,6 +69,9 @@ def nns_reg(
     rp_x = np.minimum(np.max(x_values), np.maximum(np.min(x_values), rp_x))
     rp_y = np.minimum(np.max(y_values), np.maximum(np.min(y_values), rp_y))
 
+    if multivariate_call:
+        return {"x": rp_x, "y": rp_y}
+
     coeff = _coefficients(rp_x, rp_y, x_values, y_values)
     estimate = _fitted_values(x_values, y_values, rp_x, rp_y, coeff, order)
 
@@ -160,8 +163,6 @@ def _reject_deferred_paths(
         raise NotImplementedError(
             "point_only is deferred until multivariate regression callers are ported."
         )
-    if multivariate_call:
-        raise NotImplementedError("multivariate_call is deferred until NNS.M.reg is ported.")
     if point_est is not None and np.asarray(point_est).ndim > 1:
         raise NotImplementedError("matrix point_est requires NNS.M.reg, which is not yet ported.")
 

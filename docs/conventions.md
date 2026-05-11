@@ -79,9 +79,11 @@ supported: `"off"`, `"mean"`, `"median"`, `"mode"`, and `"mode_class"`.
 `nns_reg` currently maps to R's univariate numeric `NNS.reg` path with
 `factor.2.dummy = FALSE`, plotting disabled, and no confidence interval or
 smoothing. Return keys match R's list names, but data.table outputs are plain
-dictionaries of NumPy arrays. Matrix `x`, dimension reduction, classification,
-smooth splines, confidence intervals, and multivariate caller modes are explicit
-future batches and raise `NotImplementedError`.
+dictionaries of NumPy arrays. `multivariate_call=True` returns R's internal
+two-column regression-point structure as `{"x": ..., "y": ...}` for
+`nns_m_reg`. Matrix `x`, dimension reduction, classification, smooth splines,
+and confidence intervals are explicit future batches and raise
+`NotImplementedError`.
 
 `order="max"` follows installed R's univariate convention: fitted values are the
 observed `y` values and `regression.points` is the sorted observed `(x, y)` map.
@@ -95,6 +97,20 @@ that differ from R at floating grouping granularity: installed R groups the
 `gradient` column through data.table's numeric radix grouping, while NumPy keeps
 near-identical binary floating values as separate groups. Regression points,
 coefficients, fitted values, and point estimates still match R on that path.
+
+## Multivariate Regression
+
+`nns_m_reg` maps to installed R's numeric `NNS.M.reg` path with
+`factor.2.dummy = FALSE`, plotting disabled, and no confidence interval.
+Outputs use R's keys (`R2`, `rhs.partitions`, `RPM`, `Point.est`, `pred.int`,
+and `Fitted.xy`) with data.table objects represented as dictionaries of NumPy
+arrays. Classification mode (`type="class"`), factor dummy expansion, and
+confidence intervals are deferred and raise `NotImplementedError`.
+
+Point estimates match installed R, including the one-row outsider behavior in
+the multi-point path where R drops matrix dimensions before extrapolating.
+`order="max"` follows R's convention of using the original regressor matrix as
+the regression-point matrix and defaulting `n.best` to 1.
 
 ## Normalization
 

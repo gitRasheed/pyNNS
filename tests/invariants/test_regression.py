@@ -45,7 +45,7 @@ def test_nns_reg_increasing_order_does_not_reduce_r2_for_smooth_curve() -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["dim_red", "smooth", "confidence", "class", "point_only", "multivariate_call"],
+    ["dim_red", "smooth", "confidence", "class", "point_only"],
 )
 def test_nns_reg_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
