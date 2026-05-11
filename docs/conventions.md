@@ -130,6 +130,19 @@ classification/interval/time-series branches. R's `CV.size = NULL` samples a
 random value between 0.2 and 1/3; PyNNS uses a deterministic default of `0.25`.
 Pass `cv_size` explicitly for exact R parity.
 
+## Boost
+
+`nns_boost` maps to R's numeric `NNS.boost` path and uses the real `nns_reg`
+and `nns_stack` implementations. The deterministic small-feature path
+(`n_features <= 10`, where R evaluates all feature combinations) is supported.
+Classification, balancing, prediction intervals, and `ts_test` are deferred and
+raise `NotImplementedError`. R requires usable column names for matrix inputs;
+PyNNS uses positional numeric columns. As with `nns_stack`, R samples a random
+CV size when `CV.size = NULL`; PyNNS uses deterministic `cv_size=0.25` unless
+specified. The `depth=1` boost composition is structurally identical but can
+select a different near-tie feature set because tiny differences in the
+augmented `NNS.reg` learner scores cross R's lower-hinge threshold.
+
 ## Normalization
 
 `nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with
