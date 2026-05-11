@@ -44,3 +44,16 @@ def test_nns_stack_ts_test_method1_shape(x: np.ndarray, ts_test: int) -> None:
 
     assert result["stack"].shape == (3,)
     assert np.all(np.isfinite(result["stack"]))
+
+
+@given(finite_matrices, st.sampled_from([[1], [2], [1, 2]]))
+def test_nns_stack_pred_int_shape_invariants_hold(x: np.ndarray, method: list[int]) -> None:
+    y = 0.5 * x[:, 0] - 0.25 * x[:, 1]
+    assume(np.unique(y).size > 1)
+    assume(all(np.unique(x[:, col]).size > 1 for col in range(x.shape[1])))
+
+    result = nns_stack(x, y, x[:3], cv_size=0.25, folds=1, method=method, pred_int=0.95)
+
+    assert result["stack"].shape == (3,)
+    assert result["pred.int"] is not None
+    assert all(values.shape == (3,) for values in result["pred.int"].values())

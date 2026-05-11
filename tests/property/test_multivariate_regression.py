@@ -45,3 +45,28 @@ def test_nns_m_reg_shape_invariants_hold(
     assert result["Fitted.xy"]["y.hat"].shape == (x.shape[0],)
     assert result["Fitted.xy"]["NNS.ID"].shape == (x.shape[0],)
     assert result["RPM"]["y.hat"].size <= x.shape[0]
+
+
+@given(matrix_arrays, st.sampled_from([0.8, 0.95]))
+def test_nns_m_reg_confidence_interval_shape_invariants_hold(
+    x: np.ndarray,
+    confidence_interval: float,
+) -> None:
+    y = 0.5 * x[:, 0] - 0.25 * x[:, 1]
+    assume(np.unique(y).size > 1)
+    assume(all(np.unique(x[:, col]).size > 1 for col in range(x.shape[1])))
+
+    result = nns_m_reg(
+        x,
+        y,
+        order=1,
+        n_best=1,
+        point_est=x[:3],
+        confidence_interval=confidence_interval,
+    )
+
+    assert result["Fitted.xy"]["conf.int.pos"].shape == (x.shape[0],)
+    assert result["Fitted.xy"]["conf.int.neg"].shape == (x.shape[0],)
+    assert result["pred.int"] is not None
+    assert result["pred.int"]["lower.pred.int"].shape == (3,)
+    assert result["pred.int"]["upper.pred.int"].shape == (3,)

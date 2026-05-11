@@ -44,8 +44,6 @@ def nns_stack(
         raise NotImplementedError("type='class' classification for NNS.stack is deferred.")
     if balance:
         raise NotImplementedError("balance=True requires the classification path, deferred.")
-    if pred_int is not None:
-        raise NotImplementedError("pred_int requires regression interval paths, deferred.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
     y_train = _as_vector(dv_train, "dv_train")
@@ -84,6 +82,7 @@ def nns_stack(
         dim_red_method=dim_red_method,
         dist=dist,
         ts_test=ts_test_value,
+        pred_int=pred_int,
     )
     method1_state = _evaluate_method1(
         x_train,
@@ -100,6 +99,7 @@ def nns_stack(
         dist=dist,
         method2_state=method2_state,
         ts_test=ts_test_value,
+        pred_int=pred_int,
     )
 
     reg = method1_state.prediction
@@ -112,10 +112,17 @@ def nns_stack(
         reg_clean, dimred_clean = _fill_pairwise_na(reg, dimred)
         weights = _stack_weights(reg_obj, dimred_obj, methods, objective_value)
         estimates = weights[0] * reg_clean + weights[1] * dimred_clean
+        stacked_pred_int = _combine_prediction_intervals(
+            method1_state.pred_int,
+            method2_state.pred_int,
+            weights,
+        )
     elif methods == (1,):
         estimates = reg
+        stacked_pred_int = method1_state.pred_int
     else:
         estimates = dimred
+        stacked_pred_int = method2_state.pred_int
 
     return {
         "OBJfn.reg": reg_obj,
@@ -124,11 +131,11 @@ def nns_stack(
         "OBJfn.dim.red": dimred_obj,
         "NNS.dim.red.threshold": method2_state.parameter,
         "reg": reg,
-        "reg.pred.int": None,
+        "reg.pred.int": method1_state.pred_int,
         "dim.red": dimred,
-        "dim.red.pred.int": None,
+        "dim.red.pred.int": method2_state.pred_int,
         "stack": estimates,
-        "pred.int": None,
+        "pred.int": stacked_pred_int,
     }
 
 
@@ -141,6 +148,7 @@ class _MethodState:
         train_star: NDArray[np.float64] | None = None,
         test_star: NDArray[np.float64] | None = None,
         relevant_vars: NDArray[np.int64] | None = None,
+        pred_int: dict[str, NDArray[np.float64]] | None = None,
     ) -> None:
         self.prediction = prediction
         self.objective = objective
@@ -148,6 +156,7 @@ class _MethodState:
         self.train_star = train_star
         self.test_star = test_star
         self.relevant_vars = relevant_vars
+        self.pred_int = pred_int
 
 
 def _evaluate_method2(
@@ -165,6 +174,7 @@ def _evaluate_method2(
     dim_red_method: object,
     dist: str,
     ts_test: int | None,
+    pred_int: float | None,
 ) -> _MethodState:
     n_rows, n_cols = x_train.shape
     if 2 not in methods or n_cols <= 1:
@@ -227,10 +237,12 @@ def _evaluate_method2(
         order=order,
         dist=dist,
         point_only=False,
+        confidence_interval=pred_int,
     )
     fitted = cast(dict[str, NDArray[np.float64]], final_fit["Fitted.xy"])
     final_obj = objective_fn(fitted["y.hat"], fitted["y"])
     prediction = _as_prediction(final_fit["Point.est"], x_test.shape[0])
+    final_pred_int = cast(dict[str, NDArray[np.float64]] | None, final_fit["pred.int"])
 
     if stack and methods == (1, 2):
         train_star = cast(dict[str, NDArray[np.float64]], final_fit["x.star"])["x"]
@@ -248,6 +260,7 @@ def _evaluate_method2(
         train_star=train_star,
         test_star=test_star,
         relevant_vars=relevant_vars,
+        pred_int=final_pred_int,
     )
 
 
@@ -267,6 +280,7 @@ def _evaluate_method1(
     dist: str,
     method2_state: _MethodState,
     ts_test: int | None,
+    pred_int: float | None,
 ) -> _MethodState:
     if 1 not in methods:
         obj = math.inf if objective == "min" else -math.inf
@@ -374,11 +388,18 @@ def _evaluate_method1(
         order=order,
         dist=dist,
         point_only=False,
+        confidence_interval=pred_int,
     )
     fitted = cast(dict[str, NDArray[np.float64]], final_fit["Fitted.xy"])
     final_obj = objective_fn(fitted["y.hat"], fitted["y"])
     prediction = _as_prediction(final_fit["Point.est"], x_test.shape[0])
-    return _MethodState(prediction=prediction, objective=final_obj, parameter=float(best_k))
+    final_pred_int = cast(dict[str, NDArray[np.float64]] | None, final_fit["pred.int"])
+    return _MethodState(
+        prediction=prediction,
+        objective=final_obj,
+        parameter=float(best_k),
+        pred_int=final_pred_int,
+    )
 
 
 def _fold_xstar(
@@ -640,6 +661,27 @@ def _stack_weights(
     if total > 0.0:
         return weights / total
     return np.array([0.5, 0.5], dtype=np.float64)
+
+
+def _combine_prediction_intervals(
+    left: dict[str, NDArray[np.float64]] | None,
+    right: dict[str, NDArray[np.float64]] | None,
+    weights: NDArray[np.float64],
+) -> dict[str, NDArray[np.float64]] | None:
+    if left is None and right is None:
+        return None
+    if left is None:
+        return right
+    if right is None:
+        return left
+    left_values = list(left.values())
+    right_values = list(right.values())
+    if len(left_values) != len(right_values):
+        raise ValueError("Cannot combine prediction intervals with different column counts.")
+    return {
+        key: weights[0] * left_values[index] + weights[1] * right_values[index]
+        for index, key in enumerate(left)
+    }
 
 
 def _fill_pairwise_na(

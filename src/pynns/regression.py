@@ -13,6 +13,7 @@ from pynns.copula import _target
 from pynns.dependence import _dpm_nd, _gravity, nns_dep
 from pynns.part import NoiseReduction, nns_part
 from pynns.pm_matrix import pm_matrix
+from pynns.var import lpm_var, upm_var
 
 Order = int | Literal["max"] | None
 
@@ -101,6 +102,7 @@ def nns_reg(
         order=order,
         noise=noise,
         point_values=point_values,
+        confidence_interval=confidence_interval,
         multivariate_call=multivariate_call,
         equation=None,
         x_star=None,
@@ -114,6 +116,7 @@ def _nns_reg_univariate_core(
     order: Order,
     noise: NoiseReduction,
     point_values: NDArray[np.float64] | None,
+    confidence_interval: float | None,
     multivariate_call: bool,
     equation: dict[str, NDArray[np.float64] | NDArray[np.str_]] | None,
     x_star: dict[str, NDArray[np.float64]] | None,
@@ -148,6 +151,11 @@ def _nns_reg_univariate_core(
         rp_out_x, rp_out_y = rp_x, rp_y
 
     fitted = _fitted_table(x_values, y_values, estimate, nns_ids, coeff)
+    pred_int = _apply_univariate_intervals(
+        fitted,
+        point_values,
+        confidence_interval=confidence_interval,
+    )
     se = float(math.sqrt(float(np.sum((estimate - y_values) ** 2)) / (y_values.size - 1)))
     r2 = _r2(y_values, estimate)
 
@@ -163,7 +171,7 @@ def _nns_reg_univariate_core(
             "X.Upper.Range": coeff["X.Upper.Range"],
         },
         "Point.est": point_est_y,
-        "pred.int": None,
+        "pred.int": pred_int,
         "regression.points": {"x": rp_out_x, "y": rp_out_y},
         "Fitted.xy": fitted,
     }
@@ -221,12 +229,13 @@ def _nns_reg_dimred(
             "classification type paths are deferred to a later regression batch."
         )
     if smooth:
+        if confidence_interval is not None:
+            raise NotImplementedError(
+                "nns_reg confidence_interval with smooth=True requires R smooth.spline "
+                "compatibility, which is not yet ported."
+            )
         raise NotImplementedError(
             "smooth=True requires the smoothing-spline path, deferred to a later batch."
-        )
-    if confidence_interval is not None:
-        raise NotImplementedError(
-            "confidence_interval output is deferred until the regression interval path is ported."
         )
     if multivariate_call:
         raise NotImplementedError(
@@ -252,6 +261,7 @@ def _nns_reg_dimred(
         order=dimred_order,
         noise=noise,
         point_values=projection.point_est,
+        confidence_interval=confidence_interval,
         multivariate_call=False,
         equation=projection.equation,
         x_star={"x": projection.x_star},
@@ -500,12 +510,13 @@ def _reject_deferred_paths(
             "dim_red_method paths are deferred until dimension reduction is ported."
         )
     if smooth:
+        if confidence_interval is not None:
+            raise NotImplementedError(
+                "nns_reg confidence_interval with smooth=True requires R smooth.spline "
+                "compatibility, which is not yet ported."
+            )
         raise NotImplementedError(
             "smooth=True requires the smoothing-spline path, deferred to a later batch."
-        )
-    if confidence_interval is not None:
-        raise NotImplementedError(
-            "confidence_interval output is deferred until the regression interval path is ported."
         )
     if type is not None:
         raise NotImplementedError(
@@ -880,6 +891,62 @@ def _fitted_table(
         "gradient": gradient,
         "residuals": residuals,
         "standard.errors": standard_errors,
+    }
+
+
+def _apply_univariate_intervals(
+    fitted: dict[str, NDArray[np.float64] | NDArray[np.str_]],
+    point_values: NDArray[np.float64] | None,
+    *,
+    confidence_interval: float | None,
+) -> dict[str, NDArray[np.float64]] | None:
+    if confidence_interval is None:
+        return None
+
+    alpha = (1.0 - float(confidence_interval)) / 2.0
+    y_hat = cast(NDArray[np.float64], fitted["y.hat"])
+    y = cast(NDArray[np.float64], fitted["y"])
+    residuals = cast(NDArray[np.float64], fitted["residuals"])
+    gradient = cast(NDArray[np.float64], fitted["gradient"])
+
+    conf_pos = np.empty_like(y_hat)
+    conf_neg = np.empty_like(y_hat)
+    pred_pos = np.empty_like(y_hat)
+    pred_neg = np.empty_like(y_hat)
+    for grad in np.unique(gradient):
+        mask = gradient == grad
+        residual_var = abs(upm_var(alpha, 1.0, residuals[mask]))
+        conf_pos[mask] = y_hat[mask] + residual_var
+        conf_neg[mask] = y_hat[mask] - residual_var
+        pred_pos[mask] = upm_var(alpha, 0.0, y[mask])
+        pred_neg[mask] = lpm_var(alpha, 0.0, y[mask])
+
+    fitted["conf.int.pos"] = conf_pos
+    fitted["conf.int.neg"] = conf_neg
+
+    if point_values is None:
+        return None
+
+    order = np.argsort(cast(NDArray[np.float64], fitted["x"]), kind="mergesort")
+    sorted_x = cast(NDArray[np.float64], fitted["x"])[order]
+    row_indices: list[int] = []
+    for point in point_values:
+        close = np.flatnonzero(np.isclose(sorted_x, point, rtol=1e-12, atol=1e-12))
+        if close.size:
+            row_indices.append(int(close[-1]))
+            continue
+        interval_index = int(np.searchsorted(sorted_x, point, side="right"))
+        if interval_index > 0:
+            row_indices.append(min(interval_index - 1, sorted_x.size - 1))
+    if not row_indices:
+        return {
+            "pred.int.neg": np.array([], dtype=np.float64),
+            "pred.int.pos": np.array([], dtype=np.float64),
+        }
+    selected = np.asarray(row_indices, dtype=np.int64)
+    return {
+        "pred.int.neg": pred_neg[order][selected],
+        "pred.int.pos": pred_pos[order][selected],
     }
 
 

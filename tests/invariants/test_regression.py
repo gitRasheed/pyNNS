@@ -59,9 +59,36 @@ def test_nns_reg_dim_red_shapes_and_equation() -> None:
     assert result["Fitted.xy"]["x"].shape == y.shape
 
 
+def test_nns_reg_confidence_interval_shapes_and_row_drop() -> None:
+    x = np.linspace(-2.0, 2.0, 50)
+    y = np.sin(x)
+    point_est = np.array([-3.0, -1.0, 0.0, 2.5])
+
+    result = nns_reg(x, y, order=1, point_est=point_est, confidence_interval=0.95)
+
+    assert result["Fitted.xy"]["conf.int.pos"].shape == x.shape
+    assert result["Fitted.xy"]["conf.int.neg"].shape == x.shape
+    assert result["Point.est"].shape == point_est.shape
+    assert result["pred.int"] is not None
+    assert set(result["pred.int"]) == {"pred.int.neg", "pred.int.pos"}
+    assert result["pred.int"]["pred.int.neg"].shape == (3,)
+    assert result["pred.int"]["pred.int.pos"].shape == (3,)
+
+
+def test_nns_reg_confidence_interval_none_output_unchanged() -> None:
+    x = np.linspace(-2.0, 2.0, 50)
+    y = np.sin(x)
+
+    result = nns_reg(x, y, order=1)
+
+    assert "conf.int.pos" not in result["Fitted.xy"]
+    assert "conf.int.neg" not in result["Fitted.xy"]
+    assert result["pred.int"] is None
+
+
 @pytest.mark.parametrize(
     "path",
-    ["smooth", "confidence", "class", "point_only"],
+    ["smooth", "smooth_confidence", "class", "point_only"],
 )
 def test_nns_reg_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
@@ -70,8 +97,8 @@ def test_nns_reg_deferred_paths_raise(path: str) -> None:
     with pytest.raises(NotImplementedError):
         if path == "smooth":
             nns_reg(x, y, smooth=True)
-        elif path == "confidence":
-            nns_reg(x, y, confidence_interval=0.95)
+        elif path == "smooth_confidence":
+            nns_reg(x, y, smooth=True, confidence_interval=0.95)
         elif path == "class":
             nns_reg(x, y, type="CLASS")
         elif path == "point_only":

@@ -34,6 +34,15 @@ DIM_RED_METHODS: list[str | list[float]] = [
     "equal",
     [1.0, 0.5, 0.25],
 ]
+CI_REGRESSION_CASES: list[tuple[int | None, str]] = [
+    (None, "off"),
+    (1, "off"),
+    (2, "off"),
+    (1, "mean"),
+    (None, "median"),
+    (1, "median"),
+    (2, "median"),
+]
 
 
 @pytest.mark.parity
@@ -174,6 +183,75 @@ def test_nns_reg_dim_red_point_only_matches_r() -> None:
     _assert_reg_matches(actual, expected, check_dimred=True)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize("relationship", ["linear", "quadratic", "sin"])
+@pytest.mark.parametrize("confidence_interval", [0.8, 0.95])
+@pytest.mark.parametrize(
+    "point_est",
+    [
+        None,
+        np.array([-1.0, 0.0, 1.0]),
+        np.array([-3.0, -1.0, 0.0, 2.5]),
+    ],
+)
+@pytest.mark.parametrize(("order", "noise"), CI_REGRESSION_CASES)
+def test_nns_reg_confidence_interval_matches_r(
+    rng: np.random.Generator,
+    relationship: str,
+    confidence_interval: float,
+    point_est: np.ndarray | None,
+    order: int | None,
+    noise: str,
+) -> None:
+    x, y = _relationship(relationship, 50, rng)
+
+    expected = _r_nns_reg(
+        x,
+        y,
+        order=order,
+        noise=noise,
+        point_est=point_est,
+        confidence_interval=confidence_interval,
+    )
+    actual = nns_reg(
+        x,
+        y,
+        order=order,
+        noise_reduction=cast(NoiseReduction, noise),
+        point_est=point_est,
+        confidence_interval=confidence_interval,
+    )
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_reg_below_range_point_est_pred_int_row_drop_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 50)
+    y = np.sin(x)
+    point_est = np.array([-3.0, -1.0, 0.0, 2.5])
+
+    expected = _r_nns_reg(
+        x,
+        y,
+        order=1,
+        noise="off",
+        point_est=point_est,
+        confidence_interval=0.95,
+    )
+    actual = nns_reg(
+        x,
+        y,
+        order=1,
+        point_est=point_est,
+        confidence_interval=0.95,
+    )
+
+    _assert_reg_matches(actual, expected)
+    assert actual["pred.int"] is not None
+    assert actual["pred.int"]["pred.int.neg"].shape == (3,)
+
+
 def _r_nns_reg(
     x: np.ndarray,
     y: np.ndarray,
@@ -181,6 +259,7 @@ def _r_nns_reg(
     order: int | str | None,
     noise: str,
     point_est: np.ndarray | None,
+    confidence_interval: float | None = None,
 ) -> Any:
     point_arg: list[float] | None = None if point_est is None else point_est.tolist()
     return nns(
@@ -198,7 +277,7 @@ def _r_nns_reg(
         False,
         False,
         False,
-        None,
+        confidence_interval,
         0,
         None,
         False,
@@ -219,6 +298,7 @@ def _r_nns_reg_dimred(
     threshold: float,
     point_est: np.ndarray | None,
     point_only: bool,
+    confidence_interval: float | None = None,
 ) -> Any:
     return nns(
         "NNS.reg",
@@ -235,7 +315,7 @@ def _r_nns_reg_dimred(
         False,
         False,
         False,
-        None,
+        confidence_interval,
         threshold,
         None,
         False,
@@ -260,6 +340,14 @@ def _assert_reg_matches(
     np.testing.assert_allclose(actual["R2"], _array(expected["R2"]), atol=atol)
     np.testing.assert_allclose(actual["SE"], _array(expected["SE"]), atol=atol)
     np.testing.assert_allclose(actual["Point.est"], _array(expected["Point.est"]), atol=atol)
+    if actual["pred.int"] is None:
+        assert _array(expected["pred.int"]).size == 0
+    else:
+        assert isinstance(actual["pred.int"], dict)
+        assert isinstance(expected["pred.int"], dict)
+        assert set(actual["pred.int"]) == set(expected["pred.int"])
+        for column, values in actual["pred.int"].items():
+            np.testing.assert_allclose(values, _array(expected["pred.int"][column]), atol=atol)
     if check_dimred:
         assert isinstance(expected["equation"], dict)
         assert isinstance(actual["equation"], dict)

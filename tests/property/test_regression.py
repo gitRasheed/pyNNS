@@ -89,3 +89,29 @@ def test_nns_reg_dim_red_shape_invariants_hold(
     assert result["equation"]["Variable"].shape == (x.shape[1] + 1,)
     assert result["equation"]["Coefficient"].shape == (x.shape[1] + 1,)
     assert result["Fitted.xy"]["x"].shape == (x.shape[0],)
+
+
+@given(
+    finite_arrays,
+    finite_arrays,
+    st.sampled_from([0.8, 0.95]),
+)
+def test_nns_reg_confidence_interval_shape_invariants_hold(
+    x: np.ndarray,
+    y: np.ndarray,
+    confidence_interval: float,
+) -> None:
+    size = min(x.size, y.size)
+    x = x[:size]
+    y = y[:size]
+    assume(np.unique(x).size > 1)
+    assume(np.unique(y).size > 1)
+    points = np.array([float(np.min(x)), float(np.mean(x)), float(np.max(x))])
+
+    result = nns_reg(x, y, order=1, point_est=points, confidence_interval=confidence_interval)
+
+    assert result["Fitted.xy"]["conf.int.pos"].shape == (size,)
+    assert result["Fitted.xy"]["conf.int.neg"].shape == (size,)
+    assert result["pred.int"] is not None
+    assert set(result["pred.int"]) == {"pred.int.neg", "pred.int.pos"}
+    assert result["pred.int"]["pred.int.neg"].shape == result["pred.int"]["pred.int.pos"].shape

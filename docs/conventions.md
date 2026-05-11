@@ -79,12 +79,11 @@ supported: `"off"`, `"mean"`, `"median"`, `"mode"`, and `"mode_class"`.
 ## Regression
 
 `nns_reg` currently maps to R's univariate numeric `NNS.reg` path with
-`factor.2.dummy = FALSE`, plotting disabled, and no confidence interval or
-smoothing. Return keys match R's list names, but data.table outputs are plain
+`factor.2.dummy = FALSE`, plotting disabled, and no smoothing. Return keys match R's list names, but data.table outputs are plain
 dictionaries of NumPy arrays. `multivariate_call=True` returns R's internal
 two-column regression-point structure as `{"x": ..., "y": ...}` for
 `nns_m_reg`. Matrix `x` without dimension reduction dispatches to `nns_m_reg`.
-Classification, smooth splines, factor dummy expansion, and confidence intervals
+Classification, smooth splines, and factor dummy expansion
 are explicit future batches and raise `NotImplementedError`.
 
 Numeric dimension reduction is supported for `"cor"`, `"NNS.dep"`,
@@ -108,14 +107,27 @@ that differ from R at floating grouping granularity: installed R groups the
 near-identical binary floating values as separate groups. Regression points,
 coefficients, fitted values, and point estimates still match R on that path.
 
+Regression confidence intervals are deterministic and use R's `LPM.VaR` /
+`UPM.VaR` logic, not `nns_mc` / `nns_meboot`. In the univariate fitted table,
+both `conf.int.pos` and `conf.int.neg` use `UPM.VaR(..., degree = 1)` on
+segment residuals, matching installed R even though the lower side might look
+like an `LPM` candidate. Univariate `point_est` prediction intervals use
+`UPM.VaR(..., degree = 0)` for the upper column and `LPM.VaR(..., degree = 0)`
+for the lower column. Below-range univariate point estimates follow R's
+`findInterval`/data.table behavior: index `0` rows are dropped, so `pred.int`
+can have fewer rows than `Point.est`. `smooth=True` with `confidence_interval`
+remains deferred because it depends on R-compatible smoothing splines.
+
 ## Multivariate Regression
 
 `nns_m_reg` maps to installed R's numeric `NNS.M.reg` path with
-`factor.2.dummy = FALSE`, plotting disabled, and no confidence interval.
+`factor.2.dummy = FALSE` and plotting disabled.
 Outputs use R's keys (`R2`, `rhs.partitions`, `RPM`, `Point.est`, `pred.int`,
 and `Fitted.xy`) with data.table objects represented as dictionaries of NumPy
-arrays. Classification mode (`type="class"`), factor dummy expansion, and
-confidence intervals are deferred and raise `NotImplementedError`.
+arrays. Numeric confidence intervals are deterministic and use the global
+residual `UPM.VaR(..., degree = 1)` offset from installed R. Classification mode
+(`type="class"`) and factor dummy expansion are deferred and raise
+`NotImplementedError`.
 
 Point estimates match installed R, including the one-row outsider behavior in
 the multi-point path where R drops matrix dimensions before extrapolating.
@@ -126,9 +138,10 @@ the regression-point matrix and defaulting `n.best` to 1.
 
 `nns_stack` maps to R's numeric `NNS.stack` path using the real `nns_reg`
 dimension-reduction and multivariate-regression internals. Classification
-(`type="class"`), class balancing, and prediction intervals are deferred and
-raise `NotImplementedError` because they depend on the unported
-classification/interval branches. `ts_test` is supported and follows installed
+(`type="class"`) and class balancing are deferred and raise
+`NotImplementedError` because they depend on the unported classification
+branches. Numeric prediction intervals are supported and are combined by
+installed R's weighted data.table arithmetic. `ts_test` is supported and follows installed
 R's split exactly: CV training uses the tail `ts_test` rows, while CV testing
 uses the earlier rows `1:(n - ts_test)`. This is intentionally not changed even
 though it is counterintuitive. R's `CV.size = NULL` samples a random value

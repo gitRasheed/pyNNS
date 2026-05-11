@@ -207,6 +207,18 @@ def test_nns_reg_500(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
 
 @pytest.mark.benchmark
+def test_nns_reg_200_confidence_interval(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 200)
+    y = np.sin(x) + 0.05 * np.cos(7.0 * x)
+    point_est = np.linspace(-3.0, 3.0, 20)
+
+    result = benchmark(nns_reg, x, y, point_est=point_est, confidence_interval=0.95)
+
+    assert result["pred.int"] is not None
+    assert isinstance(r_baseline["nns_reg_200_ci_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_reg_dimred_200x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-3.0, 3.0, 200)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))
@@ -231,6 +243,21 @@ def test_nns_m_reg_200x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
 
 @pytest.mark.benchmark
+def test_nns_m_reg_200x3_confidence_interval(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    x = np.linspace(-3.0, 3.0, 200)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+
+    result = benchmark(nns_m_reg, variable, y, point_est=variable[:20], confidence_interval=0.95)
+
+    assert result["pred.int"] is not None
+    assert isinstance(r_baseline["nns_m_reg_200x3_ci_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_stack_100x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-2.0, 2.0, 100)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))
@@ -249,6 +276,28 @@ def test_nns_stack_100x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert result["stack"].shape == (20,)
     assert isinstance(r_baseline["nns_stack_100x3_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_stack_100x3_pred_int(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-2.0, 2.0, 100)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+
+    result = benchmark(
+        nns_stack,
+        variable,
+        y,
+        variable[:20],
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        dim_red_method="cor",
+        pred_int=0.95,
+    )
+
+    assert result["pred.int"] is not None
+    assert isinstance(r_baseline["nns_stack_100x3_pred_int_seconds"], float)
 
 
 @pytest.mark.benchmark

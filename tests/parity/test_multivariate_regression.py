@@ -58,6 +58,12 @@ MREG_CASES = [
     (200, 5, "linear", "max", None, None, False, "median"),
     (50, 2, "nonlinear", 1, 1, np.array([[0.0, 0.0], [3.0, 0.0]]), True, "off"),
 ]
+MREG_CI_CASES = [
+    (2, 0.8, None, None, None),
+    (3, 0.95, None, 2, None),
+    (2, 0.95, 1, 1, np.array([[0.0, 0.0], [3.0, 0.0]])),
+    (3, 0.8, 2, 2, np.array([[0.0, 0.0, 0.0], [3.0, 0.0, 0.0]])),
+]
 
 
 @pytest.mark.parity
@@ -98,6 +104,49 @@ def test_nns_m_reg_matches_r(
     _assert_m_reg_matches(actual, expected)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize(
+    ("n_cols", "confidence_interval", "order", "n_best", "point_est"),
+    MREG_CI_CASES,
+)
+def test_nns_m_reg_confidence_interval_matches_r(
+    rng: np.random.Generator,
+    n_cols: int,
+    confidence_interval: float,
+    order: int | None,
+    n_best: int | None,
+    point_est: np.ndarray | None,
+) -> None:
+    x, y = _dataset(50, n_cols, "mixed", rng)
+    if point_est is not None and point_est.shape[1] != n_cols:
+        point_est = np.pad(
+            point_est[:, : min(point_est.shape[1], n_cols)],
+            ((0, 0), (0, n_cols - point_est.shape[1])),
+        )
+
+    expected = _r_nns_m_reg(
+        x,
+        y,
+        order,
+        n_best,
+        point_est,
+        False,
+        "off",
+        confidence_interval=confidence_interval,
+    )
+    actual = nns_m_reg(
+        x,
+        y,
+        order=order,
+        n_best=n_best,
+        point_est=point_est,
+        confidence_interval=confidence_interval,
+        ncores=1,
+    )
+
+    _assert_m_reg_matches(actual, expected)
+
+
 def _r_nns_m_reg(
     x: np.ndarray,
     y: np.ndarray,
@@ -106,6 +155,7 @@ def _r_nns_m_reg(
     point_est: np.ndarray | None,
     point_only: bool,
     noise: str,
+    confidence_interval: float | None = None,
 ) -> Any:
     return nns(
         "NNS.M.reg",
@@ -125,7 +175,7 @@ def _r_nns_m_reg(
         False,
         False,
         1,
-        None,
+        confidence_interval,
     )
 
 

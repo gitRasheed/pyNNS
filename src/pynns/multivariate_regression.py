@@ -12,6 +12,7 @@ from pynns.distance import KValue, nns_distance
 from pynns.part import NoiseReduction
 from pynns.regression import Order, nns_reg
 from pynns.regression import _nns_copula_matrix as _copula_matrix
+from pynns.var import upm_var
 
 NBest = int | Literal["all"] | None
 MRegResult = dict[str, Any]
@@ -43,11 +44,6 @@ def nns_m_reg(
         raise NotImplementedError(
             "type='class' classification for NNS.M.reg is deferred to a future batch."
         )
-    if confidence_interval is not None:
-        raise NotImplementedError(
-            "confidence_interval output is deferred until the multivariate interval path is ported."
-        )
-
     x_values, y_values = _validate_inputs(x, y, factor_2_dummy)
     point_values, point_is_matrix = _validate_point_est(point_est, x_values.shape[1])
     noise = _validate_noise(noise_reduction)
@@ -88,12 +84,17 @@ def nns_m_reg(
         return {"Point.est": _point_output(point_predictions), "RPM": _rpm_dict(rpm)}
 
     fitted = _fitted_dict(x_values, y_values, fitted_y, nns_ids, residuals)
+    pred_int = _apply_multivariate_intervals(
+        fitted,
+        point_predictions,
+        confidence_interval=confidence_interval,
+    )
     return {
         "R2": _r2(y_values, fitted_y),
         "rhs.partitions": _rhs_partitions_dict(reg_points_matrix),
         "RPM": _rpm_dict(rpm),
         "Point.est": _point_output(point_predictions),
-        "pred.int": None,
+        "pred.int": pred_int,
         "Fitted.xy": fitted,
     }
 
@@ -370,6 +371,28 @@ def _fitted_dict(
     out["NNS.ID"] = nns_ids
     out["residuals"] = residuals
     return out
+
+
+def _apply_multivariate_intervals(
+    fitted: dict[str, NDArray[np.float64] | NDArray[np.str_]],
+    point_predictions: NDArray[np.float64] | None,
+    *,
+    confidence_interval: float | None,
+) -> dict[str, NDArray[np.float64]] | None:
+    if confidence_interval is None:
+        return None
+    alpha = (1.0 - float(confidence_interval)) / 2.0
+    yhat = cast(NDArray[np.float64], fitted["y.hat"])
+    residuals = cast(NDArray[np.float64], fitted["residuals"])
+    residual_var = abs(upm_var(alpha, 1.0, residuals))
+    fitted["conf.int.pos"] = yhat + residual_var
+    fitted["conf.int.neg"] = yhat - residual_var
+    if point_predictions is None:
+        return None
+    return {
+        "lower.pred.int": point_predictions - residual_var,
+        "upper.pred.int": point_predictions + residual_var,
+    }
 
 
 def _r2(y: NDArray[np.float64], yhat: NDArray[np.float64]) -> float:

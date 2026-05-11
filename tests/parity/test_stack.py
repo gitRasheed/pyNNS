@@ -151,12 +151,56 @@ def test_nns_stack_var_like_ts_test_matches_r() -> None:
     _assert_stack_matches(actual, expected)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize("method", [[1], [2], [1, 2]])
+def test_nns_stack_pred_int_matches_r(method: list[int]) -> None:
+    x = np.linspace(-2.0, 2.0, 40)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+    point = variable[:5]
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+        pred_int=0.95,
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        stack=True,
+        dim_red_method="cor",
+        pred_int=0.95,
+    )
+
+    _assert_stack_matches(actual, expected)
+
+
 def _assert_stack_matches(actual: dict[str, Any], expected: Any) -> None:
     assert isinstance(expected, dict)
     assert set(actual) == set(expected)
     for key in actual:
         if actual[key] is None:
             assert expected[key] is None
+        elif isinstance(actual[key], dict):
+            assert isinstance(expected[key], dict)
+            assert set(actual[key]) == set(expected[key])
+            for column, values in actual[key].items():
+                np.testing.assert_allclose(
+                    np.asarray(values, dtype=np.float64),
+                    _numeric(expected[key][column]),
+                    atol=COMPOUND,
+                )
         else:
             np.testing.assert_allclose(
                 np.asarray(actual[key], dtype=np.float64),

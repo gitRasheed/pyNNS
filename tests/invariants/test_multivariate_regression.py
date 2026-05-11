@@ -46,7 +46,23 @@ def test_nns_m_reg_order_max_is_perfect_fit() -> None:
     assert result["R2"] == pytest.approx(1.0)
 
 
-@pytest.mark.parametrize("kwargs", [{"type": "class"}, {"confidence_interval": 0.95}])
+def test_nns_m_reg_confidence_interval_shapes() -> None:
+    x1 = np.linspace(-2.0, 2.0, 50)
+    x = np.column_stack((x1, np.sin(x1)))
+    y = x1 + np.sin(x1)
+    points = np.array([[0.0, 0.0], [1.0, np.sin(1.0)]])
+
+    result = nns_m_reg(x, y, order=1, n_best=1, point_est=points, confidence_interval=0.95)
+
+    assert result["Fitted.xy"]["conf.int.pos"].shape == y.shape
+    assert result["Fitted.xy"]["conf.int.neg"].shape == y.shape
+    assert result["pred.int"] is not None
+    assert set(result["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert result["pred.int"]["lower.pred.int"].shape == (2,)
+    assert result["pred.int"]["upper.pred.int"].shape == (2,)
+
+
+@pytest.mark.parametrize("kwargs", [{"type": "class"}])
 def test_nns_m_reg_deferred_paths_raise(kwargs: dict[str, object]) -> None:
     x1 = np.linspace(-2.0, 2.0, 20)
     x = np.column_stack((x1, np.sin(x1)))

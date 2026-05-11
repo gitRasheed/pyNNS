@@ -54,6 +54,7 @@ def nns_stack_numeric(
     stack: bool,
     dim_red_method: str | list[float],
     ts_test: int | None = None,
+    pred_int: float | None = None,
 ) -> RValue:
     args = {
         "x": x,
@@ -66,6 +67,7 @@ def nns_stack_numeric(
         "stack": stack,
         "dim_red_method": dim_red_method,
         "ts_test": ts_test,
+        "pred_int": pred_int,
     }
     key = _cache_key("NNS.stack.numeric", (args,))
     cache, refresh = _cache_state()
@@ -490,12 +492,15 @@ def _call_r_stack_numeric(args: dict[str, Any]) -> RValue:
         "if (is.list(dim_arg)) dim_arg <- as.numeric(unlist(dim_arg))\n"
         "ts_arg <- args$ts_test\n"
         "if (length(ts_arg) == 0) ts_arg <- NULL else ts_arg <- as.integer(ts_arg)\n"
+        "pred_arg <- args$pred_int\n"
+        "if (length(pred_arg) == 0) pred_arg <- NULL else pred_arg <- as.numeric(pred_arg)\n"
         "result <- NNS::NNS.stack("
         "mat(args$x), as.numeric(unlist(args$y)), IVs.test = mat(args$x_test), "
         "CV.size = as.numeric(args$cv_size), folds = as.integer(args$folds), "
         "method = as.numeric(unlist(args$method)), order = order_arg, "
         "stack = isTRUE(as.logical(unlist(args$stack))), "
-        "dim.red.method = dim_arg, ts.test = ts_arg, status = FALSE, ncores = 1)\n"
+        "dim.red.method = dim_arg, pred.int = pred_arg, ts.test = ts_arg, "
+        "status = FALSE, ncores = 1)\n"
         "encode <- function(x) {\n"
         "  if (is.null(x)) return(NULL)\n"
         "  if (is.matrix(x)) {\n"
@@ -805,6 +810,23 @@ def _decode(value: JsonValue) -> RValue:
         return value
     if isinstance(value, list) and all(isinstance(item, str) for item in value):
         return cast(list[str], value)
+    if isinstance(value, list):
+        converted: list[JsonValue] = []
+        has_numeric_special = False
+        for item in value:
+            if item == "NA":
+                converted.append(float("nan"))
+                has_numeric_special = True
+            elif item == "Inf":
+                converted.append(float("inf"))
+                has_numeric_special = True
+            elif item == "-Inf":
+                converted.append(float("-inf"))
+                has_numeric_special = True
+            else:
+                converted.append(item)
+        if has_numeric_special:
+            return np.asarray(converted, dtype=np.float64)
     return np.asarray(value, dtype=np.float64)
 
 

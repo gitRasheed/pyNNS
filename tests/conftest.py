@@ -120,14 +120,23 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_reg_500_seconds" not in cache:
         cache["nns_reg_500_seconds"] = _time_r_nns_reg()
         _write_benchmark_baseline(cache)
+    if "nns_reg_200_ci_seconds" not in cache:
+        cache["nns_reg_200_ci_seconds"] = _time_r_nns_reg_ci()
+        _write_benchmark_baseline(cache)
     if "nns_reg_dimred_200x3_seconds" not in cache:
         cache["nns_reg_dimred_200x3_seconds"] = _time_r_nns_reg_dimred()
         _write_benchmark_baseline(cache)
     if "nns_m_reg_200x3_seconds" not in cache:
         cache["nns_m_reg_200x3_seconds"] = _time_r_nns_m_reg()
         _write_benchmark_baseline(cache)
+    if "nns_m_reg_200x3_ci_seconds" not in cache:
+        cache["nns_m_reg_200x3_ci_seconds"] = _time_r_nns_m_reg_ci()
+        _write_benchmark_baseline(cache)
     if "nns_stack_100x3_seconds" not in cache:
         cache["nns_stack_100x3_seconds"] = _time_r_nns_stack()
+        _write_benchmark_baseline(cache)
+    if "nns_stack_100x3_pred_int_seconds" not in cache:
+        cache["nns_stack_100x3_pred_int_seconds"] = _time_r_nns_stack_pred_int()
         _write_benchmark_baseline(cache)
     if "nns_stack_100x3_ts_test_seconds" not in cache:
         cache["nns_stack_100x3_ts_test_seconds"] = _time_r_nns_stack_ts_test()
@@ -514,6 +523,28 @@ def _time_r_nns_reg() -> float:
     return float(completed.stdout)
 
 
+def _time_r_nns_reg_ci() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 200)\n"
+        "y <- sin(x) + 0.05 * cos(7 * x)\n"
+        "point <- seq(-3, 3, length.out = 20)\n"
+        "run <- function() NNS::NNS.reg(x, y, point.est = point, "
+        "factor.2.dummy = FALSE, plot = FALSE, confidence.interval = 0.95)\n"
+        "invisible(run())\n"
+        "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
 def _time_r_nns_reg_dimred() -> float:
     script = (
         "library(NNS)\n"
@@ -560,6 +591,29 @@ def _time_r_nns_m_reg() -> float:
     return float(completed.stdout)
 
 
+def _time_r_nns_m_reg_ci() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 200)\n"
+        "X <- cbind(x, sin(x), cos(x))\n"
+        "y <- x + sin(x) + 0.25 * cos(x)\n"
+        "run <- function() NNS:::NNS.M.reg(X, y, point.est = X[1:20,], "
+        "factor.2.dummy = FALSE, plot = FALSE, residual.plot = FALSE, "
+        "ncores = 1, confidence.interval = 0.95)\n"
+        "invisible(run())\n"
+        "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
 def _time_r_nns_stack() -> float:
     script = (
         "library(NNS)\n"
@@ -569,6 +623,29 @@ def _time_r_nns_stack() -> float:
         "run <- function() NNS::NNS.stack(X, y, IVs.test = X[1:20,], "
         "CV.size = 0.25, folds = 2, method = c(1, 2), stack = TRUE, "
         "dim.red.method = 'cor', status = FALSE, ncores = 1)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_stack_pred_int() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-2, 2, length.out = 100)\n"
+        "X <- cbind(x, sin(x), cos(x))\n"
+        "y <- x + sin(x) + 0.25 * cos(x)\n"
+        "run <- function() NNS::NNS.stack(X, y, IVs.test = X[1:20,], "
+        "CV.size = 0.25, folds = 1, method = c(1, 2), stack = TRUE, "
+        "dim.red.method = 'cor', pred.int = 0.95, status = FALSE, ncores = 1)\n"
         "invisible(run())\n"
         "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
