@@ -29,6 +29,7 @@ _EXPORTS = {
     "nns_distance_bulk": ("pynns.distance", "nns_distance_bulk"),
     "nns_mode": ("pynns.central_tendencies", "nns_mode"),
     "nns_m_reg": ("pynns.multivariate_regression", "nns_m_reg"),
+    "nns_meboot": ("pynns.meboot", "nns_meboot"),
     "nns_norm": ("pynns.norm", "nns_norm"),
     "nns_part": ("pynns.part", "nns_part"),
     "nns_reg": ("pynns.regression", "nns_reg"),

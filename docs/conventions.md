@@ -174,6 +174,21 @@ forecasts for some explicit numeric-lag paths. Character `weights` with numeric
 multi-lag seasonal factors is rejected because installed R errors during numeric
 multiplication on that path.
 
+## Meboot
+
+`nns_meboot` maps to R's `NNS.meboot` maximum-entropy bootstrap algorithm and
+returns plain Python dictionaries instead of R's vectorized list-matrix wrapper.
+Scalar `rho` returns one result dictionary; vector `rho` returns a list of result
+dictionaries in R's vectorized order. `rho=None` follows installed R's empty
+output behavior, and length-one input returns only `{"x": x}`.
+
+Exact replicate parity with R is not expected because PyNNS uses NumPy's random
+number generator and SciPy's optimizer while R uses its global RNG and
+`optim()`. Deterministic diagnostics (`xx`, `z`, `dv`, `dvtrim`, `xmin`,
+`xmax`, `desintxb`, `ordxx`, and `kappa`) are parity-tested exactly. Stochastic
+outputs are tested structurally and statistically. `random_seed` is a PyNNS-only
+convenience for reproducible bootstrap draws.
+
 ## Normalization
 
 `nns_norm(x, linear=False)` maps to R's numeric matrix `NNS.norm` path with

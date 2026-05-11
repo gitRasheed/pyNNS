@@ -17,6 +17,7 @@ from pynns import (
     nns_distance,
     nns_distance_bulk,
     nns_m_reg,
+    nns_meboot,
     nns_mode,
     nns_norm,
     nns_part,
@@ -346,3 +347,25 @@ def test_nns_arma_500_explicit12_nonlin(
 
     assert result.shape == (12,)
     assert isinstance(r_baseline["nns_arma_500_explicit12_nonlin_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_meboot_500_reps100(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    t = np.arange(1, 501, dtype=np.float64)
+    x = 0.01 * t + np.sin(t / 11.0) + 0.2 * np.cos(t / 5.0)
+
+    result = benchmark(nns_meboot, x, 100, 0.0, random_seed=123)
+
+    assert result["replicates"].shape == (500, 100)
+    assert isinstance(r_baseline["nns_meboot_500_reps100_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_meboot_1000_reps100(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    t = np.arange(1, 1001, dtype=np.float64)
+    x = 0.01 * t + np.sin(t / 11.0) + 0.2 * np.cos(t / 5.0)
+
+    result = benchmark(nns_meboot, x, 100, 0.0, random_seed=123)
+
+    assert result["replicates"].shape == (1000, 100)
+    assert isinstance(r_baseline["nns_meboot_1000_reps100_seconds"], float)

@@ -122,6 +122,75 @@ def nns_boost_numeric(
         return result
 
 
+def nns_meboot_diagnostics(
+    x: list[float],
+    *,
+    rho: float,
+    reps: int = 2,
+    drift: bool = True,
+    trim: float = 0.1,
+    xmin: float | None = None,
+    xmax: float | None = None,
+    sym: bool = False,
+    scl_adjustment: bool = False,
+    seed: int = 1,
+) -> RValue:
+    args = {
+        "x": x,
+        "rho": rho,
+        "reps": reps,
+        "drift": drift,
+        "trim": trim,
+        "xmin": xmin,
+        "xmax": xmax,
+        "sym": sym,
+        "scl_adjustment": scl_adjustment,
+        "seed": seed,
+    }
+    key = _cache_key("NNS.meboot.diagnostics", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.meboot.diagnostics with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_meboot_diagnostics(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
+def nns_meboot_stat_summary(
+    x: list[float],
+    *,
+    rho: float,
+    reps: int = 100,
+    seed: int = 1,
+) -> RValue:
+    args = {"x": x, "rho": rho, "reps": reps, "seed": seed}
+    key = _cache_key("NNS.meboot.stat_summary", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.meboot.stat_summary with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_meboot_stat_summary(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def _uncached_nns(
     function: str,
     args: tuple[Any, ...],
@@ -318,6 +387,66 @@ def _call_r_boost_numeric(args: dict[str, Any]) -> RValue:
         "  as.numeric(x)\n"
         "}\n"
         "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA, null = 'null'))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_meboot_diagnostics(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "f <- get('FUN', envir = environment(NNS::NNS.meboot))\n"
+        "set.seed(as.integer(args$seed))\n"
+        "nullify <- function(v) if (length(v) == 0) NULL else as.numeric(v)\n"
+        "result <- f("
+        "x = as.numeric(unlist(args$x)), reps = as.integer(args$reps), "
+        "rho = as.numeric(args$rho), drift = isTRUE(as.logical(args$drift)), "
+        "trim = as.numeric(args$trim), xmin = nullify(args$xmin), xmax = nullify(args$xmax), "
+        "expand.sd = FALSE, force.clt = FALSE, "
+        "scl.adjustment = isTRUE(as.logical(args$scl_adjustment)), "
+        "sym = isTRUE(as.logical(args$sym)))\n"
+        "picked <- result[c('x','xx','z','dv','dvtrim','xmin','xmax','desintxb','ordxx','kappa')]\n"
+        "encode <- function(x) {\n"
+        "  if (is.null(x)) return(NULL)\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(picked), auto_unbox = TRUE, digits = NA, null = 'null'))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_meboot_stat_summary(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "f <- get('FUN', envir = environment(NNS::NNS.meboot))\n"
+        "set.seed(as.integer(args$seed))\n"
+        "result <- f(x = as.numeric(unlist(args$x)), reps = as.integer(args$reps), "
+        "rho = as.numeric(args$rho))\n"
+        "replicates <- result$replicates\n"
+        "summary <- c(mean_ensemble = mean(result$ensemble), sd_ensemble = sd(result$ensemble), "
+        "median_rep_means = median(colMeans(replicates)), "
+        "median_rep_sds = median(apply(replicates, 2, sd)))\n"
+        "cat(jsonlite::toJSON(as.numeric(summary), auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

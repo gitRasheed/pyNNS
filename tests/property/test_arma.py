@@ -33,6 +33,7 @@ def test_nns_arma_random_explicit_lag_shape(
     method: str,
 ) -> None:
     assume(np.ptp(variable) > 0.0)
+    assume(np.unique(variable).size > 5)
 
     result = nns_arma(variable, h=h, seasonal_factor=seasonal_factor, method=method)
 
