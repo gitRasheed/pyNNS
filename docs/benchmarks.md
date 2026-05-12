@@ -17,9 +17,14 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_sd_cluster`, degree=2, N=50, T_obs=252 | 31.020 ms | 13.800 ms | 2.25x |
 | `nns_sd_cluster`, degree=2, N=100, T_obs=252 | 688.179 ms | 131.200 ms | 5.25x |
 | `nns_sd_cluster`, degree=1 continuous, N=50, T_obs=252 | 47.505 ms | 21.600 ms | 2.20x |
-| `nns_cdf`, T_obs=1000, degree=0, type=CDF | 8.063 ms | 1.100 ms | 7.33x |
-| `nns_cdf`, T_obs=1000, degree=2, type=CDF | 23.560 ms | 1.450 ms | 16.25x |
-| `nns_cdf`, N=3, T_obs=500, degree=1, type=CDF | 45.009 ms | 56.600 ms | 0.80x |
+| `nns_cdf`, T_obs=1000, degree=0, type=CDF | 0.024 ms | 1.150 ms | 0.02x |
+| `nns_cdf`, T_obs=1000, degree=1, type=CDF | 0.073 ms | 1.350 ms | 0.05x |
+| `nns_cdf`, T_obs=1000, degree=2, type=CDF | 0.093 ms | 1.400 ms | 0.07x |
+| `nns_cdf`, T_obs=1000, degree=3, type=CDF | 0.149 ms | 1.500 ms | 0.10x |
+| `nns_cdf`, T_obs=1000, degree=2, type=survival | 0.096 ms | 1.400 ms | 0.07x |
+| `nns_cdf`, T_obs=1000, degree=2, type=cumulative hazard | 0.102 ms | 1.400 ms | 0.07x |
+| `nns_cdf`, T_obs=1000, degree=2, type=hazard | 37.207 ms | 34.000 ms | 1.09x |
+| `nns_cdf`, N=3, T_obs=500, degree=1, type=CDF | 54.407 ms | 54.400 ms | 1.00x |
 | `nns_dep`, T_obs=1000 | 7.465 ms | 11.300 ms | 0.66x |
 | `nns_copula`, T_obs=1000 | 0.524 ms | 4.800 ms | 0.11x |
 | `nns_causation`, T_obs=1000 | 23.572 ms | 97.600 ms | 0.24x |

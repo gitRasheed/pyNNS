@@ -45,7 +45,11 @@ def _univariate_cdf(
         raise ValueError("variable must be non-empty.")
     target_value = _univariate_target(target, values)
     x = np.sort(values[~np.isnan(values)])
-    pval = _r_lpm_ratio(degree, x, values)
+    pval = (
+        _finite_sorted_grid_lpm_ratio(degree, x)
+        if np.all(np.isfinite(values))
+        else _r_lpm_ratio(degree, x, values)
+    )
     column_name = {
         "cdf": "CDF",
         "survival": "S(x)",
@@ -227,6 +231,43 @@ def _r_lpm_ratio(
     with np.errstate(invalid="ignore", divide="ignore"):
         ratio = lower / (lower + upper)
     return np.asarray(ratio, dtype=np.float64)
+
+
+def _finite_sorted_grid_lpm_ratio(
+    degree: float,
+    sorted_values: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    if degree == 0.0:
+        counts = np.searchsorted(sorted_values, sorted_values, side="right")
+        return np.asarray(counts / float(sorted_values.size), dtype=np.float64)
+
+    if degree != int(degree) or int(degree) not in {1, 2, 3}:
+        return _r_lpm_ratio(degree, sorted_values, sorted_values)
+
+    d = int(degree)
+    n = sorted_values.size
+    right_counts = np.searchsorted(sorted_values, sorted_values, side="right")
+    powers = [np.ones(n, dtype=np.float64)]
+    for power in range(1, d + 1):
+        powers.append(sorted_values**power)
+    prefix = [np.concatenate(([0.0], np.cumsum(power_values))) for power_values in powers]
+    totals = [float(power_prefix[-1]) for power_prefix in prefix]
+
+    lower = np.zeros(n, dtype=np.float64)
+    upper = np.zeros(n, dtype=np.float64)
+    for power in range(d + 1):
+        coefficient = float(math.comb(d, power))
+        lower += (
+            coefficient
+            * (sorted_values ** (d - power))
+            * ((-1.0) ** power)
+            * prefix[power][right_counts]
+        )
+        suffix_sum = totals[power] - prefix[power][right_counts]
+        upper += coefficient * ((-sorted_values) ** (d - power)) * suffix_sum
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.asarray(lower / (lower + upper), dtype=np.float64)
 
 
 def _r_partial_moments(

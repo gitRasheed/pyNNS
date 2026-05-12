@@ -7,6 +7,7 @@ from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
 from pynns import nns_arma
+from pynns.arma import _numeric_seasonal_weights
 
 finite_arrays = arrays(
     dtype=np.float64,
@@ -46,6 +47,7 @@ def test_nns_arma_random_explicit_lag_shape(
 ) -> None:
     assume(np.ptp(variable) > 0.0)
     assume(np.unique(variable).size > 8)
+    assume(np.all(np.isfinite(_numeric_seasonal_weights(variable, np.array([seasonal_factor])))))
 
     result = nns_arma(variable, h=h, seasonal_factor=seasonal_factor, method=method)
 
