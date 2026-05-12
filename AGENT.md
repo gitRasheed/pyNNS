@@ -46,6 +46,8 @@ If an ignored docs file exists locally, read it but do not assume it is tracked.
 - Types are required; mypy runs in strict mode.
 - Keep implementation comments sparse and useful.
 - Prefer NumPy arrays at numeric API boundaries.
+- PyNNS is currently a pure-Python/NumPy/SciPy port. Do not add native
+  extensions unless explicitly requested and justified by benchmarks.
 - Preserve GPL-3.0-only licensing.
 - Installed R is ground truth, not the source in `reference/NNS/`; when parity tests fail, match the installed binary and document the divergence.
 - Watch R C-API distribution functions (`Rf_dexp`, `Rf_dnorm`, `Rf_dbinom`, etc.); verify at least one numeric case against the installed binary before trusting source-level parameter meaning.

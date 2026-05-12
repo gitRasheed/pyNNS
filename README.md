@@ -8,6 +8,8 @@ Pre-alpha, parity-tested port of NNS 12.0.
 
 The package API is not stable yet. Current work is focused on matching the
 reference R implementation before adding higher-level Python conveniences.
+Native extension scaffolding has been removed; PyNNS is currently a
+pure-Python/NumPy/SciPy port.
 
 ## Install
 

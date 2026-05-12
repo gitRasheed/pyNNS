@@ -23,14 +23,11 @@ dev = [
 ]
 
 [build-system]
-requires = [
-    "nanobind",
-    "scikit-build-core",
-]
-build-backend = "scikit_build_core.build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.scikit-build]
-wheel.packages = ["src/pynns"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/pynns"]
 
 [tool.pytest.ini_options]
 addopts = "-ra -m 'not benchmark' --benchmark-disable -n 4"

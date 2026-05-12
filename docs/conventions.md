@@ -1,5 +1,12 @@
 # Conventions
 
+## Build
+
+PyNNS is currently a pure-Python/NumPy/SciPy port. The earlier native extension
+scaffolding was removed after the core port demonstrated pure NumPy/SciPy parity
+and competitive performance. Reintroduce native code only as a deliberate future
+change backed by benchmarks.
+
 ## Degree-Zero Boundary
 
 At degree zero, `LPM` uses `x <= T` and `UPM` uses `x > T`.
