@@ -193,6 +193,41 @@ def test_nns_reg_dim_red_point_only_matches_r() -> None:
 
 
 @pytest.mark.parity
+def test_nns_reg_dim_red_degenerate_equal_projection_matches_r() -> None:
+    x = np.array(
+        [
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [1.0, -1.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    y = 0.5 * x[:, 0] - 0.25 * x[:, 1]
+
+    expected = _r_nns_reg_dimred(
+        x,
+        y,
+        order=None,
+        dim_red_method="equal",
+        threshold=0.0,
+        point_est=None,
+        point_only=False,
+    )
+    actual = nns_reg(x, y, dim_red_method="equal")
+
+    _assert_reg_matches(actual, expected, check_dimred=True)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize("relationship", ["linear", "quadratic", "sin"])
 @pytest.mark.parametrize("confidence_interval", [0.8, 0.95])
 @pytest.mark.parametrize(

@@ -189,6 +189,9 @@ def _nns_reg_univariate_core(
 
     if isinstance(order, str):
         rp_out_x, rp_out_y = _consolidate_points(part_map["dt"]["x"], part_map["dt"]["y"])
+    elif np.unique(x_values).size <= 1 and rp_x.size == 1:
+        rp_out_x = np.repeat(rp_x, 3)
+        rp_out_y = np.repeat(rp_y, 3)
     else:
         rp_out_x, rp_out_y = rp_x, rp_y
 
@@ -897,9 +900,10 @@ def _coefficients(
     lower = rp_x[:-1] if rp_x.size > 1 else np.array([float(np.unique(rp_x)[0])])
     upper = rp_x[1:] if rp_x.size > 1 else np.array([float(np.unique(rp_x)[0])])
     if np.unique(upper).size <= 1:
-        coef = np.zeros_like(upper, dtype=np.float64)
-        lower = np.asarray(np.unique(upper), dtype=np.float64)
-        upper = np.asarray(np.unique(upper), dtype=np.float64)
+        collapsed = np.asarray(np.unique(upper), dtype=np.float64)
+        coef = np.zeros_like(collapsed, dtype=np.float64)
+        lower = collapsed
+        upper = collapsed
     coef = np.where(np.isposinf(coef), 1.0, coef)
     coef = np.where(np.isfinite(coef), coef, 0.0)
     matrix = np.column_stack((coef, lower, upper))
