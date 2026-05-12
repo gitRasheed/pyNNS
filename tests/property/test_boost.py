@@ -35,6 +35,37 @@ def test_nns_boost_numeric_bounds_hold(x: np.ndarray) -> None:
     assert np.sum(result["feature.weights"]) > 0.0
 
 
+@given(finite_matrices, st.sampled_from([1, 2]), st.sampled_from([0.8, 0.95]))
+def test_nns_boost_numeric_pred_int_shape_holds(
+    x: np.ndarray,
+    depth: int,
+    pred_int: float,
+) -> None:
+    row_jitter = np.arange(x.shape[0], dtype=np.float64)[:, np.newaxis] * 1e-6
+    col_jitter = np.arange(x.shape[1], dtype=np.float64)[np.newaxis, :] * 1e-7
+    x = x + row_jitter + col_jitter
+    y = 0.5 * x[:, 0] - 0.25 * x[:, 1]
+
+    result = nns_boost(
+        x,
+        y,
+        x[:3],
+        cv_size=0.25,
+        depth=depth,
+        pred_int=pred_int,
+        feature_importance=False,
+    )
+
+    assert result["results"].shape == (3,)
+    assert isinstance(result["pred.int"], dict)
+    assert set(result["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert result["pred.int"]["lower.pred.int"].shape == (3,)
+    assert result["pred.int"]["upper.pred.int"].shape == (3,)
+    assert np.all(np.isfinite(result["results"]))
+    assert np.all(np.isfinite(result["pred.int"]["lower.pred.int"]))
+    assert np.all(np.isfinite(result["pred.int"]["upper.pred.int"]))
+
+
 @given(finite_matrices, st.integers(min_value=2, max_value=4), st.sampled_from([1, 2]))
 def test_nns_boost_class_shape_and_codes_hold(
     x: np.ndarray,

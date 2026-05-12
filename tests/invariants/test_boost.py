@@ -43,7 +43,7 @@ def test_nns_boost_class_shapes_and_codes() -> None:
     assert result["pred.int"] is None
 
 
-@pytest.mark.parametrize("path", ["ts", "interval"])
+@pytest.mark.parametrize("path", ["ts"])
 def test_nns_boost_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
@@ -52,17 +52,37 @@ def test_nns_boost_deferred_paths_raise(path: str) -> None:
     with pytest.raises(NotImplementedError):
         if path == "ts":
             nns_boost(variable, y, ts_test=4)
-        else:
-            nns_boost(variable, y, pred_int=0.95)
-
-
-def test_nns_boost_numeric_pred_int_guard_is_current() -> None:
+def test_nns_boost_numeric_pred_int_shape() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
     y = x + np.sin(x)
 
-    with pytest.raises(NotImplementedError, match="boost-specific interval wiring"):
-        nns_boost(variable, y, pred_int=0.95)
+    result = nns_boost(variable, y, variable[:5], pred_int=0.95, feature_importance=False)
+
+    assert result["results"].shape == (5,)
+    assert isinstance(result["pred.int"], dict)
+    assert set(result["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert result["pred.int"]["lower.pred.int"].shape == result["results"].shape
+    assert result["pred.int"]["upper.pred.int"].shape == result["results"].shape
+    assert np.all(np.isfinite(result["pred.int"]["lower.pred.int"]))
+    assert np.all(np.isfinite(result["pred.int"]["upper.pred.int"]))
+
+
+def test_nns_boost_features_only_ignores_numeric_pred_int() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    variable = np.column_stack((x, np.sin(x)))
+    y = x + np.sin(x)
+
+    result = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        pred_int=0.95,
+        features_only=True,
+        feature_importance=False,
+    )
+
+    assert set(result) == {"feature.weights", "feature.frequency"}
 
 
 def test_nns_boost_class_pred_int_raises() -> None:
@@ -84,6 +104,25 @@ def test_nns_boost_rejects_unported_stochastic_epoch_path() -> None:
         match="n_features > 10 requires R's stochastic epoch keeper loop",
     ):
         nns_boost(variable, y, variable[:3], cv_size=0.25, feature_importance=False)
+
+
+def test_nns_boost_pred_int_does_not_enable_stochastic_epoch_path() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    variable = np.column_stack([np.sin((idx + 1) * x) for idx in range(11)])
+    y = x + np.sin(x)
+
+    with pytest.raises(
+        NotImplementedError,
+        match="n_features > 10 requires R's stochastic epoch keeper loop",
+    ):
+        nns_boost(
+            variable,
+            y,
+            variable[:3],
+            cv_size=0.25,
+            pred_int=0.95,
+            feature_importance=False,
+        )
 
 
 @pytest.mark.stochastic

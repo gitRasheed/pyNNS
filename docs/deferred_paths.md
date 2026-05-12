@@ -9,7 +9,6 @@ limits stay visible.
 | Boost | `n_features > 10` stochastic epoch keeper loop | R uses stochastic epoch loop not yet ported | Port stochastic boost epoch loop |
 | Boost | class `pred_int` | Classification interval wiring is not ported | Port class interval parity if an R caller requires it |
 | Boost | `ts_test` | Time-series boost evaluation not ported | Port after ARMA/time-series stack paths |
-| Boost | `pred_int` | Numeric regression and stack intervals are ported, but boost-specific interval wiring is not | Wire boost outputs through the existing numeric interval paths |
 | Stack | class `pred_int` | Classification interval tables are not ported | Port class interval parity if an R caller requires it |
 | Regression | `confidence_interval` with `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility before interval tables can be generated on smoothed fits | Port a minimal R-compatible fixed-spar smoothing spline backend |
 | Regression | `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility; SciPy smoothers are not parity-compatible | Port a minimal R-compatible fixed-spar smoothing spline backend, then enable `nns_reg(smooth=True)` |

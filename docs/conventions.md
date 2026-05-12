@@ -193,8 +193,11 @@ supported for deterministic small-feature classification and uses the same
 R-style `downSample` + `upSample` structure as `nns_stack`; exact sampled-row
 parity with R is not expected because PyNNS uses NumPy's RNG, and `random_seed`
 is PyNNS-only. The stochastic epoch keeper path for `n_features > 10` is not yet
-ported and raises `NotImplementedError`. Prediction intervals and `ts_test` are
-also deferred and raise `NotImplementedError`. R requires usable column names
+ported and raises `NotImplementedError`. Numeric `pred_int` is supported and
+delegates to `nns_stack(pred_int=...)`, matching installed R; it is deterministic
+and does not use MC/meboot. `features_only=True` returns before the final stack
+fit and ignores `pred_int`, matching R. Classification `pred_int` and `ts_test`
+remain deferred and raise `NotImplementedError`. R requires usable column names
 for matrix inputs; PyNNS uses positional numeric columns. As with `nns_stack`, R
 samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
 `cv_size=0.25` unless specified. For classification boost, final predictions,

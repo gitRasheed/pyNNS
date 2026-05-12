@@ -156,6 +156,73 @@ def test_nns_boost_features_only_matches_r() -> None:
 
 
 @pytest.mark.parity
+@pytest.mark.parametrize(("depth", "pred_int"), [(1, 0.95), (2, 0.8)])
+def test_nns_boost_numeric_pred_int_matches_r(depth: int, pred_int: float) -> None:
+    x = np.linspace(-2.0, 2.0, 40)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = 1.0 + 0.8 * x + 0.5 * np.sin(x) - 0.2 * np.cos(x)
+    point = variable[30:40]
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=depth,
+        features_only=False,
+        pred_int=pred_int,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        point,
+        learner_trials=10,
+        cv_size=0.25,
+        depth=depth,
+        pred_int=pred_int,
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected)
+    assert isinstance(actual["pred.int"], dict)
+    assert set(actual["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert actual["pred.int"]["lower.pred.int"].shape == actual["results"].shape
+    assert actual["pred.int"]["upper.pred.int"].shape == actual["results"].shape
+
+
+@pytest.mark.parity
+def test_nns_boost_features_only_ignores_pred_int_like_r() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        variable[:5].tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=None,
+        features_only=True,
+        pred_int=0.95,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        features_only=True,
+        pred_int=0.95,
+        feature_importance=False,
+    )
+
+    assert set(actual) == {"feature.weights", "feature.frequency"}
+    _assert_boost_matches(actual, expected)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize("depth", [None, 1, 2])
 def test_nns_boost_binary_class_matches_r(depth: int | None) -> None:
     x = np.linspace(-2.0, 2.0, 30)
@@ -516,14 +583,24 @@ def _assert_boost_matches(
             assert np.asarray(actual[key], dtype=np.float64).size > 0
             assert np.asarray(expected[key], dtype=np.float64).size > 0
             continue
-        if actual[key] is None:
-            assert expected[key] is None
-        else:
-            np.testing.assert_allclose(
-                np.asarray(actual[key], dtype=np.float64),
-                np.asarray(expected[key], dtype=np.float64),
-                atol=COMPOUND,
-            )
+        _assert_nested_numeric_close(actual[key], expected[key])
+
+
+def _assert_nested_numeric_close(actual: Any, expected: Any) -> None:
+    if actual is None:
+        assert expected is None
+        return
+    if isinstance(actual, dict):
+        assert isinstance(expected, dict)
+        assert set(actual) == set(expected)
+        for key in actual:
+            _assert_nested_numeric_close(actual[key], expected[key])
+        return
+    np.testing.assert_allclose(
+        np.asarray(actual, dtype=np.float64),
+        np.asarray(expected, dtype=np.float64),
+        atol=COMPOUND,
+    )
 
 
 def _assert_boost_class_structure(

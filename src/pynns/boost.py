@@ -55,10 +55,8 @@ def nns_boost(
         type_value = "class"
     if ts_test is not None:
         raise NotImplementedError("ts_test requires the time-series boost path, deferred.")
-    if pred_int is not None:
-        if type_value == "class":
-            raise NotImplementedError("nns_boost pred_int for classification is not yet ported.")
-        raise NotImplementedError("nns_boost pred_int requires boost-specific interval wiring.")
+    if pred_int is not None and type_value == "class":
+        raise NotImplementedError("nns_boost pred_int for classification is not yet ported.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
     x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
@@ -105,6 +103,7 @@ def nns_boost(
             extreme=extreme,
             features_only=features_only,
             feature_importance=feature_importance,
+            pred_int=pred_int,
             rng=rng,
         )
     except NotImplementedError:
@@ -155,6 +154,7 @@ def _nns_boost_core(
     extreme: bool,
     features_only: bool,
     feature_importance: bool,
+    pred_int: float | None,
     rng: np.random.Generator,
 ) -> BoostResult:
     objective_l = objective.lower()
@@ -240,6 +240,7 @@ def _nns_boost_core(
         objective=objective_value,
         cv_size=0.25 if cv_size is None else cv_size,
         type=type_value,
+        pred_int=pred_int,
     )
     estimates = np.asarray(final_fit["stack"], dtype=np.float64)
     if estimates.size == 0 or np.any(np.isnan(estimates)):
@@ -250,7 +251,7 @@ def _nns_boost_core(
 
     return {
         "results": estimates,
-        "pred.int": None,
+        "pred.int": final_fit["pred.int"],
         "feature.weights": weights[order_idx],
         "feature.frequency": counts[order_idx],
         "n.best": final_fit["NNS.reg.n.best"],
