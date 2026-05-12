@@ -9,11 +9,22 @@ C++ routine's LPM-at-global-maximum ordering and original-index tie break.
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
 
 from pynns.core import _as_1d_values, lpm
+
+
+@dataclass(frozen=True)
+class _SDPrecomputed:
+    values: NDArray[np.float64]
+    sorted_values: NDArray[np.float64]
+    curves: NDArray[np.float64]
+    minimums: NDArray[np.float64]
+    means: NDArray[np.float64]
+    identical: NDArray[np.bool_]
 
 
 def fsd(x: NDArray[np.float64], y: NDArray[np.float64]) -> int:
@@ -83,40 +94,42 @@ def nns_sd_cluster(
         raise ValueError("degree must be 1, 2, or 3.")
     if not np.all(np.isfinite(values)):
         raise ValueError("data must contain only finite values.")
+    type_value = _sd_type_value(int(degree), type)
+    discrete = int(degree) != 1 or type_value != "continuous"
     min_cluster = int(min_cluster)
     if min_cluster < 0:
         raise ValueError("min_cluster must be non-negative.")
 
     column_count = values.shape[1]
     if names is None:
-        remaining_names = [f"X_{index + 1}" for index in range(column_count)]
+        all_names = [f"X_{index + 1}" for index in range(column_count)]
     else:
-        remaining_names = [str(name) for name in names]
-        if len(remaining_names) != column_count:
+        all_names = [str(name) for name in names]
+        if len(all_names) != column_count:
             raise ValueError("names length must match the number of data columns.")
 
-    remaining = values
+    precomputed = _precompute_sd_table(values, int(degree), discrete=discrete)
+    active = list(range(column_count))
     clusters: dict[str, list[str]] = {}
     iteration = 1
 
-    while remaining.shape[1] > min_cluster:
-        sd_set = _sd_efficient_set_names(remaining, int(degree), type, remaining_names)
+    while len(active) > min_cluster:
+        sd_set_indices = _sd_efficient_active_indices(precomputed, active, int(degree))
+        sd_set = [all_names[index] for index in sd_set_indices]
         if not sd_set:
             break
 
         clusters[f"Cluster_{iteration}"] = sd_set
-        remove = set(sd_set)
-        keep_mask = [name not in remove for name in remaining_names]
-        remaining = remaining[:, keep_mask]
-        remaining_names = [name for name in remaining_names if name not in remove]
+        remove_indices = set(sd_set_indices)
+        active = [index for index in active if index not in remove_indices]
         iteration += 1
 
-        if remaining.shape[1] <= min_cluster:
-            clusters[f"Cluster_{iteration}"] = list(remaining_names)
+        if len(active) <= min_cluster:
+            clusters[f"Cluster_{iteration}"] = [all_names[index] for index in active]
             break
 
-    if remaining.shape[1] > min_cluster and f"Cluster_{iteration}" not in clusters:
-        clusters[f"Cluster_{iteration}"] = list(remaining_names)
+    if len(active) > min_cluster and f"Cluster_{iteration}" not in clusters:
+        clusters[f"Cluster_{iteration}"] = [all_names[index] for index in active]
 
     if clusters:
         final_cluster_name = f"Cluster_{len(clusters)}"
@@ -144,42 +157,14 @@ def sd_efficient_set(
     if not np.all(np.isfinite(values)):
         raise ValueError("returns must contain only finite values.")
 
-    type_value = type.lower()
-    if degree == 1 and type_value not in {"discrete", "continuous"}:
-        type_value = "discrete"
+    type_value = _sd_type_value(degree, type)
     discrete = degree != 1 or type_value != "continuous"
 
     if values.shape[1] == 0:
         return []
 
-    sorted_values = np.sort(values, axis=0)
-    curves = _sd_curve_table(sorted_values, degree, discrete=discrete)
-    minimums = sorted_values[0, :]
-    means = np.mean(values, axis=0)
-    tmax = float(np.max(values))
-    order_lpm = _lpm_at_target(values, tmax, degree)
-    order = sorted(
-        range(values.shape[1]),
-        key=lambda index: (order_lpm[index], index),
-    )
-
-    keep: list[int] = []
-    for index in order:
-        dominated = any(
-            _dominates_from_curves(
-                kept,
-                index,
-                degree,
-                curves,
-                sorted_values,
-                minimums,
-                means,
-            )
-            for kept in keep
-        )
-        if not dominated:
-            keep.append(index)
-    return keep
+    precomputed = _precompute_sd_table(values, degree, discrete=discrete)
+    return _sd_efficient_active_indices(precomputed, list(range(values.shape[1])), degree)
 
 
 def _sd_efficient_set_names(
@@ -189,6 +174,83 @@ def _sd_efficient_set_names(
     names: Sequence[str],
 ) -> list[str]:
     return [names[index] for index in sd_efficient_set(values, degree, type=type)]
+
+
+def _sd_type_value(degree: int, type: str) -> str:
+    type_value = type.lower()
+    if degree == 1 and type_value in {"discrete", "continuous"}:
+        return type_value
+    return "discrete"
+
+
+def _precompute_sd_table(
+    values: NDArray[np.float64],
+    degree: int,
+    *,
+    discrete: bool,
+) -> _SDPrecomputed:
+    sorted_values = np.sort(values, axis=0)
+    return _SDPrecomputed(
+        values=values,
+        sorted_values=sorted_values,
+        curves=_sd_curve_table(sorted_values, degree, discrete=discrete),
+        minimums=sorted_values[0, :],
+        means=np.mean(values, axis=0),
+        identical=np.all(
+            sorted_values.T[:, np.newaxis, :] == sorted_values.T[np.newaxis, :, :],
+            axis=2,
+        ),
+    )
+
+
+def _sd_efficient_active_indices(
+    precomputed: _SDPrecomputed,
+    active: Sequence[int],
+    degree: int,
+) -> list[int]:
+    if not active:
+        return []
+
+    active_array = np.asarray(active, dtype=np.intp)
+    tmax = float(np.max(precomputed.values[:, active_array]))
+    order_lpm = _lpm_at_target(precomputed.values[:, active_array], tmax, degree)
+    order = [
+        active[int(position)]
+        for position in sorted(
+            range(len(active)),
+            key=lambda position: (order_lpm[position], active[position]),
+        )
+    ]
+
+    keep: list[int] = []
+    for index in order:
+        dominated = any(
+            _dominates_from_precomputed(kept, index, degree, precomputed)
+            for kept in keep
+        )
+        if not dominated:
+            keep.append(index)
+    return keep
+
+
+def _dominates_from_precomputed(
+    x_index: int,
+    y_index: int,
+    degree: int,
+    precomputed: _SDPrecomputed,
+) -> bool:
+    if precomputed.identical[x_index, y_index]:
+        return False
+    if precomputed.minimums[x_index] < precomputed.minimums[y_index]:
+        return False
+    if degree > 1 and precomputed.means[x_index] < precomputed.means[y_index]:
+        return False
+
+    x_curve = precomputed.curves[:, x_index]
+    y_curve = precomputed.curves[:, y_index]
+    if np.array_equal(x_curve, y_curve):
+        return False
+    return bool(not np.any(x_curve > y_curve))
 
 
 def _sd_result(x: NDArray[np.float64], y: NDArray[np.float64], degree: int) -> int:
