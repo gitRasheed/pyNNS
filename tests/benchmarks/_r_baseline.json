@@ -37,6 +37,7 @@
     "nns_stack_100x3_seconds": 0.3696667,
     "nns_stack_100x3_ts_test_seconds": 0.3003333,
     "nns_stack_class_100x3_seconds": 0.2706667,
+    "nns_stack_class_balance_150x3_seconds": 0.246,
     "pm_matrix_100x500_seconds": 0.0168,
     "pm_matrix_10x500_seconds": 0.0004,
     "pm_matrix_50x500_seconds": 0.0038,

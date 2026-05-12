@@ -57,6 +57,8 @@ def nns_stack_numeric(
     pred_int: float | None = None,
     type: str | None = None,
     class_levels: Sequence[object] | None = None,
+    balance: bool = False,
+    seed: int | None = None,
 ) -> RValue:
     args = {
         "x": x,
@@ -73,6 +75,10 @@ def nns_stack_numeric(
         "type": type,
         "class_levels": class_levels,
     }
+    if balance:
+        args["balance"] = True
+    if seed is not None:
+        args["seed"] = seed
     key = _cache_key("NNS.stack.numeric", (args,))
     cache, refresh = _cache_state()
     if key in cache:
@@ -536,13 +542,15 @@ def _call_r_stack_numeric(args: dict[str, Any]) -> RValue:
         "dv <- unlist(args$y)\n"
         "if (!is.null(levels_arg)) dv <- factor(as.character(dv), levels = levels_arg) "
         "else dv <- as.numeric(dv)\n"
+        "seed_arg <- args$seed\n"
+        "if (length(seed_arg) != 0) set.seed(as.integer(seed_arg))\n"
         "result <- NNS::NNS.stack("
         "mat(args$x), dv, IVs.test = mat(args$x_test), "
         "CV.size = as.numeric(args$cv_size), folds = as.integer(args$folds), "
         "method = as.numeric(unlist(args$method)), order = order_arg, "
         "stack = isTRUE(as.logical(unlist(args$stack))), "
         "dim.red.method = dim_arg, pred.int = pred_arg, ts.test = ts_arg, "
-        "type = type_arg, "
+        "type = type_arg, balance = isTRUE(as.logical(unlist(args$balance))), "
         "status = FALSE, ncores = 1)\n"
         "encode <- function(x) {\n"
         "  if (is.null(x)) return(NULL)\n"

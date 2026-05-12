@@ -34,6 +34,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_stack`, N=3, T_obs=100, T_test=20, pred_int=0.95 | 144.093 ms | 286.000 ms | 0.50x |
 | `nns_stack`, N=3, T_obs=100, T_test=20, ts_test=20 | 159.132 ms | 300.333 ms | 0.53x |
 | `nns_stack` class, N=3, T_obs=100, T_test=20 | 122.462 ms | 270.667 ms | 0.45x |
+| `nns_stack` class balance, N=3, T_obs=150, T_test=20 | 142.479 ms | 246.000 ms | 0.58x |
 | `nns_boost`, N=3, T_obs=50, T_test=10 | 180.320 ms | 2919.500 ms | 0.06x |
 | `nns_boost` class, N=3, T_obs=50, T_test=10 | 161.442 ms | 5790.000 ms | 0.03x |
 | `nns_seas`, T_obs=1000 | 0.011 ms | 1.100 ms | 0.01x |

@@ -7,6 +7,7 @@ from typing import Any, Literal, cast
 import numpy as np
 from numpy.typing import NDArray
 
+from pynns.categorical import _balance_class_training, _dense_factor_codes
 from pynns.central_tendencies import nns_mode
 from pynns.dependence import _gravity
 from pynns.regression import (
@@ -45,29 +46,36 @@ def nns_stack(
     status: bool = False,
     ncores: int | None = None,
     class_levels: list[object] | None = None,
+    random_seed: int | None = None,
 ) -> StackResult:
     """Port of R's deterministic numeric/classification NNS.stack orchestration."""
     del optimize_threshold, status, ncores
     type_value = _normalize_type(type)
     if balance:
-        raise NotImplementedError(
-            "nns_stack balance=True requires R down/up sampling helpers, which are not yet ported."
-        )
+        type_value = "class"
     if type_value == "class" and pred_int is not None:
         raise NotImplementedError("nns_stack pred_int for classification is not yet ported.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
-    if type_value == "class":
-        y_train, _ = _prepare_y_values(
-            dv_train,
-            type_value=type_value,
-            class_levels=class_levels,
-        )
+    if balance:
+        y_train, class_codes = _dense_factor_codes(dv_train, levels=class_levels)
+    elif type_value == "class":
+        y_train, _ = _prepare_y_values(dv_train, type_value=type_value, class_levels=class_levels)
+        class_codes = np.unique(y_train[np.isfinite(y_train)])
     else:
         y_train = _as_vector(dv_train, "dv_train")
+        class_codes = np.empty(0, dtype=np.float64)
     if x_train.shape[0] != y_train.size:
         raise ValueError("ivs_train and dv_train must have the same row count.")
     x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
+    if balance:
+        rng = np.random.default_rng(random_seed)
+        x_train, y_train = _balance_class_training(
+            x_train,
+            y_train,
+            classes=class_codes,
+            rng=rng,
+        )
     methods = _methods(method)
     objective_l = objective.lower()
     if objective_l not in {"min", "max"}:

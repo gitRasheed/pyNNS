@@ -50,17 +50,48 @@ def test_nns_stack_classification_shapes_and_codes() -> None:
     assert first["pred.int"] is None
 
 
-@pytest.mark.parametrize("path", ["balance", "class_pred_int"])
-def test_nns_stack_deferred_paths_raise(path: str) -> None:
+def test_nns_stack_class_pred_int_deferred_path_raises() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
-    y = x + np.sin(x)
 
     with pytest.raises(NotImplementedError):
-        if path == "balance":
-            nns_stack(variable, y, balance=True)
-        else:
-            nns_stack(variable, np.where(x > 0.0, 2.0, 1.0), type="class", pred_int=0.95)
+        nns_stack(variable, np.where(x > 0.0, 2.0, 1.0), type="class", pred_int=0.95)
+
+
+@pytest.mark.stochastic
+def test_nns_stack_balance_shape_codes_and_seed_determinism() -> None:
+    x = np.linspace(-2.0, 2.0, 40)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x < 1.0, 1.0, 2.0)
+    point = variable[:6]
+
+    first = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        type="class",
+        balance=True,
+        random_seed=11,
+    )
+    second = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        type="class",
+        balance=True,
+        random_seed=11,
+    )
+
+    assert first["stack"].shape == (6,)
+    assert np.all(np.isin(first["stack"], np.unique(y)))
+    np.testing.assert_allclose(first["stack"], second["stack"])
+    assert first["pred.int"] is None
 
 
 @pytest.mark.parametrize("method", [(1,), (2,), (1, 2)])

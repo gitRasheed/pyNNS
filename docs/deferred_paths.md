@@ -11,7 +11,6 @@ limits stay visible.
 | Boost | class `pred_int` | Classification interval wiring is not ported | Port class interval parity if an R caller requires it |
 | Boost | `ts_test` | Time-series boost evaluation not ported | Port after ARMA/time-series stack paths |
 | Boost | `pred_int` | Boost interval wiring is not ported | Reuse numeric regression/stack intervals in the boost path |
-| Stack | `balance=True` | R uses down/up sampling helpers not yet ported | Port classification balancing helpers |
 | Stack | class `pred_int` | Classification interval tables are not ported | Port class interval parity if an R caller requires it |
 | Regression | `confidence_interval` with `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility before interval tables can be generated on smoothed fits | Port a minimal R-compatible fixed-spar smoothing spline backend |
 | Regression | `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility; SciPy smoothers are not parity-compatible | Port a minimal R-compatible fixed-spar smoothing spline backend, then enable `nns_reg(smooth=True)` |

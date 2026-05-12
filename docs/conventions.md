@@ -142,9 +142,15 @@ paths using the real `nns_reg` dimension-reduction and multivariate-regression
 internals. `type="class"` is supported for numeric/logical/factor-like targets
 and returns numeric class codes, not labels. Use `class_levels=` to reproduce R
 factor level ordering. Raw string labels remain rejected unless explicit levels
-are supplied. Class balancing and classification prediction intervals remain
-deferred and raise `NotImplementedError`. Numeric prediction intervals are
-supported and are combined by installed R's weighted data.table arithmetic.
+are supplied. `balance=True` is supported for classification and follows R's
+`downSample` + `upSample` structure: each non-empty class is downsampled to the
+minority count without replacement, each class is upsampled to the majority
+count with replacement, and the downsampled rows are concatenated before the
+upsampled rows. Exact sampled-row parity with R is not expected because PyNNS
+uses NumPy's RNG; `random_seed` is a PyNNS-only reproducibility convenience.
+Classification prediction intervals remain deferred and raise
+`NotImplementedError`. Numeric prediction intervals are supported and are
+combined by installed R's weighted data.table arithmetic.
 `ts_test` is supported and follows installed R's split exactly: CV training uses
 the tail `ts_test` rows, while CV testing uses the earlier rows
 `1:(n - ts_test)`. This is intentionally not changed even though it is
