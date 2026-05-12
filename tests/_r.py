@@ -400,6 +400,33 @@ def nns_arma_pred_int(
         return result
 
 
+def nns_cdf_custom(
+    variable: list[float] | list[list[float]],
+    *,
+    degree: float = 0.0,
+    target: float | list[float] | None = None,
+    type: str = "CDF",
+    names: Sequence[str] | None = None,
+) -> RValue:
+    args = {"variable": variable, "degree": degree, "target": target, "type": type, "names": names}
+    key = _cache_key("NNS.CDF.custom", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.CDF.custom with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_cdf_custom(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def _uncached_nns(
     function: str,
     args: tuple[Any, ...],
@@ -873,6 +900,51 @@ def _call_r_arma_pred_int(args: dict[str, Any]) -> RValue:
         "as.numeric(unlist(args$variable)), h = as.integer(args$h), "
         "seasonal.factor = seasonal, method = args$method, "
         "pred.int = as.numeric(args$pred_int), plot = FALSE, seasonal.plot = FALSE)\n"
+        "encode <- function(x) {\n"
+        "  if (is.null(x)) return(NULL)\n"
+        "  if (is.matrix(x) || is.data.frame(x)) {\n"
+        "    out <- lapply(seq_along(x), function(i) as.numeric(x[[i]]))\n"
+        "    names(out) <- names(x)\n"
+        "    return(out)\n"
+        "  }\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA, null = 'null'))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_cdf_custom(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "variable <- args$variable\n"
+        "if (is.list(variable) && length(variable) > 0 && is.list(variable[[1]])) {\n"
+        "  variable <- do.call(rbind, lapply(variable, as.numeric))\n"
+        "  if (!is.null(args$names)) colnames(variable) <- unlist(args$names)\n"
+        "} else {\n"
+        "  variable <- as.numeric(unlist(variable))\n"
+        "}\n"
+        "target <- args$target\n"
+        "if (is.null(target)) {\n"
+        "  result <- NNS::NNS.CDF(variable, degree = as.numeric(args$degree), "
+        "type = args$type, plot = FALSE)\n"
+        "} else {\n"
+        "  target <- as.numeric(unlist(target))\n"
+        "  result <- NNS::NNS.CDF(variable, degree = as.numeric(args$degree), "
+        "target = target, type = args$type, plot = FALSE)\n"
+        "}\n"
         "encode <- function(x) {\n"
         "  if (is.null(x)) return(NULL)\n"
         "  if (is.matrix(x) || is.data.frame(x)) {\n"

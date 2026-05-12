@@ -28,6 +28,7 @@ _EXPORTS = {
     "nns_arma": ("pynns.arma", "nns_arma"),
     "nns_boost": ("pynns.boost", "nns_boost"),
     "nns_causation": ("pynns.causation", "nns_causation"),
+    "nns_cdf": ("pynns.cdf", "nns_cdf"),
     "nns_copula": ("pynns.copula", "nns_copula"),
     "nns_cor": ("pynns.dependence", "nns_cor"),
     "nns_dep": ("pynns.dependence", "nns_dep"),

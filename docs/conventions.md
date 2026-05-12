@@ -59,6 +59,15 @@ cluster labels; when names are omitted, PyNNS uses R-style `X_1`, `X_2`, ...
 names. `type="continuous"` is supported for first-degree efficient sets.
 `dendrogram=True` is deferred because R returns an `hclust` object.
 
+`nns_cdf` maps to R's `NNS.CDF` deterministic non-plotting paths. It is a
+partial-moment distribution wrapper rather than a textbook ECDF: `degree = 0`
+uses R's lower-partial-moment frequency convention, and positive degrees use
+`LPM.ratio` deformation. Univariate output columns follow installed R (`x` plus
+`CDF`, `S(x)`, `h(x)`, or `H(x)`), while multivariate output keeps the final
+column named `CDF` for all types, including survival, hazard, and cumulative
+hazard. Plotting is ignored. The univariate `NA`/`Inf` comparison quirks are
+handled inside `nns_cdf` without loosening the global partial-moment APIs.
+
 ## Dependence
 
 `nns_dep` follows R's `NNS.dep` bivariate path, including `NNS.gravity` handling

@@ -90,6 +90,15 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_sd_cluster_252x50_degree2_seconds" not in cache:
         cache["nns_sd_cluster_252x50_degree2_seconds"] = _time_r_nns_sd_cluster()
         _write_benchmark_baseline(cache)
+    if "nns_cdf_1000_degree0_seconds" not in cache:
+        cache["nns_cdf_1000_degree0_seconds"] = _time_r_nns_cdf_univariate(0)
+        _write_benchmark_baseline(cache)
+    if "nns_cdf_1000_degree2_seconds" not in cache:
+        cache["nns_cdf_1000_degree2_seconds"] = _time_r_nns_cdf_univariate(2)
+        _write_benchmark_baseline(cache)
+    if "nns_cdf_500x3_degree1_seconds" not in cache:
+        cache["nns_cdf_500x3_degree1_seconds"] = _time_r_nns_cdf_multivariate()
+        _write_benchmark_baseline(cache)
     if "nns_dep_1000_seconds" not in cache:
         cache["nns_dep_1000_seconds"] = _time_r_nns_dep()
         _write_benchmark_baseline(cache)
@@ -322,6 +331,46 @@ def _time_r_nns_sd_cluster() -> float:
         "}\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 5)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_cdf_univariate(degree: int) -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 1000) + 0.1 * sin(seq_len(1000))\n"
+        f"invisible(NNS::NNS.CDF(x, degree = {degree}, type = 'CDF', plot = FALSE))\n"
+        "times <- replicate(20, system.time(invisible(NNS::NNS.CDF(x, "
+        f"degree = {degree}, type = 'CDF', plot = FALSE)))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_cdf_multivariate() -> float:
+    script = (
+        "library(NNS)\n"
+        "row <- seq_len(500)\n"
+        "col <- seq_len(3)\n"
+        "x <- outer(row, col, function(i, j) sin(i * j / 11) + cos((i + 1) / (j + 2)))\n"
+        "invisible(NNS::NNS.CDF(x, degree = 1, type = 'CDF', plot = FALSE))\n"
+        "times <- replicate(5, system.time(invisible(NNS::NNS.CDF(x, "
+        "degree = 1, type = 'CDF', plot = FALSE)))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

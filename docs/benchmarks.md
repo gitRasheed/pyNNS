@@ -17,6 +17,9 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_sd_cluster`, degree=2, N=50, T_obs=252 | 31.020 ms | 13.800 ms | 2.25x |
 | `nns_sd_cluster`, degree=2, N=100, T_obs=252 | 688.179 ms | 131.200 ms | 5.25x |
 | `nns_sd_cluster`, degree=1 continuous, N=50, T_obs=252 | 47.505 ms | 21.600 ms | 2.20x |
+| `nns_cdf`, T_obs=1000, degree=0, type=CDF | 8.063 ms | 1.100 ms | 7.33x |
+| `nns_cdf`, T_obs=1000, degree=2, type=CDF | 23.560 ms | 1.450 ms | 16.25x |
+| `nns_cdf`, N=3, T_obs=500, degree=1, type=CDF | 45.009 ms | 56.600 ms | 0.80x |
 | `nns_dep`, T_obs=1000 | 7.465 ms | 11.300 ms | 0.66x |
 | `nns_copula`, T_obs=1000 | 0.524 ms | 4.800 ms | 0.11x |
 | `nns_causation`, T_obs=1000 | 23.572 ms | 97.600 ms | 0.24x |

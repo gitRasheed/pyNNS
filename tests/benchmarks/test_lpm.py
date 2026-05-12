@@ -11,6 +11,7 @@ from pynns import (
     nns_arma,
     nns_boost,
     nns_causation,
+    nns_cdf,
     nns_copula,
     nns_dep,
     nns_diff,
@@ -86,6 +87,38 @@ def test_nns_sd_cluster_252x50_degree2(
 
     assert isinstance(result["Clusters"], dict)
     assert isinstance(r_baseline["nns_sd_cluster_252x50_degree2_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_cdf_1000_degree0(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 1000) + 0.1 * np.sin(np.arange(1000, dtype=np.float64))
+
+    result = benchmark(nns_cdf, x, degree=0.0, type="CDF")
+
+    assert set(result) == {"Function", "target.value"}
+    assert isinstance(r_baseline["nns_cdf_1000_degree0_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_cdf_1000_degree2(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 1000) + 0.1 * np.sin(np.arange(1000, dtype=np.float64))
+
+    result = benchmark(nns_cdf, x, degree=2.0, type="CDF")
+
+    assert set(result) == {"Function", "target.value"}
+    assert isinstance(r_baseline["nns_cdf_1000_degree2_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_cdf_500x3_degree1(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    row = np.arange(1, 501, dtype=np.float64)[:, np.newaxis]
+    col = np.arange(1, 4, dtype=np.float64)[np.newaxis, :]
+    variable = np.sin(row * col / 11.0) + np.cos((row + 1.0) / (col + 2.0))
+
+    result = benchmark(nns_cdf, variable, degree=1.0, type="CDF")
+
+    assert set(result) == {"Function", "target.value"}
+    assert isinstance(r_baseline["nns_cdf_500x3_degree1_seconds"], float)
 
 
 @pytest.mark.benchmark

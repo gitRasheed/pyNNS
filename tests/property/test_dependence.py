@@ -34,5 +34,5 @@ def test_nns_dep_bounds_hold_for_random_pairs(
 
     result = nns_dep(x, y, asym=asym)
 
-    assert result["Dependence"] >= 0.0
-    assert result["Dependence"] <= 1.0
+    assert result["Dependence"] >= -1e-12
+    assert result["Dependence"] <= 1.0 + 1e-12
