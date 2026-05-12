@@ -45,6 +45,36 @@ def kurt_pm(x: NDArray[np.float64], excess: bool = True) -> float:
     return kurtosis
 
 
+def nns_moments(x: NDArray[np.float64], population: bool = True) -> dict[str, float]:
+    """Return R NNS.moments' first four partial-moment moments."""
+    values = _as_1d_values(x)
+    n = values.size
+    center = float(np.mean(values))
+    mean = float(upm(1, 0.0, values) - lpm(1, 0.0, values))
+    variance = float(upm(2, center, values) + lpm(2, center, values))
+    skew_base = float(upm(3, center, values) - lpm(3, center, values))
+    kurt_base = float(upm(4, center, values) + lpm(4, center, values))
+
+    if population:
+        skewness = float(skew_base / variance**1.5)
+        kurtosis = float(kurt_base / variance**2 - 3.0)
+    else:
+        skewness = float((n / ((n - 1) * (n - 2))) * ((n * skew_base) / variance**1.5))
+        kurtosis = float(
+            ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3)))
+            * ((n * kurt_base) / (variance * (n / (n - 1))) ** 2)
+            - ((3 * ((n - 1) ** 2)) / ((n - 2) * (n - 3)))
+        )
+        variance = float(variance * (n / (n - 1)))
+
+    return {
+        "mean": mean,
+        "variance": variance,
+        "skewness": skewness,
+        "kurtosis": kurtosis,
+    }
+
+
 def ecdf_pm(
     x: NDArray[np.float64],
     points: NDArray[np.float64] | None = None,

@@ -58,7 +58,7 @@ def nns_boost(
     if pred_int is not None:
         if type_value == "class":
             raise NotImplementedError("nns_boost pred_int for classification is not yet ported.")
-        raise NotImplementedError("pred_int requires regression interval paths, deferred.")
+        raise NotImplementedError("nns_boost pred_int requires boost-specific interval wiring.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
     x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])

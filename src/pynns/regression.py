@@ -524,8 +524,8 @@ def _dimred_tau(tau: object | None) -> int:
         return 0
     if tau == "ts":
         raise NotImplementedError(
-            "tau='ts' requires NNS.seas (seasonality detection), which is not yet ported in PyNNS. "
-            "Use tau='cs' or a numeric lag instead."
+            "nns_reg dim_red_method with tau='ts' requires wiring NNS.seas-derived "
+            "lags into the dim-red path, which is not yet ported."
         )
     tau_value = int(cast(Any, tau))
     if tau_value < 0:
@@ -615,7 +615,7 @@ def _reject_deferred_paths(
     multivariate_call: bool,
 ) -> None:
     if x.ndim != 1:
-        raise NotImplementedError("matrix x input requires NNS.M.reg, which is not yet ported.")
+        raise NotImplementedError("matrix x input should be dispatched to nns_m_reg.")
     if dim_red_method is not None:
         raise NotImplementedError(
             "dim_red_method paths are deferred until dimension reduction is ported."
@@ -631,10 +631,14 @@ def _reject_deferred_paths(
         )
     if point_only:
         raise NotImplementedError(
-            "point_only is deferred until multivariate regression callers are ported."
+            "bare univariate point_only=True is deferred; use nns_m_reg point_only or "
+            "dim_red_method point_only paths."
         )
     if point_est is not None and np.asarray(point_est).ndim > 1:
-        raise NotImplementedError("matrix point_est requires NNS.M.reg, which is not yet ported.")
+        raise NotImplementedError(
+            "matrix point_est is only supported for matrix x via nns_m_reg; univariate "
+            "nns_reg requires scalar or 1D point_est."
+        )
 
 
 def _validate_noise_reduction(value: str) -> NoiseReduction:
@@ -653,7 +657,10 @@ def _as_point_est(point_est: NDArray[np.float64] | float | None) -> NDArray[np.f
     if values.ndim == 0:
         values = values.reshape(1)
     if values.ndim != 1:
-        raise NotImplementedError("matrix point_est requires NNS.M.reg, which is not yet ported.")
+        raise NotImplementedError(
+            "matrix point_est is only supported for matrix x via nns_m_reg; univariate "
+            "nns_reg requires scalar or 1D point_est."
+        )
     if not np.all(np.isfinite(values)):
         raise ValueError("point_est must contain only finite values.")
     return values

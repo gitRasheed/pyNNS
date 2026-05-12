@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from _r import RValue, nns
 
-from pynns import fsd, sd_efficient_set, ssd, tsd
+from pynns import fsd, fsd_uni, sd_efficient_set, ssd, ssd_uni, tsd, tsd_uni
 
 SIZES = [50, 200, 1000]
 
@@ -36,6 +36,41 @@ def test_sd_functions_match_r(
     expected = _sd_result_from_r(r_name, x, y, x_dominates, y_dominates, none)
 
     assert function(x, y) == expected
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize(
+    ("r_name", "function"),
+    [
+        ("NNS.FSD.uni", fsd_uni),
+        ("NNS.SSD.uni", ssd_uni),
+        ("NNS.TSD.uni", tsd_uni),
+    ],
+)
+@pytest.mark.parametrize("case", ["dominance", "reverse", "crossing", "identical"])
+def test_sd_uni_wrappers_match_r(
+    r_name: str,
+    function: Callable[..., int],
+    case: str,
+) -> None:
+    x, y = _uni_pair(case)
+    if r_name == "NNS.FSD.uni":
+        r_value = nns(r_name, x.tolist(), y.tolist(), "discrete")
+        expected_value = int(np.asarray(r_value).reshape(-1)[0])
+        actual = function(x, y, "discrete")
+    else:
+        bidirectional = _sd_result_from_r(
+            r_name.removesuffix(".uni"),
+            x,
+            y,
+            f"X {r_name[4:7]} Y",
+            f"Y {r_name[4:7]} X",
+            f"NO {r_name[4:7]} EXISTS",
+        )
+        expected_value = 1 if bidirectional == 1 else 0
+        actual = function(x, y)
+
+    assert actual == expected_value
 
 
 @pytest.mark.parity
@@ -91,6 +126,17 @@ def _pair(
         y = np.concatenate((np.full(half, 0.0), np.full(size - half, 0.7)))
         return x, y
     return rng.normal(size=size), rng.normal(size=size)
+
+
+def _uni_pair(case: str) -> tuple[np.ndarray, np.ndarray]:
+    base = np.array([-1.0, -0.25, 0.5, 1.0, 2.0], dtype=np.float64)
+    if case == "dominance":
+        return base + 0.5, base
+    if case == "reverse":
+        return base, base + 0.5
+    if case == "crossing":
+        return np.array([-1.0, 0.0, 3.0, 3.5]), np.array([-0.5, 1.0, 1.5, 2.0])
+    return base, base.copy()
 
 
 def _sd_result_from_r(

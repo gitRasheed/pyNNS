@@ -23,6 +23,14 @@ def fsd(x: NDArray[np.float64], y: NDArray[np.float64]) -> int:
     return _sd_result(x_values, y_values, 1)
 
 
+def fsd_uni(x: NDArray[np.float64], y: NDArray[np.float64], type: str = "discrete") -> int:
+    """Unidirectional first-order stochastic dominance: 1 if x dominates y, else 0."""
+    x_values = _as_sd_values(x, "x")
+    y_values = _as_sd_values(y, "y")
+    discrete = type.lower() != "continuous"
+    return int(_dominates_uni(x_values, y_values, 1, discrete=discrete))
+
+
 def ssd(x: NDArray[np.float64], y: NDArray[np.float64]) -> int:
     """Second-order stochastic dominance."""
     x_values = _as_sd_values(x, "x")
@@ -30,11 +38,25 @@ def ssd(x: NDArray[np.float64], y: NDArray[np.float64]) -> int:
     return _sd_result(x_values, y_values, 2)
 
 
+def ssd_uni(x: NDArray[np.float64], y: NDArray[np.float64]) -> int:
+    """Unidirectional second-order stochastic dominance: 1 if x dominates y, else 0."""
+    x_values = _as_sd_values(x, "x")
+    y_values = _as_sd_values(y, "y")
+    return int(_dominates_uni(x_values, y_values, 2, discrete=True))
+
+
 def tsd(x: NDArray[np.float64], y: NDArray[np.float64]) -> int:
     """Third-order stochastic dominance."""
     x_values = _as_sd_values(x, "x")
     y_values = _as_sd_values(y, "y")
     return _sd_result(x_values, y_values, 3)
+
+
+def tsd_uni(x: NDArray[np.float64], y: NDArray[np.float64]) -> int:
+    """Unidirectional third-order stochastic dominance: 1 if x dominates y, else 0."""
+    x_values = _as_sd_values(x, "x")
+    y_values = _as_sd_values(y, "y")
+    return int(_dominates_uni(x_values, y_values, 3, discrete=True))
 
 
 def sd_efficient_set(returns: NDArray[np.float64], degree: int) -> list[int]:
@@ -91,6 +113,16 @@ def _sd_result(x: NDArray[np.float64], y: NDArray[np.float64], degree: int) -> i
 
 
 def _dominates(x: NDArray[np.float64], y: NDArray[np.float64], degree: int) -> bool:
+    return _dominates_uni(x, y, degree, discrete=True)
+
+
+def _dominates_uni(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    degree: int,
+    *,
+    discrete: bool,
+) -> bool:
     if x.size != y.size:
         raise ValueError("x and y must have the same length.")
     if np.array_equal(np.sort(x), np.sort(y)):
@@ -101,8 +133,8 @@ def _dominates(x: NDArray[np.float64], y: NDArray[np.float64], degree: int) -> b
         return False
 
     grid = np.sort(np.concatenate((x, y)))
-    x_lpm = _dominance_curve(x, grid, degree)
-    y_lpm = _dominance_curve(y, grid, degree)
+    x_lpm = _dominance_curve(x, grid, degree, discrete=discrete)
+    y_lpm = _dominance_curve(y, grid, degree, discrete=discrete)
     if np.array_equal(x_lpm, y_lpm):
         return False
     return bool(not np.any(x_lpm > y_lpm))
@@ -112,9 +144,11 @@ def _dominance_curve(
     values: NDArray[np.float64],
     grid: NDArray[np.float64],
     degree: int,
+    *,
+    discrete: bool = True,
 ) -> NDArray[np.float64]:
     if degree == 1:
-        return np.asarray(lpm(0, grid, values), dtype=np.float64)
+        return np.asarray(lpm(0 if discrete else 1, grid, values), dtype=np.float64)
     return np.asarray(lpm(degree - 1, grid, values), dtype=np.float64)
 
 

@@ -182,9 +182,9 @@ def _dpm_nd(
     discordant = ~(all_below | all_above)
 
     if degree == 0.0:
-        dpm = float(np.mean(discordant))
+        return float(np.mean(discordant))
     else:
-        values = np.prod(np.abs(diff), axis=1)
+        values = np.prod(np.abs(diff) ** degree, axis=1)
         dpm = float(np.mean(np.where(discordant, values, 0.0)))
 
     if not norm:
@@ -201,7 +201,7 @@ def _clpm_nd(data: NDArray[np.float64], target: NDArray[np.float64], degree: flo
     if degree == 0.0:
         return float(np.mean(np.all(diff >= 0.0, axis=1)))
     valid = np.all(diff >= 0.0, axis=1)
-    return float(np.mean(np.where(valid, np.prod(diff, axis=1), 0.0)))
+    return float(np.mean(np.where(valid, np.prod(diff**degree, axis=1), 0.0)))
 
 
 def _cupm_nd(data: NDArray[np.float64], target: NDArray[np.float64], degree: float) -> float:
@@ -209,7 +209,70 @@ def _cupm_nd(data: NDArray[np.float64], target: NDArray[np.float64], degree: flo
     if degree == 0.0:
         return float(np.mean(np.all(diff >= 0.0, axis=1)))
     valid = np.all(diff >= 0.0, axis=1)
-    return float(np.mean(np.where(valid, np.prod(diff, axis=1), 0.0)))
+    return float(np.mean(np.where(valid, np.prod(diff**degree, axis=1), 0.0)))
+
+
+def co_lpm_nd(
+    data: NDArray[np.float64],
+    target: NDArray[np.float64],
+    degree: float = 0.0,
+    norm: bool = True,
+) -> float:
+    values, target_values = _as_nd_moment_inputs(data, target)
+    degree = float(degree)
+    clpm = _clpm_nd(values, target_values, degree)
+    if not norm or degree == 0.0:
+        return clpm
+    cupm = _cupm_nd(values, target_values, degree)
+    dpm = _dpm_nd(values, target_values, degree, norm=False)
+    total = clpm + cupm + dpm
+    return clpm / total if total > 0.0 else 0.0
+
+
+def co_upm_nd(
+    data: NDArray[np.float64],
+    target: NDArray[np.float64],
+    degree: float = 0.0,
+    norm: bool = True,
+) -> float:
+    values, target_values = _as_nd_moment_inputs(data, target)
+    degree = float(degree)
+    cupm = _cupm_nd(values, target_values, degree)
+    if not norm or degree == 0.0:
+        return cupm
+    clpm = _clpm_nd(values, target_values, degree)
+    dpm = _dpm_nd(values, target_values, degree, norm=False)
+    total = clpm + cupm + dpm
+    return cupm / total if total > 0.0 else 0.0
+
+
+def dpm_nd(
+    data: NDArray[np.float64],
+    target: NDArray[np.float64],
+    degree: float = 0.0,
+    norm: bool = True,
+) -> float:
+    values, target_values = _as_nd_moment_inputs(data, target)
+    return _dpm_nd(values, target_values, float(degree), norm=bool(norm))
+
+
+def _as_nd_moment_inputs(
+    data: NDArray[np.float64],
+    target: NDArray[np.float64],
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    values = np.asarray(data, dtype=np.float64)
+    target_values = np.asarray(target, dtype=np.float64).reshape(-1)
+    if values.ndim != 2:
+        raise ValueError("data must be a 2D matrix.")
+    if values.shape[0] == 0:
+        raise ValueError("data must have at least one row.")
+    if target_values.size != values.shape[1]:
+        raise ValueError("target length must match number of columns in data.")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("data must be finite.")
+    if not np.all(np.isfinite(target_values)):
+        raise ValueError("target must be finite.")
+    return values, target_values
 
 
 def _gravity(x: NDArray[np.float64]) -> float:

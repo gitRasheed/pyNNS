@@ -88,7 +88,7 @@ def test_nns_reg_confidence_interval_none_output_unchanged() -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["smooth", "smooth_confidence", "point_only"],
+    ["smooth", "smooth_confidence", "point_only", "dimred_tau_ts", "matrix_point_est"],
 )
 def test_nns_reg_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
@@ -101,6 +101,11 @@ def test_nns_reg_deferred_paths_raise(path: str) -> None:
             nns_reg(x, y, smooth=True, confidence_interval=0.95)
         elif path == "point_only":
             nns_reg(x, y, point_only=True)
+        elif path == "dimred_tau_ts":
+            matrix = np.column_stack((x, np.cos(x)))
+            nns_reg(matrix, y, dim_red_method="NNS.caus", tau="ts")
+        elif path == "matrix_point_est":
+            nns_reg(x, y, point_est=np.array([[0.0], [1.0]]))
         else:
             nns_reg(x, y, multivariate_call=True)
 

@@ -64,6 +64,53 @@ def nns_mode(
     return _continuous_mode(finite, multi)
 
 
+def nns_gravity(x: NDArray[np.float64], discrete: bool = False) -> float:
+    """Alternative central tendency matching R's NNS.gravity."""
+    values = np.asarray(x, dtype=np.float64)
+    finite = np.sort(values[np.isfinite(values)])
+    n = finite.size
+    if n == 0:
+        return float("nan")
+    if n <= 3:
+        median = float(np.median(finite))
+        return _nearest_int_half_up(median) if discrete else median
+    if bool(np.all(finite == finite[0])):
+        return float(finite[0])
+
+    value_range = float(abs(finite[-1] - finite[0]))
+    if value_range == 0.0:
+        return float(finite[0])
+
+    q1, q2, q3 = _quartiles_like_r_code(finite)
+    width = (q3 - q1) * n**-0.5
+    if width <= 0.0 or not np.isfinite(width):
+        width = value_range / 128.0
+
+    bin_names, counts = _simple_bin_counts(finite, width, float(finite[0]))
+    max_count = int(np.max(counts))
+    max_positions = np.flatnonzero(counts == max_count)
+    if max_positions.size == 1:
+        center = int(max_positions[0])
+        lo = max(0, center - 1)
+        hi = min(counts.size - 1, center + 1)
+    else:
+        lo = 0
+        hi = counts.size - 1
+
+    selected_names = bin_names[lo : hi + 1]
+    selected_counts = counts[lo : hi + 1]
+    denominator = float(np.sum(selected_counts))
+    mode_gravity = (
+        float(np.sum(selected_names * selected_counts) / denominator)
+        if denominator > 0.0
+        else float(bin_names[(lo + hi) // 2])
+    )
+    out = 0.25 * (q2 + mode_gravity + float(np.mean(finite)) + 0.5 * (q1 + q3))
+    if not math.isfinite(out):
+        out = q2
+    return _nearest_int_half_up(out) if discrete else float(out)
+
+
 def _discrete_mode(values: NDArray[np.float64], multi: bool) -> float | NDArray[np.float64]:
     n = values.size
     if n <= 3:

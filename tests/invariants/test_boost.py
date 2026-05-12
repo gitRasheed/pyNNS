@@ -56,6 +56,15 @@ def test_nns_boost_deferred_paths_raise(path: str) -> None:
             nns_boost(variable, y, pred_int=0.95)
 
 
+def test_nns_boost_numeric_pred_int_guard_is_current() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    variable = np.column_stack((x, np.sin(x)))
+    y = x + np.sin(x)
+
+    with pytest.raises(NotImplementedError, match="boost-specific interval wiring"):
+        nns_boost(variable, y, pred_int=0.95)
+
+
 def test_nns_boost_class_pred_int_raises() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))

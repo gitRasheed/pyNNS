@@ -36,6 +36,13 @@ default, matching NumPy defaults and `NNS.moments(population = TRUE)`. `var_pm`
 accepts `ddof` for NumPy-style variance scaling. `skew_pm` and `kurt_pm` do not
 apply SciPy's optional finite-sample bias correction.
 
+`nns_moments` is the public `NNS.moments` wrapper and returns R's dictionary
+shape with `mean`, `variance`, `skewness`, and `kurtosis`. `nns_gravity` exposes
+R's public `NNS.gravity` central-tendency helper. `fsd_uni`, `ssd_uni`, and
+`tsd_uni` are the unidirectional stochastic-dominance wrappers behind R's
+`.uni` exports. `co_lpm_nd`, `co_upm_nd`, and `dpm_nd` expose the public
+n-dimensional partial-moment wrappers.
+
 ## Dependence
 
 `nns_dep` follows R's `NNS.dep` bivariate path, including `NNS.gravity` handling
