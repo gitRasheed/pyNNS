@@ -473,6 +473,31 @@ def test_nns_boost_class_50x3(benchmark: Any, r_baseline: dict[str, object]) -> 
 
 
 @pytest.mark.benchmark
+def test_nns_boost_class_balance_80x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-2.0, 2.0, 80)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x < -0.75, 1.0, np.where(x > 1.0, 3.0, 2.0))
+
+    result = benchmark(
+        nns_boost,
+        variable,
+        y,
+        variable[:10],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=2,
+        type="class",
+        balance=True,
+        random_seed=42,
+        feature_importance=False,
+    )
+
+    assert result["results"].shape == (10,)
+    assert np.all(np.isin(result["results"], np.unique(y)))
+    assert isinstance(r_baseline["nns_boost_class_balance_80x3_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_mode_continuous_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.concatenate((np.linspace(-3.0, 3.0, 500), np.linspace(1.0, 2.0, 500)))
 

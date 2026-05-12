@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 
+import pynns.boost as boost_module
 from pynns import nns_boost
 
 
@@ -40,16 +43,14 @@ def test_nns_boost_class_shapes_and_codes() -> None:
     assert result["pred.int"] is None
 
 
-@pytest.mark.parametrize("path", ["balance", "ts", "interval"])
+@pytest.mark.parametrize("path", ["ts", "interval"])
 def test_nns_boost_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
     y = x + np.sin(x)
 
     with pytest.raises(NotImplementedError):
-        if path == "balance":
-            nns_boost(variable, y, balance=True)
-        elif path == "ts":
+        if path == "ts":
             nns_boost(variable, y, ts_test=4)
         else:
             nns_boost(variable, y, pred_int=0.95)
@@ -74,3 +75,83 @@ def test_nns_boost_rejects_unported_stochastic_epoch_path() -> None:
         match="n_features > 10 requires R's stochastic epoch keeper loop",
     ):
         nns_boost(variable, y, variable[:3], cv_size=0.25, feature_importance=False)
+
+
+@pytest.mark.stochastic
+def test_nns_boost_balance_shape_codes_and_seed_determinism() -> None:
+    x = np.linspace(-2.0, 2.0, 42)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x < 1.0, 1.0, 2.0)
+
+    first = nns_boost(
+        variable,
+        y,
+        variable[:6],
+        cv_size=0.25,
+        depth=1,
+        type="class",
+        balance=True,
+        random_seed=11,
+        feature_importance=False,
+    )
+    second = nns_boost(
+        variable,
+        y,
+        variable[:6],
+        cv_size=0.25,
+        depth=1,
+        type="class",
+        balance=True,
+        random_seed=11,
+        feature_importance=False,
+    )
+
+    assert first["results"].shape == (6,)
+    assert np.all(np.isin(first["results"], np.unique(y)))
+    np.testing.assert_allclose(first["results"], second["results"])
+    np.testing.assert_allclose(first["feature.frequency"], second["feature.frequency"])
+
+
+def test_nns_boost_balance_does_not_enable_stochastic_epoch_path() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    variable = np.column_stack([np.sin((idx + 1) * x) for idx in range(11)])
+    y = np.where(x > 0.0, 2.0, 1.0)
+
+    with pytest.raises(
+        NotImplementedError,
+        match="n_features > 10 requires R's stochastic epoch keeper loop",
+    ):
+        nns_boost(variable, y, variable[:3], type="class", balance=True, random_seed=1)
+
+
+def test_nns_boost_balance_retries_ordinary_fit_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x < 1.0, 1.0, 2.0)
+    original = boost_module._nns_boost_core
+    calls = {"count": 0}
+
+    def fail_first(*args: Any, **kwargs: Any) -> dict[str, object]:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("ordinary fit failure")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(boost_module, "_nns_boost_core", fail_first)
+
+    with pytest.warns(RuntimeWarning, match="retrying with balance = False"):
+        result = nns_boost(
+            variable,
+            y,
+            variable[:4],
+            type="class",
+            balance=True,
+            cv_size=0.25,
+            depth=1,
+            random_seed=2,
+            feature_importance=False,
+        )
+
+    assert calls["count"] == 2
+    assert result["results"].shape == (4,)
+    assert np.all(np.isin(result["results"], np.unique(y)))

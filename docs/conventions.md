@@ -165,15 +165,19 @@ paths and uses the real `nns_reg` and `nns_stack` implementations. The
 small-feature path (`n_features <= 10`, where R evaluates all feature
 combinations) is supported. `type="class"` returns numeric class codes, not
 labels; use `class_levels=` to reproduce R factor level ordering. Raw string
-labels remain rejected unless explicit levels are supplied. The stochastic epoch
-keeper path for `n_features > 10` is not yet ported and raises
-`NotImplementedError`. Class balancing, prediction intervals, and `ts_test` are
+labels remain rejected unless explicit levels are supplied. `balance=True` is
+supported for deterministic small-feature classification and uses the same
+R-style `downSample` + `upSample` structure as `nns_stack`; exact sampled-row
+parity with R is not expected because PyNNS uses NumPy's RNG, and `random_seed`
+is PyNNS-only. The stochastic epoch keeper path for `n_features > 10` is not yet
+ported and raises `NotImplementedError`. Prediction intervals and `ts_test` are
 also deferred and raise `NotImplementedError`. R requires usable column names
 for matrix inputs; PyNNS uses positional numeric columns. As with `nns_stack`, R
 samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
 `cv_size=0.25` unless specified. For classification boost, final predictions,
-feature weights, and feature frequencies are parity-tested against installed R.
-The public `n.best` value is structural-only because R's final internal
+feature weights, and feature frequencies are parity-tested against installed R
+when balance is disabled and structurally tested when balance sampling is
+enabled. The public `n.best` value is structural-only because R's final internal
 `NNS.stack` call samples its own `CV.size = NULL` split, while PyNNS keeps the
 deterministic stack default.
 

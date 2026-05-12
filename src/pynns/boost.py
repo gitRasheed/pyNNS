@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import itertools
 import math
+import warnings
 from collections.abc import Callable
 from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
 
+from pynns.categorical import _balance_class_training, _dense_factor_codes
 from pynns.dependence import _gravity
 from pynns.regression import (
     Order,
@@ -50,9 +52,7 @@ def nns_boost(
     del status
     type_value = _normalize_type(type)
     if balance:
-        raise NotImplementedError(
-            "nns_boost balance=True requires R down/up sampling helpers, which are not yet ported."
-        )
+        type_value = "class"
     if ts_test is not None:
         raise NotImplementedError("ts_test requires the time-series boost path, deferred.")
     if pred_int is not None:
@@ -61,17 +61,102 @@ def nns_boost(
         raise NotImplementedError("pred_int requires regression interval paths, deferred.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
-    if type_value == "class":
+    x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
+    if balance:
+        y_train, class_codes = _dense_factor_codes(dv_train, levels=class_levels)
+    elif type_value == "class":
         y_train, _ = _prepare_y_values(
             dv_train,
             type_value=type_value,
             class_levels=class_levels,
         )
+        class_codes = np.unique(y_train[np.isfinite(y_train)])
     else:
         y_train = _as_vector(dv_train, "dv_train")
+        class_codes = np.empty(0, dtype=np.float64)
     if x_train.shape[0] != y_train.size:
         raise ValueError("ivs_train and dv_train must have the same row count.")
-    x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
+    if x_train.shape[1] > 10:
+        raise NotImplementedError(
+            "nns_boost for n_features > 10 requires R's stochastic epoch keeper loop, "
+            "which is not yet ported. Use <=10 features or port the epoch loop first."
+        )
+    rng = np.random.default_rng(random_seed)
+    if balance:
+        x_train, y_train = _balance_class_training(
+            x_train,
+            y_train,
+            classes=class_codes,
+            rng=rng,
+        )
+
+    try:
+        return _nns_boost_core(
+            x_train,
+            y_train,
+            x_test,
+            type_value=type_value,
+            depth=depth,
+            learner_trials=learner_trials,
+            cv_size=cv_size,
+            threshold=threshold,
+            obj_fn=obj_fn,
+            objective=objective,
+            extreme=extreme,
+            features_only=features_only,
+            feature_importance=feature_importance,
+            rng=rng,
+        )
+    except NotImplementedError:
+        raise
+    except Exception:
+        if not balance:
+            raise
+        warnings.warn(
+            "[retry] First attempt failed; retrying with balance = False",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return nns_boost(
+            ivs_train,
+            dv_train,
+            ivs_test,
+            type=type,
+            depth=depth,
+            learner_trials=learner_trials,
+            epochs=epochs,
+            cv_size=cv_size,
+            balance=False,
+            ts_test=ts_test,
+            threshold=threshold,
+            obj_fn=obj_fn,
+            objective=objective,
+            extreme=extreme,
+            features_only=features_only,
+            feature_importance=feature_importance,
+            pred_int=pred_int,
+            random_seed=random_seed,
+            class_levels=class_levels,
+        )
+
+
+def _nns_boost_core(
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.float64],
+    x_test: NDArray[np.float64],
+    *,
+    type_value: str | None,
+    depth: Order,
+    learner_trials: int,
+    cv_size: float | None,
+    threshold: float | None,
+    obj_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float] | None,
+    objective: Objective,
+    extreme: bool,
+    features_only: bool,
+    feature_importance: bool,
+    rng: np.random.Generator,
+) -> BoostResult:
     objective_l = objective.lower()
     if objective_l not in {"min", "max"}:
         raise ValueError("objective must be 'min' or 'max'.")
@@ -81,14 +166,8 @@ def nns_boost(
         objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float] = _accuracy
     else:
         objective_fn = _sse if obj_fn is None else obj_fn
-    rng = np.random.default_rng(random_seed)
 
     n_rows, n_cols = x_train.shape
-    if n_cols > 10:
-        raise NotImplementedError(
-            "nns_boost for n_features > 10 requires R's stochastic epoch keeper loop, "
-            "which is not yet ported. Use <=10 features or port the epoch loop first."
-        )
     feature_sets = _all_feature_sets(n_cols)
     deterministic = (len(feature_sets) < n_rows) or n_cols <= 10
     if deterministic:

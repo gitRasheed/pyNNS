@@ -7,7 +7,6 @@ limits stay visible.
 |---|---|---|---|
 | ARMA.optim | default optimizer path | Default optimizer evaluates `nns_reg(..., smooth=True)`, so it cannot be faithfully ported until smooth regression is real | Port `smooth=True` first, then `NNS.ARMA.optim` |
 | Boost | `n_features > 10` stochastic epoch keeper loop | R uses stochastic epoch loop not yet ported | Port stochastic boost epoch loop |
-| Boost | `balance=True` | R uses down/up sampling helpers not yet ported | Port classification balancing helpers |
 | Boost | class `pred_int` | Classification interval wiring is not ported | Port class interval parity if an R caller requires it |
 | Boost | `ts_test` | Time-series boost evaluation not ported | Port after ARMA/time-series stack paths |
 | Boost | `pred_int` | Boost interval wiring is not ported | Reuse numeric regression/stack intervals in the boost path |
