@@ -106,6 +106,25 @@ def test_sd_efficient_set_matches_r(
     assert _strings(expected) == [f"X_{index + 1}" for index in sd_efficient_set(returns, degree)]
 
 
+@pytest.mark.parity
+def test_sd_efficient_set_continuous_fsd_matches_r() -> None:
+    row = np.arange(1, 9, dtype=np.float64)
+    returns = np.column_stack(
+        [
+            0.2 * row,
+            np.sin(row),
+            np.cos(row) + 0.1 * row,
+            np.where(row % 2 == 0, 1.0, -1.0),
+        ]
+    )
+
+    expected = nns("NNS.SD.efficient.set", returns.tolist(), 1, "continuous", False)
+
+    assert _strings(expected) == [
+        f"X_{index + 1}" for index in sd_efficient_set(returns, 1, type="continuous")
+    ]
+
+
 SDPairFunction = Callable[[np.ndarray, np.ndarray], int]
 
 

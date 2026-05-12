@@ -8,7 +8,7 @@ C++ routine's LPM-at-global-maximum ordering and original-index tie break.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -59,7 +59,80 @@ def tsd_uni(x: NDArray[np.float64], y: NDArray[np.float64]) -> int:
     return int(_dominates_uni(x_values, y_values, 3, discrete=True))
 
 
-def sd_efficient_set(returns: NDArray[np.float64], degree: int) -> list[int]:
+def nns_sd_cluster(
+    data: NDArray[np.float64],
+    degree: int = 1,
+    type: str = "discrete",
+    min_cluster: int = 1,
+    dendrogram: bool = False,
+    names: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Cluster variables by iteratively peeling stochastic-dominance efficient sets."""
+    if dendrogram:
+        raise NotImplementedError(
+            "nns_sd_cluster(dendrogram=True) requires R hclust-compatible dendrogram "
+            "output, which is not yet ported."
+        )
+
+    values = np.asarray(data, dtype=np.float64)
+    if values.ndim != 2:
+        raise ValueError("data must be a 2D array.")
+    if values.shape[0] == 0:
+        raise ValueError("data must have at least one row.")
+    if not 1 <= int(degree) <= 3:
+        raise ValueError("degree must be 1, 2, or 3.")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("data must contain only finite values.")
+    min_cluster = int(min_cluster)
+    if min_cluster < 0:
+        raise ValueError("min_cluster must be non-negative.")
+
+    column_count = values.shape[1]
+    if names is None:
+        remaining_names = [f"X_{index + 1}" for index in range(column_count)]
+    else:
+        remaining_names = [str(name) for name in names]
+        if len(remaining_names) != column_count:
+            raise ValueError("names length must match the number of data columns.")
+
+    remaining = values
+    clusters: dict[str, list[str]] = {}
+    iteration = 1
+
+    while remaining.shape[1] > min_cluster:
+        sd_set = _sd_efficient_set_names(remaining, int(degree), type, remaining_names)
+        if not sd_set:
+            break
+
+        clusters[f"Cluster_{iteration}"] = sd_set
+        remove = set(sd_set)
+        keep_mask = [name not in remove for name in remaining_names]
+        remaining = remaining[:, keep_mask]
+        remaining_names = [name for name in remaining_names if name not in remove]
+        iteration += 1
+
+        if remaining.shape[1] <= min_cluster:
+            clusters[f"Cluster_{iteration}"] = list(remaining_names)
+            break
+
+    if remaining.shape[1] > min_cluster and f"Cluster_{iteration}" not in clusters:
+        clusters[f"Cluster_{iteration}"] = list(remaining_names)
+
+    if clusters:
+        final_cluster_name = f"Cluster_{len(clusters)}"
+        if len(clusters[final_cluster_name]) < min_cluster and len(clusters) > 1:
+            previous_cluster_name = f"Cluster_{len(clusters) - 1}"
+            clusters[previous_cluster_name].extend(clusters[final_cluster_name])
+            del clusters[final_cluster_name]
+
+    return {"Clusters": clusters}
+
+
+def sd_efficient_set(
+    returns: NDArray[np.float64],
+    degree: int,
+    type: str = "discrete",
+) -> list[int]:
     """Return indices of non-dominated columns at the requested SD degree."""
     values = np.asarray(returns, dtype=np.float64)
     if values.ndim != 2:
@@ -71,11 +144,16 @@ def sd_efficient_set(returns: NDArray[np.float64], degree: int) -> list[int]:
     if not np.all(np.isfinite(values)):
         raise ValueError("returns must contain only finite values.")
 
+    type_value = type.lower()
+    if degree == 1 and type_value not in {"discrete", "continuous"}:
+        type_value = "discrete"
+    discrete = degree != 1 or type_value != "continuous"
+
     if values.shape[1] == 0:
         return []
 
     sorted_values = np.sort(values, axis=0)
-    curves = _sd_curve_table(sorted_values, degree)
+    curves = _sd_curve_table(sorted_values, degree, discrete=discrete)
     minimums = sorted_values[0, :]
     means = np.mean(values, axis=0)
     tmax = float(np.max(values))
@@ -102,6 +180,15 @@ def sd_efficient_set(returns: NDArray[np.float64], degree: int) -> list[int]:
         if not dominated:
             keep.append(index)
     return keep
+
+
+def _sd_efficient_set_names(
+    values: NDArray[np.float64],
+    degree: int,
+    type: str,
+    names: Sequence[str],
+) -> list[str]:
+    return [names[index] for index in sd_efficient_set(values, degree, type=type)]
 
 
 def _sd_result(x: NDArray[np.float64], y: NDArray[np.float64], degree: int) -> int:
@@ -148,7 +235,17 @@ def _dominance_curve(
     discrete: bool = True,
 ) -> NDArray[np.float64]:
     if degree == 1:
-        return np.asarray(lpm(0 if discrete else 1, grid, values), dtype=np.float64)
+        if discrete:
+            return np.asarray(lpm(0, grid, values), dtype=np.float64)
+        lower = np.asarray(lpm(1, grid, values), dtype=np.float64)
+        upper = np.mean(np.maximum(0.0, values - grid[:, np.newaxis]), axis=1)
+        ratio: NDArray[np.float64] = np.divide(
+            lower,
+            lower + upper,
+            out=np.zeros_like(lower),
+            where=(lower + upper) != 0,
+        )
+        return ratio
     return np.asarray(lpm(degree - 1, grid, values), dtype=np.float64)
 
 
@@ -178,13 +275,18 @@ def _dominates_from_curves(
 def _sd_curve_table(
     sorted_values: NDArray[np.float64],
     degree: int,
+    *,
+    discrete: bool = True,
 ) -> NDArray[np.float64]:
     grid = np.unique(sorted_values.reshape(-1))
     observations, columns = sorted_values.shape
     curves = np.empty((grid.size, columns), dtype=np.float64)
 
     if degree == 1:
-        _fill_cdf_curves(curves, grid, sorted_values)
+        if discrete:
+            _fill_cdf_curves(curves, grid, sorted_values)
+        else:
+            _fill_continuous_fsd_curves(curves, grid, sorted_values)
         return curves
 
     prefix1 = _prefix_sum(sorted_values)
@@ -223,6 +325,29 @@ def _fill_lpm_degree1_curves(
             counts = np.searchsorted(sorted_values[:, index], thresholds, side="right")
             sums1 = prefix1[counts, index]
             curves[start:stop, index] = (counts * thresholds - sums1) / observations
+
+
+def _fill_continuous_fsd_curves(
+    curves: NDArray[np.float64],
+    grid: NDArray[np.float64],
+    sorted_values: NDArray[np.float64],
+) -> None:
+    observations = sorted_values.shape[0]
+    prefix1 = _prefix_sum(sorted_values)
+    totals = prefix1[-1, :]
+    for start, stop in _grid_chunks(grid.size, sorted_values.shape[1]):
+        thresholds = grid[start:stop]
+        for index in range(sorted_values.shape[1]):
+            counts = np.searchsorted(sorted_values[:, index], thresholds, side="right")
+            sums1 = prefix1[counts, index]
+            lower = (counts * thresholds - sums1) / observations
+            upper = (totals[index] - sums1 - (observations - counts) * thresholds) / observations
+            curves[start:stop, index] = np.divide(
+                lower,
+                lower + upper,
+                out=np.zeros_like(lower),
+                where=(lower + upper) != 0,
+            )
 
 
 def _fill_lpm_degree2_curves(

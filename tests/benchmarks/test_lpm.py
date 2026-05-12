@@ -23,6 +23,7 @@ from pynns import (
     nns_norm,
     nns_part,
     nns_reg,
+    nns_sd_cluster,
     nns_seas,
     nns_ss,
     nns_stack,
@@ -71,6 +72,20 @@ def test_sd_efficient_set_degree_2_scale(
 
     assert all(0 <= index < 50 for index in result)
     assert isinstance(r_baseline["sd_efficient_set_50x252_degree2_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_sd_cluster_252x50_degree2(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    row = np.arange(252, dtype=np.float64)
+    data = np.column_stack([np.sin(row / (index + 2)) + 0.01 * index for index in range(50)])
+
+    result = benchmark(nns_sd_cluster, data, degree=2, min_cluster=1)
+
+    assert isinstance(result["Clusters"], dict)
+    assert isinstance(r_baseline["nns_sd_cluster_252x50_degree2_seconds"], float)
 
 
 @pytest.mark.benchmark

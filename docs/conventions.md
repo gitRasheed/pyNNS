@@ -52,6 +52,13 @@ and `p_star = p_gt + 0.5 * p_tie`. `NaN` values are omitted independently from
 the RNG streams differ. `random_seed` is a PyNNS-only reproducibility
 convenience for that stochastic path.
 
+`nns_sd_cluster` maps to R's `NNS.SD.cluster` default path. It iteratively
+peels `sd_efficient_set` results and returns a dictionary of `Cluster_1`,
+`Cluster_2`, ... memberships. The output contains variable names, not numeric
+cluster labels; when names are omitted, PyNNS uses R-style `X_1`, `X_2`, ...
+names. `type="continuous"` is supported for first-degree efficient sets.
+`dendrogram=True` is deferred because R returns an `hclust` object.
+
 ## Dependence
 
 `nns_dep` follows R's `NNS.dep` bivariate path, including `NNS.gravity` handling

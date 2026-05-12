@@ -87,6 +87,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "sd_efficient_set_50x252_degree2_seconds" not in cache:
         cache["sd_efficient_set_50x252_degree2_seconds"] = _time_r_sd_efficient_set()
         _write_benchmark_baseline(cache)
+    if "nns_sd_cluster_252x50_degree2_seconds" not in cache:
+        cache["nns_sd_cluster_252x50_degree2_seconds"] = _time_r_nns_sd_cluster()
+        _write_benchmark_baseline(cache)
     if "nns_dep_1000_seconds" not in cache:
         cache["nns_dep_1000_seconds"] = _time_r_nns_dep()
         _write_benchmark_baseline(cache)
@@ -290,6 +293,29 @@ def _time_r_sd_efficient_set() -> float:
         "start <- proc.time()[['elapsed']]\n"
         "for (i in seq_len(5)) {\n"
         "  invisible(NNS::NNS.SD.efficient.set(x, degree = 2, type = 'discrete', status = FALSE))\n"
+        "}\n"
+        "elapsed <- proc.time()[['elapsed']] - start\n"
+        "cat(elapsed / 5)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_sd_cluster() -> float:
+    script = (
+        "library(NNS)\n"
+        "row <- seq(0, 251)\n"
+        "x <- sapply(seq_len(50), function(i) sin(row / (i + 1)) + 0.01 * (i - 1))\n"
+        "invisible(NNS::NNS.SD.cluster(x, degree = 2, min_cluster = 1, dendrogram = FALSE))\n"
+        "start <- proc.time()[['elapsed']]\n"
+        "for (i in seq_len(5)) {\n"
+        "  invisible(NNS::NNS.SD.cluster(x, degree = 2, min_cluster = 1, dendrogram = FALSE))\n"
         "}\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 5)\n"
