@@ -165,7 +165,11 @@ keeper path for `n_features > 10` is not yet ported and raises
 also deferred and raise `NotImplementedError`. R requires usable column names
 for matrix inputs; PyNNS uses positional numeric columns. As with `nns_stack`, R
 samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
-`cv_size=0.25` unless specified.
+`cv_size=0.25` unless specified. For classification boost, final predictions,
+feature weights, and feature frequencies are parity-tested against installed R.
+The public `n.best` value is structural-only because R's final internal
+`NNS.stack` call samples its own `CV.size = NULL` split, while PyNNS keeps the
+deterministic stack default.
 
 ## Seasonality
 

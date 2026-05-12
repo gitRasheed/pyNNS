@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -184,7 +184,7 @@ def test_nns_boost_binary_class_matches_r(depth: int | None) -> None:
         feature_importance=False,
     )
 
-    _assert_boost_matches(actual, expected, exact_feature_metadata=False)
+    _assert_boost_matches(actual, expected, exact_n_best=False)
 
 
 @pytest.mark.parity
@@ -215,7 +215,7 @@ def test_nns_boost_multiclass_matches_r(depth: int) -> None:
         feature_importance=False,
     )
 
-    _assert_boost_matches(actual, expected, exact_feature_metadata=False)
+    _assert_boost_matches(actual, expected, exact_n_best=False)
 
 
 @pytest.mark.parity
@@ -247,7 +247,51 @@ def test_nns_boost_factor_like_class_matches_r() -> None:
         feature_importance=False,
     )
 
-    _assert_boost_matches(actual, expected, exact_feature_metadata=False)
+    _assert_boost_matches(actual, expected, exact_n_best=False)
+
+
+@pytest.mark.parity
+def test_nns_boost_class_stable_metadata_matches_r_when_n_best_is_structural() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x + np.sin(x) > 0.0, 2.0, 1.0)
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        variable[:5].tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        features_only=False,
+        type="class",
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        type="class",
+        feature_importance=False,
+    )
+
+    assert isinstance(expected, dict)
+    expected_dict = cast(dict[str, Any], expected)
+    np.testing.assert_allclose(actual["results"], expected_dict["results"], atol=COMPOUND)
+    np.testing.assert_allclose(
+        actual["feature.weights"],
+        expected_dict["feature.weights"],
+        atol=COMPOUND,
+    )
+    np.testing.assert_allclose(
+        actual["feature.frequency"],
+        expected_dict["feature.frequency"],
+        atol=COMPOUND,
+    )
+    assert np.asarray(actual["n.best"], dtype=np.float64).size > 0
+    assert np.asarray(expected_dict["n.best"], dtype=np.float64).size > 0
 
 
 @pytest.mark.parity
@@ -327,12 +371,12 @@ def _assert_boost_matches(
     actual: dict[str, Any],
     expected: Any,
     *,
-    exact_feature_metadata: bool = True,
+    exact_n_best: bool = True,
 ) -> None:
     assert isinstance(expected, dict)
     assert set(actual) == set(expected)
     for key in actual:
-        if key in {"feature.weights", "feature.frequency", "n.best"} and not exact_feature_metadata:
+        if key == "n.best" and not exact_n_best:
             assert np.asarray(actual[key], dtype=np.float64).size > 0
             assert np.asarray(expected[key], dtype=np.float64).size > 0
             continue
