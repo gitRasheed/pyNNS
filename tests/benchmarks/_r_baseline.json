@@ -34,6 +34,8 @@
     "nns_reg_dimred_200x3_seconds": 0.0426,
     "nns_seas_1000_seconds": 0.0011,
     "nns_seas_5000_seconds": 0.004,
+    "nns_ss_1000_seconds": 0.0002,
+    "nns_ss_200_ci_reps100_seconds": 0.1526667,
     "nns_stack_100x3_pred_int_seconds": 0.286,
     "nns_stack_100x3_seconds": 0.3696667,
     "nns_stack_100x3_ts_test_seconds": 0.3003333,

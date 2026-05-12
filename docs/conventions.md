@@ -43,6 +43,15 @@ R's public `NNS.gravity` central-tendency helper. `fsd_uni`, `ssd_uni`, and
 `.uni` exports. `co_lpm_nd`, `co_upm_nd`, and `dpm_nd` expose the public
 n-dimensional partial-moment wrappers.
 
+`nns_ss` maps to R's `NNS.SS` stochastic-superiority function, not to the
+stochastic-dominance tests. It returns `p_gt = P(X > Y)`, `p_tie = P(X = Y)`,
+and `p_star = p_gt + 0.5 * p_tie`. `NaN` values are omitted independently from
+`x` and `y`, matching R's `na.omit` preprocessing. With
+`confidence_interval=True`, intervals are computed through `nns_meboot`,
+`lpm_var`, and `upm_var`; exact bootstrap parity with R is not expected because
+the RNG streams differ. `random_seed` is a PyNNS-only reproducibility
+convenience for that stochastic path.
+
 ## Dependence
 
 `nns_dep` follows R's `NNS.dep` bivariate path, including `NNS.gravity` handling

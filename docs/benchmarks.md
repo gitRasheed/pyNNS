@@ -48,3 +48,5 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_meboot`, T_obs=1000, reps=100, rho=0 | 115.564 ms | 108.000 ms | 1.07x |
 | `nns_mc`, T_obs=500, reps=30, by=0.2 | 319.045 ms | 736.000 ms | 0.43x |
 | `nns_mc`, T_obs=500, reps=30, by=0.1 | 608.958 ms | 1437.000 ms | 0.42x |
+| `nns_ss`, T_obs=1000 | 0.413 ms | 0.200 ms | 2.07x |
+| `nns_ss`, T_obs=200, reps=100, confidence_interval=TRUE | 163.931 ms | 152.667 ms | 1.07x |

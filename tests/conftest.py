@@ -195,6 +195,12 @@ def r_baseline() -> BenchmarkBaseline:
             method="nonlin",
         )
         _write_benchmark_baseline(cache)
+    if "nns_ss_1000_seconds" not in cache:
+        cache["nns_ss_1000_seconds"] = _time_r_nns_ss()
+        _write_benchmark_baseline(cache)
+    if "nns_ss_200_ci_reps100_seconds" not in cache:
+        cache["nns_ss_200_ci_reps100_seconds"] = _time_r_nns_ss_ci()
+        _write_benchmark_baseline(cache)
     return cache
 
 
@@ -989,6 +995,46 @@ def _time_r_nns_arma_pred_int(*, auto: bool, method: str) -> float:
         f"method = '{method}', pred.int = 0.95, plot = FALSE, seasonal.plot = FALSE)\n"
         "set.seed(123); invisible(run())\n"
         "times <- replicate(5, { set.seed(123); system.time(invisible(run()))[['elapsed']] })\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_ss() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-2, 3, length.out = 1000) + 0.2 * sin(seq_len(1000))\n"
+        "y <- seq(-1.5, 2.5, length.out = 1000) + 0.3 * cos(seq_len(1000))\n"
+        "invisible(NNS::NNS.SS(x, y))\n"
+        "times <- replicate(50, system.time(invisible(NNS::NNS.SS(x, y)))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_ss_ci() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-2, 3, length.out = 200) + 0.2 * sin(seq_len(200))\n"
+        "y <- seq(-1.5, 2.5, length.out = 200) + 0.3 * cos(seq_len(200))\n"
+        "run <- function() { set.seed(123); NNS::NNS.SS(x, y, "
+        "confidence.interval = TRUE, reps = 100, rho = 1) }\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(

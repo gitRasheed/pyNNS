@@ -24,6 +24,7 @@ from pynns import (
     nns_part,
     nns_reg,
     nns_seas,
+    nns_ss,
     nns_stack,
     pm_matrix,
     sd_efficient_set,
@@ -662,3 +663,33 @@ def test_nns_mc_500_reps30_by01(benchmark: Any, r_baseline: dict[str, object]) -
 
     assert result["ensemble"].shape == (500,)
     assert isinstance(r_baseline["nns_mc_500_reps30_by01_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_ss_1000(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-2.0, 3.0, 1000) + 0.2 * np.sin(np.arange(1000, dtype=np.float64))
+    y = np.linspace(-1.5, 2.5, 1000) + 0.3 * np.cos(np.arange(1000, dtype=np.float64))
+
+    result = benchmark(nns_ss, x, y)
+
+    assert set(result) == {"p_gt", "p_tie", "p_star"}
+    assert isinstance(r_baseline["nns_ss_1000_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_ss_200_ci_reps100(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-2.0, 3.0, 200) + 0.2 * np.sin(np.arange(200, dtype=np.float64))
+    y = np.linspace(-1.5, 2.5, 200) + 0.3 * np.cos(np.arange(200, dtype=np.float64))
+
+    result = benchmark(
+        nns_ss,
+        x,
+        y,
+        confidence_interval=True,
+        reps=100,
+        rho=1.0,
+        random_seed=123,
+    )
+
+    assert result["boot_vals"].shape == (100,)
+    assert isinstance(r_baseline["nns_ss_200_ci_reps100_seconds"], float)
