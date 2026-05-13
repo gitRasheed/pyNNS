@@ -207,9 +207,11 @@ the tail `ts_test` rows, while CV testing uses the earlier rows
 counterintuitive. R's `CV.size = NULL` samples a random value between 0.2 and
 1/3; PyNNS uses a deterministic default of `0.25`. Pass `cv_size` explicitly for
 exact R parity.
-Factor predictor expansion remains deferred for `nns_stack`; installed R uses a
-stack-specific aligned train/test full-rank dummy builder rather than the
-`nns_reg` preprocessing helper.
+Factor predictor expansion is supported for `nns_stack(method=1)` with explicit
+`factor_levels=` metadata. PyNNS expands training and test predictors together
+using the same full-rank dummy convention as installed R's aligned train/test
+builder. Method-2 factor diagnostics remain deferred pending installed-R parity
+investigation.
 
 ## Boost
 

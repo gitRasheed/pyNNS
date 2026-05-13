@@ -446,6 +446,31 @@ def test_nns_stack_100x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
 
 @pytest.mark.benchmark
+def test_nns_stack_factor_predictor_60_method1(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    levels = ["a", "b", "c"]
+    x = np.asarray([levels[index % len(levels)] for index in range(60)])
+    y = np.sin(np.arange(60, dtype=np.float64) / 7.0) + (np.arange(60) % 3)
+    point_est = np.asarray(["a", "c", "b", "a", "b"])
+
+    result = benchmark(
+        nns_stack,
+        x,
+        y,
+        point_est,
+        factor_levels=levels,
+        cv_size=0.25,
+        folds=1,
+        method=1,
+    )
+
+    assert result["stack"].shape == (5,)
+    assert isinstance(r_baseline["nns_stack_factor_predictor_60_method1_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_stack_100x3_pred_int(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-2.0, 2.0, 100)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))

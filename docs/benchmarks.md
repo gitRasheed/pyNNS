@@ -45,6 +45,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_m_reg` class, N=3, T_obs=200, T_test=20 | 50.501 ms | 126.600 ms | 0.40x |
 | `nns_m_reg` class, N=3, T_obs=200, T_test=20, confidence_interval=0.95 | 47.601 ms | 150.400 ms | 0.32x |
 | `nns_stack`, N=3, T_obs=100, T_test=20 | 197.228 ms | 369.667 ms | 0.53x |
+| `nns_stack`, factor predictor method=1, T_obs=60, T_test=5 | 28.700 ms | 214.333 ms | 0.13x |
 | `nns_stack`, N=3, T_obs=100, T_test=20, pred_int=0.95 | 144.093 ms | 286.000 ms | 0.50x |
 | `nns_stack`, N=3, T_obs=100, T_test=20, ts_test=20 | 159.132 ms | 300.333 ms | 0.53x |
 | `nns_stack` class, N=3, T_obs=100, T_test=20 | 122.462 ms | 270.667 ms | 0.45x |

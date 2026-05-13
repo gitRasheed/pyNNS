@@ -50,6 +50,25 @@ def test_nns_stack_classification_shapes_and_codes() -> None:
     assert first["pred.int"] is None
 
 
+def test_nns_stack_factor_predictor_expands_train_and_test() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"])
+    y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
+
+    result = nns_stack(
+        x,
+        y,
+        np.asarray(["a", "c", "b"]),
+        factor_levels=["a", "b", "c"],
+        cv_size=0.25,
+        folds=1,
+        method=1,
+    )
+
+    assert result["reg"].shape == (3,)
+    assert result["stack"].shape == (3,)
+    assert np.all(np.isfinite(result["stack"]))
+
+
 def test_nns_stack_class_pred_int_shapes_and_rounding() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))

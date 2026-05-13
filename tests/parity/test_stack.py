@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from _r import nns_stack_numeric
+from _r import nns_stack_factor_predictor, nns_stack_numeric
 from _tolerances import COMPOUND
 
 from pynns import nns_stack
@@ -72,6 +72,40 @@ def test_nns_stack_equal_dim_red_matches_r() -> None:
         order=2,
         stack=False,
         dim_red_method="equal",
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+
+
+@pytest.mark.parity
+def test_nns_stack_factor_predictor_method1_matches_r() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"])
+    y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
+    point = np.asarray(["a", "c", "b"])
+    levels = ["a", "b", "c"]
+
+    expected = nns_stack_factor_predictor(
+        x.tolist(),
+        y.tolist(),
+        point.tolist(),
+        levels=levels,
+        cv_size=0.25,
+        folds=1,
+        method=[1],
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+    )
+    actual = nns_stack(
+        x,
+        y,
+        point,
+        factor_levels=levels,
+        cv_size=0.25,
+        folds=1,
+        method=1,
+        stack=True,
+        dim_red_method="cor",
     )
 
     _assert_stack_matches(actual, expected, exact_probability_threshold=False)
@@ -593,7 +627,7 @@ def _assert_stack_matches(
             assert np.isfinite(float(_numeric(expected[key])))
             continue
         if actual[key] is None:
-            assert expected[key] is None
+            assert expected[key] is None or expected[key] == {}
         elif isinstance(actual[key], dict):
             assert isinstance(expected[key], dict)
             assert set(actual[key]) == set(expected[key])

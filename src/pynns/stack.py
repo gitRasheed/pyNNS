@@ -12,6 +12,7 @@ from pynns.central_tendencies import nns_mode
 from pynns.dependence import _gravity
 from pynns.regression import (
     Order,
+    _expand_factor_predictors,
     _normalize_type,
     _prepare_y_values,
     _r_minmax_columns,
@@ -46,6 +47,7 @@ def nns_stack(
     status: bool = False,
     ncores: int | None = None,
     class_levels: list[object] | None = None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None = None,
     random_seed: int | None = None,
 ) -> StackResult:
     """Port of R's deterministic numeric/classification NNS.stack orchestration."""
@@ -54,7 +56,18 @@ def nns_stack(
     if balance:
         type_value = "class"
 
-    x_train = _as_matrix(ivs_train, "ivs_train")
+    x_input: NDArray[Any] | NDArray[np.float64] = np.asarray(ivs_train)
+    x_test_input: NDArray[Any] | NDArray[np.float64] | None = (
+        None if ivs_test is None else np.asarray(ivs_test)
+    )
+    if factor_levels is not None:
+        x_input, x_test_input = _expand_factor_predictors(
+            ivs_train,
+            ivs_test,
+            factor_levels=factor_levels,
+        )
+
+    x_train = _as_matrix(x_input, "ivs_train")
     if balance:
         y_train, class_codes = _dense_factor_codes(dv_train, levels=class_levels)
     elif type_value == "class":
@@ -65,7 +78,11 @@ def nns_stack(
         class_codes = np.empty(0, dtype=np.float64)
     if x_train.shape[0] != y_train.size:
         raise ValueError("ivs_train and dv_train must have the same row count.")
-    x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
+    x_test = (
+        x_train.copy()
+        if x_test_input is None
+        else _as_point_matrix(x_test_input, x_train.shape[1])
+    )
     if balance:
         rng = np.random.default_rng(random_seed)
         x_train, y_train = _balance_class_training(
