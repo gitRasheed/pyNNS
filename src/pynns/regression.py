@@ -120,8 +120,6 @@ def nns_reg(
     if class_mode:
         noise_reduction = "mode_class"
     _reject_deferred_paths(
-        x_values,
-        dim_red_method=dim_red_method,
         point_est=point_for_dispatch,
         confidence_interval=confidence_interval,
         smooth=smooth,
@@ -246,14 +244,11 @@ def _validate_univariate_inputs(
     class_levels: list[object] | None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     if factor_2_dummy and (_is_fcl(x) or _is_fcl(y)):
-        raise NotImplementedError(
-            "factor_2_dummy=True with non-numeric inputs is deferred until "
-            "the factor path is ported."
-        )
+        raise ValueError("non-numeric univariate inputs must be expanded before validation.")
     x_values = np.asarray(x, dtype=np.float64)
     y_values, _ = _prepare_y_values(y, type_value=type_value, class_levels=class_levels)
     if x_values.ndim != 1 or y_values.ndim != 1:
-        raise NotImplementedError("matrix x input requires NNS.M.reg, which is not yet ported.")
+        raise ValueError("univariate validation requires 1D x and y.")
     if x_values.size == 0:
         raise ValueError("x and y must be non-empty.")
     if x_values.size != y_values.size:
@@ -693,21 +688,13 @@ def _dimred_order(x_star: NDArray[np.float64], y: NDArray[np.float64], order: Or
 
 
 def _reject_deferred_paths(
-    x: NDArray[np.float64],
     *,
-    dim_red_method: object | None,
     point_est: NDArray[np.float64] | float | None,
     confidence_interval: float | None,
     smooth: bool,
     point_only: bool,
     multivariate_call: bool,
 ) -> None:
-    if x.ndim != 1:
-        raise NotImplementedError("matrix x input should be dispatched to nns_m_reg.")
-    if dim_red_method is not None:
-        raise NotImplementedError(
-            "dim_red_method paths are deferred until dimension reduction is ported."
-        )
     if smooth:
         if confidence_interval is not None:
             raise NotImplementedError(
