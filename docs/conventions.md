@@ -192,9 +192,11 @@ minority count without replacement, each class is upsampled to the majority
 count with replacement, and the downsampled rows are concatenated before the
 upsampled rows. Exact sampled-row parity with R is not expected because PyNNS
 uses NumPy's RNG; `random_seed` is a PyNNS-only reproducibility convenience.
-Classification prediction intervals remain deferred and raise
-`NotImplementedError`. Numeric prediction intervals are supported and are
-combined by installed R's weighted data.table arithmetic.
+Numeric and class prediction intervals are supported and are combined by
+installed R's weighted data.table arithmetic. For class stacks, single-method
+`method=1` and `method=2` return the delegated interval table unchanged; when
+`method=(1,2)`, the weighted final interval table is rounded with R's
+`x %% 1 < 0.5` rule.
 `ts_test` is supported and follows installed R's split exactly: CV training uses
 the tail `ts_test` rows, while CV testing uses the earlier rows
 `1:(n - ts_test)`. This is intentionally not changed even though it is
@@ -217,9 +219,10 @@ is PyNNS-only. The stochastic epoch keeper path for `n_features > 10` is not yet
 ported and raises `NotImplementedError`. Numeric `pred_int` is supported and
 delegates to `nns_stack(pred_int=...)`, matching installed R; it is deterministic
 and does not use MC/meboot. `features_only=True` returns before the final stack
-fit and ignores `pred_int`, matching R. Classification `pred_int` and `ts_test`
-remain deferred and raise `NotImplementedError`. R requires usable column names
-for matrix inputs; PyNNS uses positional numeric columns. As with `nns_stack`, R
+fit and ignores `pred_int`, matching R. Classification `pred_int` is supported
+and delegates to final stack `method=1`, so interval bounds remain raw numeric
+values. `ts_test` remains deferred and raises `NotImplementedError`. R requires
+usable column names for matrix inputs; PyNNS uses positional numeric columns. As with `nns_stack`, R
 samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
 `cv_size=0.25` unless specified. For classification boost, final predictions,
 feature weights, and feature frequencies are parity-tested against installed R
@@ -332,7 +335,8 @@ PyNNS can reproduce R factor codes explicitly. Raw string classification remains
 rejected where installed R errors or produces unusable `NA` conversions.
 Predictions and point estimates are numeric class codes, not original labels,
 matching installed R. Class confidence intervals are supported in `nns_reg` and
-`nns_m_reg`; stack/boost class `pred_int` remains deferred until the next batch.
+`nns_m_reg`; stack/boost class `pred_int` is supported through those regression
+interval tables.
 
 ## Differentiation
 

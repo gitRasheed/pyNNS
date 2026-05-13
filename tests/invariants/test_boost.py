@@ -87,13 +87,25 @@ def test_nns_boost_features_only_ignores_numeric_pred_int() -> None:
     assert set(result) == {"feature.weights", "feature.frequency"}
 
 
-def test_nns_boost_class_pred_int_raises() -> None:
+def test_nns_boost_class_pred_int_shape() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
     y = np.where(x > 0.0, 2.0, 1.0)
 
-    with pytest.raises(NotImplementedError, match="classification"):
-        nns_boost(variable, y, type="class", pred_int=0.95)
+    result = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        type="class",
+        pred_int=0.95,
+        feature_importance=False,
+    )
+
+    assert result["results"].shape == (5,)
+    assert isinstance(result["pred.int"], dict)
+    assert set(result["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert result["pred.int"]["lower.pred.int"].shape == result["results"].shape
+    assert result["pred.int"]["upper.pred.int"].shape == result["results"].shape
 
 
 def test_nns_boost_rejects_unported_stochastic_epoch_path() -> None:

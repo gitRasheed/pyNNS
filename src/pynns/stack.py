@@ -53,8 +53,6 @@ def nns_stack(
     type_value = _normalize_type(type)
     if balance:
         type_value = "class"
-    if type_value == "class" and pred_int is not None:
-        raise NotImplementedError("nns_stack pred_int for classification is not yet ported.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
     if balance:
@@ -162,6 +160,8 @@ def nns_stack(
     )
     if type_value == "class":
         estimates = _class_threshold_round(estimates, probability_threshold, y_train)
+        if methods == (1, 2):
+            stacked_pred_int = _round_class_prediction_intervals(stacked_pred_int)
 
     return {
         "OBJfn.reg": reg_obj,
@@ -777,6 +777,17 @@ def _combine_prediction_intervals(
     return {
         key: weights[0] * left_values[index] + weights[1] * right_values[index]
         for index, key in enumerate(left)
+    }
+
+
+def _round_class_prediction_intervals(
+    pred_int: dict[str, NDArray[np.float64]] | None,
+) -> dict[str, NDArray[np.float64]] | None:
+    if pred_int is None:
+        return None
+    return {
+        key: np.where(values % 1.0 < 0.5, np.floor(values), np.ceil(values)).astype(np.float64)
+        for key, values in pred_int.items()
     }
 
 

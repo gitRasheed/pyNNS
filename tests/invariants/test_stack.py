@@ -50,12 +50,21 @@ def test_nns_stack_classification_shapes_and_codes() -> None:
     assert first["pred.int"] is None
 
 
-def test_nns_stack_class_pred_int_deferred_path_raises() -> None:
+def test_nns_stack_class_pred_int_shapes_and_rounding() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
+    y = np.where(x > 0.0, 2.0, 1.0)
 
-    with pytest.raises(NotImplementedError):
-        nns_stack(variable, np.where(x > 0.0, 2.0, 1.0), type="class", pred_int=0.95)
+    single = nns_stack(variable, y, variable[:5], type="class", method=1, pred_int=0.95)
+    combined = nns_stack(variable, y, variable[:5], type="class", method=(1, 2), pred_int=0.95)
+
+    assert single["pred.int"] is not None
+    assert set(single["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert all(values.shape == (5,) for values in single["pred.int"].values())
+    assert combined["pred.int"] is not None
+    assert all(values.shape == (5,) for values in combined["pred.int"].values())
+    for values in combined["pred.int"].values():
+        np.testing.assert_allclose(values, np.round(values))
 
 
 @pytest.mark.stochastic

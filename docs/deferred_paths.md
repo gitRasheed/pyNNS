@@ -7,9 +7,7 @@ limits stay visible.
 |---|---|---|---|
 | ARMA.optim | default optimizer path | Default optimizer evaluates `nns_reg(..., smooth=True)`, so it cannot be faithfully ported until smooth regression is real | Port `smooth=True` first, then `NNS.ARMA.optim` |
 | Boost | `n_features > 10` stochastic epoch keeper loop | R uses stochastic epoch loop not yet ported | Port stochastic boost epoch loop |
-| Boost | class `pred_int` | Classification interval wiring is not ported | Port class interval parity if an R caller requires it |
 | Boost | `ts_test` | Time-series boost evaluation not ported | Port after ARMA/time-series stack paths |
-| Stack | class `pred_int` | Classification interval tables are not ported | Port class interval parity if an R caller requires it |
 | Regression | `confidence_interval` with `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility before interval tables can be generated on smoothed fits | Port a minimal R-compatible fixed-spar smoothing spline backend |
 | Regression | `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility; SciPy smoothers are not parity-compatible | Port a minimal R-compatible fixed-spar smoothing spline backend, then enable `nns_reg(smooth=True)` |
 | Regression | factor/dummy predictor paths | Factor target encoding is supported with `class_levels`, but factor predictor expansion is not wired | Enable predictor dummy expansion in `nns_reg` factor paths |

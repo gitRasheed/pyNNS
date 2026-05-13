@@ -223,6 +223,49 @@ def test_nns_stack_binary_class_matches_r(method: list[int]) -> None:
 
 @pytest.mark.parity
 @pytest.mark.parametrize("method", [[1], [2], [1, 2]])
+def test_nns_stack_binary_class_pred_int_matches_r(method: list[int]) -> None:
+    x = np.linspace(-2.0, 2.0, 36)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x + np.sin(x) > 0.0, 2.0, 1.0)
+    point = variable[::9]
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+        pred_int=0.95,
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=method,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+        pred_int=0.95,
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+    assert isinstance(actual["pred.int"], dict)
+    assert all(values.shape == actual["stack"].shape for values in actual["pred.int"].values())
+    if method == [1, 2]:
+        assert set(actual["pred.int"]) == set(actual["reg.pred.int"])
+        for values in actual["pred.int"].values():
+            np.testing.assert_allclose(values, np.round(values))
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("method", [[1], [2], [1, 2]])
 def test_nns_stack_multiclass_matches_r(method: list[int]) -> None:
     x = np.linspace(-2.0, 2.0, 36)
     variable = np.column_stack((x, x**2, np.sin(x)))
@@ -252,6 +295,45 @@ def test_nns_stack_multiclass_matches_r(method: list[int]) -> None:
         stack=True,
         dim_red_method="cor",
         type="class",
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+
+
+@pytest.mark.parity
+def test_nns_stack_factor_like_class_pred_int_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    labels = np.where(x < -0.5, "A", np.where(x > 0.75, "C", "B"))
+    point = variable[::10]
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        labels.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=[1, 2],
+        order=1,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+        class_levels=["A", "B", "C"],
+        pred_int=0.95,
+    )
+    actual = nns_stack(
+        variable,
+        labels,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        order=1,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+        class_levels=["A", "B", "C"],
+        pred_int=0.95,
     )
 
     _assert_stack_matches(actual, expected, exact_probability_threshold=False)
@@ -392,6 +474,53 @@ def test_nns_stack_balance_multiclass_and_factor_structure() -> None:
 
 @pytest.mark.parity
 @pytest.mark.stochastic
+def test_nns_stack_balance_class_pred_int_matches_r_structure() -> None:
+    x = np.linspace(-2.0, 2.0, 48)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x < 1.0, 1.0, 2.0)
+    point = variable[[2, 12, 28, 42]]
+
+    expected = nns_stack_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        cv_size=0.25,
+        folds=1,
+        method=[1],
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+        balance=True,
+        seed=42,
+        pred_int=0.95,
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        cv_size=0.25,
+        folds=1,
+        method=(1,),
+        stack=True,
+        dim_red_method="cor",
+        type="class",
+        balance=True,
+        random_seed=42,
+        pred_int=0.95,
+    )
+
+    _assert_stack_class_structure(
+        actual,
+        expected,
+        point_rows=point.shape[0],
+        classes=np.unique(y),
+        expect_pred_int=True,
+    )
+
+
+@pytest.mark.parity
+@pytest.mark.stochastic
 def test_nns_stack_balance_type_none_forces_class_path() -> None:
     x = np.linspace(-2.0, 2.0, 40)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))
@@ -499,6 +628,7 @@ def _assert_stack_class_structure(
     *,
     point_rows: int,
     classes: np.ndarray,
+    expect_pred_int: bool = False,
 ) -> None:
     assert isinstance(expected, dict)
     assert set(actual) == set(expected)
@@ -519,6 +649,16 @@ def _assert_stack_class_structure(
             assert np.all(np.isin(finite_expected, classes))
     assert np.isfinite(float(actual["probability.threshold"]))
     assert np.isfinite(float(_numeric(expected["probability.threshold"])))
-    assert actual["reg.pred.int"] is None
-    assert actual["dim.red.pred.int"] is None
-    assert actual["pred.int"] is None
+    for key in ("reg.pred.int", "dim.red.pred.int", "pred.int"):
+        actual_pred_int = actual[key]
+        expected_pred_int = expected[key]
+        if not expect_pred_int or actual_pred_int is None:
+            assert actual_pred_int is None
+            assert expected_pred_int is None
+            continue
+        assert isinstance(actual_pred_int, dict)
+        assert isinstance(expected_pred_int, dict)
+        assert set(actual_pred_int) == set(expected_pred_int)
+        for values in actual_pred_int.values():
+            assert values.shape == (point_rows,)
+            assert np.all(np.isfinite(values))

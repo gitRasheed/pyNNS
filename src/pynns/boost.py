@@ -55,8 +55,6 @@ def nns_boost(
         type_value = "class"
     if ts_test is not None:
         raise NotImplementedError("ts_test requires the time-series boost path, deferred.")
-    if pred_int is not None and type_value == "class":
-        raise NotImplementedError("nns_boost pred_int for classification is not yet ported.")
 
     x_train = _as_matrix(ivs_train, "ivs_train")
     x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])

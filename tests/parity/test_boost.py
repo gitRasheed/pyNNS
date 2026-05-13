@@ -256,6 +256,43 @@ def test_nns_boost_binary_class_matches_r(depth: int | None) -> None:
 
 @pytest.mark.parity
 @pytest.mark.parametrize("depth", [1, 2])
+def test_nns_boost_binary_class_pred_int_matches_r(depth: int) -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x + np.sin(x) > 0.0, 2.0, 1.0)
+    point = variable[:5]
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=depth,
+        features_only=False,
+        type="class",
+        pred_int=0.95,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        point,
+        learner_trials=10,
+        cv_size=0.25,
+        depth=depth,
+        type="class",
+        pred_int=0.95,
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected, exact_n_best=False)
+    assert isinstance(actual["pred.int"], dict)
+    assert set(actual["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert all(values.shape == actual["results"].shape for values in actual["pred.int"].values())
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("depth", [1, 2])
 def test_nns_boost_multiclass_matches_r(depth: int) -> None:
     x = np.linspace(-2.0, 2.0, 30)
     variable = np.column_stack((x, x**2, np.sin(x)))
@@ -283,6 +320,40 @@ def test_nns_boost_multiclass_matches_r(depth: int) -> None:
     )
 
     _assert_boost_matches(actual, expected, exact_n_best=False)
+
+
+@pytest.mark.parity
+def test_nns_boost_features_only_ignores_class_pred_int_like_r() -> None:
+    x = np.linspace(-2.0, 2.0, 30)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x + np.sin(x) > 0.0, 2.0, 1.0)
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        variable[:5].tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        features_only=True,
+        type="class",
+        pred_int=0.95,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        features_only=True,
+        type="class",
+        pred_int=0.95,
+        feature_importance=False,
+    )
+
+    assert set(actual) == {"feature.weights", "feature.frequency"}
+    _assert_boost_matches(actual, expected)
 
 
 @pytest.mark.parity
@@ -474,6 +545,50 @@ def test_nns_boost_balance_multiclass_and_factor_structure() -> None:
 
 @pytest.mark.parity
 @pytest.mark.stochastic
+def test_nns_boost_balance_class_pred_int_matches_r_structure() -> None:
+    x = np.linspace(-2.0, 2.0, 48)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = np.where(x < 1.0, 1.0, 2.0)
+    point = variable[:8]
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        point.tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        features_only=False,
+        type="class",
+        balance=True,
+        seed=42,
+        pred_int=0.95,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        point,
+        learner_trials=10,
+        cv_size=0.25,
+        depth=1,
+        type="class",
+        balance=True,
+        random_seed=42,
+        pred_int=0.95,
+        feature_importance=False,
+    )
+
+    _assert_boost_class_structure(
+        actual,
+        expected,
+        point_rows=point.shape[0],
+        classes=np.unique(y),
+        expect_pred_int=True,
+    )
+
+
+@pytest.mark.parity
+@pytest.mark.stochastic
 def test_nns_boost_balance_type_none_forces_class_path() -> None:
     x = np.linspace(-2.0, 2.0, 42)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))
@@ -609,6 +724,7 @@ def _assert_boost_class_structure(
     *,
     point_rows: int,
     classes: np.ndarray,
+    expect_pred_int: bool = False,
 ) -> None:
     assert isinstance(expected, dict)
     assert set(actual) == set(expected)
@@ -617,8 +733,16 @@ def _assert_boost_class_structure(
     assert actual_results.shape == expected_results.shape == (point_rows,)
     assert np.all(np.isin(actual_results[np.isfinite(actual_results)], classes))
     assert np.all(np.isin(expected_results[np.isfinite(expected_results)], classes))
-    assert actual["pred.int"] is None
-    assert expected["pred.int"] is None
+    if expect_pred_int:
+        assert isinstance(actual["pred.int"], dict)
+        assert isinstance(expected["pred.int"], dict)
+        assert set(actual["pred.int"]) == set(expected["pred.int"])
+        for values in actual["pred.int"].values():
+            assert values.shape == (point_rows,)
+            assert np.all(np.isfinite(values))
+    else:
+        assert actual["pred.int"] is None
+        assert expected["pred.int"] is None
     assert np.asarray(actual["feature.weights"], dtype=np.float64).ndim == 1
     assert np.asarray(expected["feature.weights"], dtype=np.float64).ndim == 1
     assert np.asarray(actual["feature.frequency"], dtype=np.float64).ndim == 1

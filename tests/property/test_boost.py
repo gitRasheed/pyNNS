@@ -86,6 +86,44 @@ def test_nns_boost_class_shape_and_codes_hold(
     assert np.sum(result["feature.weights"]) > 0.0
 
 
+@given(
+    finite_matrices,
+    st.integers(min_value=2, max_value=4),
+    st.sampled_from([1]),
+    st.sampled_from([0.8, 0.95]),
+)
+def test_nns_boost_class_pred_int_shape_holds(
+    x: np.ndarray,
+    n_classes: int,
+    depth: int,
+    pred_int: float,
+) -> None:
+    row_jitter = np.arange(x.shape[0], dtype=np.float64)[:, np.newaxis] * 1e-6
+    col_jitter = np.arange(x.shape[1], dtype=np.float64)[np.newaxis, :] * 1e-7
+    x = x + row_jitter + col_jitter
+    score = x[:, 0] + 0.25 * x[:, 1]
+    quantiles = np.quantile(score, np.linspace(0.0, 1.0, n_classes + 1)[1:-1])
+    y = np.searchsorted(quantiles, score, side="right").astype(np.float64) + 1.0
+
+    result = nns_boost(
+        x,
+        y,
+        x[:3],
+        cv_size=0.25,
+        depth=depth,
+        type="class",
+        pred_int=pred_int,
+        feature_importance=False,
+    )
+
+    assert result["results"].shape == (3,)
+    assert np.all(np.isin(result["results"], np.unique(y)))
+    assert isinstance(result["pred.int"], dict)
+    assert set(result["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert result["pred.int"]["lower.pred.int"].shape == (3,)
+    assert result["pred.int"]["upper.pred.int"].shape == (3,)
+
+
 @pytest.mark.stochastic
 @given(finite_matrices, st.integers(min_value=2, max_value=4), st.sampled_from([1, 2]))
 def test_nns_boost_balance_class_shape_and_codes_hold(
