@@ -151,6 +151,25 @@ def test_nns_boost_pred_int_does_not_enable_stochastic_epoch_path() -> None:
         )
 
 
+def test_nns_boost_threshold_does_not_enable_stochastic_epoch_path() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    variable = np.column_stack([np.sin((idx + 1) * x) for idx in range(11)])
+    y = x + np.sin(x)
+
+    with pytest.raises(
+        NotImplementedError,
+        match="n_features > 10 requires R's stochastic epoch keeper loop",
+    ):
+        nns_boost(
+            variable,
+            y,
+            variable[:3],
+            cv_size=0.25,
+            threshold=1.0,
+            feature_importance=False,
+        )
+
+
 @pytest.mark.stochastic
 def test_nns_boost_balance_shape_codes_and_seed_determinism() -> None:
     x = np.linspace(-2.0, 2.0, 42)

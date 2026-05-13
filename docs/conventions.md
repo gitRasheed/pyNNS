@@ -238,6 +238,9 @@ is PyNNS-only. The stochastic epoch keeper path for `n_features > 10` is not yet
 ported and raises `NotImplementedError`; installed R samples learner-trial
 feature sets and then samples epoch feature counts from a weighted survivor pool
 using R `sample()`, so a faithful port needs that sampling contract mapped first.
+Installed R also errors for `threshold=` on this path because the threshold
+short-circuit leaves `test.features` undefined, so PyNNS keeps the guard before
+threshold handling.
 Simple explicit-level factor predictors are supported through `factor_levels=`.
 PyNNS integer-codes those columns before deterministic feature selection,
 matching installed R's `data.matrix` conversion. Pass `None` for numeric
