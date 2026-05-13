@@ -166,6 +166,50 @@ def test_nns_reg_dim_red_matches_r(method: str | list[float]) -> None:
 
 
 @pytest.mark.parity
+@pytest.mark.parametrize("method", ["NNS.caus", "all"])
+def test_nns_reg_dim_red_tau_ts_matches_r_fixed_uni_caus_lag(method: str) -> None:
+    x1 = np.linspace(-2.0, 2.0, 40)
+    x = np.column_stack((x1, np.sin(x1), np.cos(x1)))
+    y = x[:, 0] + x[:, 1] + 0.25 * x[:, 2]
+    point_est = x[:3]
+
+    expected = _r_nns_reg_dimred(
+        x,
+        y,
+        order=None,
+        dim_red_method=method,
+        tau="ts",
+        threshold=0.0,
+        point_est=point_est,
+        point_only=False,
+    )
+    actual = nns_reg(
+        x,
+        y,
+        dim_red_method=method,
+        tau="ts",
+        point_est=point_est,
+    )
+
+    assert isinstance(expected, dict)
+    assert isinstance(expected["equation"], dict)
+    assert isinstance(actual["equation"], dict)
+    np.testing.assert_array_equal(
+        actual["equation"]["Variable"].astype(str),
+        _strings(expected["equation"]["Variable"]),
+    )
+    np.testing.assert_allclose(
+        actual["equation"]["Coefficient"],
+        _array(expected["equation"]["Coefficient"]),
+        atol=5e-2,
+    )
+    assert isinstance(expected["x.star"], dict)
+    assert isinstance(actual["x.star"], dict)
+    np.testing.assert_allclose(actual["x.star"]["x"], _array(expected["x.star"]["x"]), atol=5e-2)
+    np.testing.assert_allclose(actual["Point.est"], _array(expected["Point.est"]), atol=5e-2)
+
+
+@pytest.mark.parity
 def test_nns_reg_dim_red_point_only_matches_r() -> None:
     x1 = np.linspace(-2.0, 2.0, 50)
     x = np.column_stack((x1, np.sin(x1), np.cos(x1)))
@@ -602,6 +646,7 @@ def _r_nns_reg_dimred(
     point_est: np.ndarray | None,
     point_only: bool,
     confidence_interval: float | None = None,
+    tau: object | None = None,
 ) -> Any:
     return nns(
         "NNS.reg",
@@ -610,7 +655,7 @@ def _r_nns_reg_dimred(
         False,
         order,
         dim_red_method,
-        None,
+        tau,
         None,
         None if point_est is None else point_est.tolist(),
         "top",

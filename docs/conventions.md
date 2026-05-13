@@ -125,16 +125,18 @@ dictionaries of NumPy arrays. `multivariate_call=True` returns R's internal
 two-column regression-point structure as `{"x": ..., "y": ...}` for
 `nns_m_reg`. Matrix `x` without dimension reduction dispatches to `nns_m_reg`.
 Classification is supported for numeric/logical/factor-like class-code targets.
-Smooth splines and factor dummy expansion are explicit future batches and raise
-`NotImplementedError`.
+Smooth splines remain an explicit future batch and raise `NotImplementedError`.
+Factor predictor expansion is supported through the public `nns_reg` path.
 
 Numeric dimension reduction is supported for `"cor"`, `"NNS.dep"`,
 `"NNS.caus"`, `"all"`, `"equal"`, and numeric coefficient vectors. The
 synthetic `x.star` projection follows R's min-max normalization and denominator
-conventions, including joint normalization for `point_est`. `tau="ts"` remains
-deferred in the dim-red regression path. The `"NNS.caus"` branch uses the ported
-`Uni.caus` internals and may differ from installed R at small asymmetric
-dependence granularity.
+conventions, including joint normalization for `point_est`. In this dim-red
+regression path, `tau="ts"` follows R's direct `Uni.caus` call and maps to a
+fixed lag of `3`; public `nns_causation(..., tau="ts")` still uses the
+`NNS.seas`-derived lag path. The `"NNS.caus"` branch uses the ported `Uni.caus`
+internals and may differ from installed R at small asymmetric dependence
+granularity.
 
 `order="max"` follows installed R's univariate convention: fitted values are the
 observed `y` values and `regression.points` is the sorted observed `(x, y)` map.

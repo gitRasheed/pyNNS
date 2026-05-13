@@ -611,10 +611,10 @@ def _dimred_tau(tau: object | None) -> int:
     if tau is None or tau == "cs":
         return 0
     if tau == "ts":
-        raise NotImplementedError(
-            "nns_reg dim_red_method with tau='ts' requires wiring NNS.seas-derived "
-            "lags into the dim-red path, which is not yet ported."
-        )
+        # R's NNS.reg dim-red branch calls internal Uni.caus directly, where
+        # tau="ts" is a fixed lag of 3 rather than the public NNS.caus
+        # NNS.seas-derived lag path.
+        return 3
     tau_value = int(cast(Any, tau))
     if tau_value < 0:
         raise ValueError("tau must be non-negative.")

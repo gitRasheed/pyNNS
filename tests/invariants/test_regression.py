@@ -88,7 +88,7 @@ def test_nns_reg_confidence_interval_none_output_unchanged() -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["smooth", "smooth_confidence", "point_only", "dimred_tau_ts", "matrix_point_est"],
+    ["smooth", "smooth_confidence", "point_only", "matrix_point_est"],
 )
 def test_nns_reg_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
@@ -101,13 +101,25 @@ def test_nns_reg_deferred_paths_raise(path: str) -> None:
             nns_reg(x, y, smooth=True, confidence_interval=0.95)
         elif path == "point_only":
             nns_reg(x, y, point_only=True)
-        elif path == "dimred_tau_ts":
-            matrix = np.column_stack((x, np.cos(x)))
-            nns_reg(matrix, y, dim_red_method="NNS.caus", tau="ts")
         elif path == "matrix_point_est":
             nns_reg(x, y, point_est=np.array([[0.0], [1.0]]))
         else:
             nns_reg(x, y, multivariate_call=True)
+
+
+def test_nns_reg_dimred_tau_ts_uses_fixed_uni_caus_lag() -> None:
+    x1 = np.linspace(-2.0, 2.0, 30)
+    x = np.column_stack((x1, np.sin(x1), np.cos(x1)))
+    y = x[:, 0] + x[:, 1]
+
+    ts_result = nns_reg(x, y, dim_red_method="NNS.caus", tau="ts")
+    lag_result = nns_reg(x, y, dim_red_method="NNS.caus", tau=3)
+
+    np.testing.assert_allclose(ts_result["x.star"]["x"], lag_result["x.star"]["x"])
+    np.testing.assert_allclose(
+        ts_result["equation"]["Coefficient"],
+        lag_result["equation"]["Coefficient"],
+    )
 
 
 def test_nns_reg_classification_outputs_numeric_codes() -> None:
