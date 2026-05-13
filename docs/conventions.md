@@ -251,11 +251,9 @@ Simple single-column explicit-level factor predictors are supported through
 selection, matching installed R's `data.matrix` conversion. Pass `None` for
 numeric columns in mixed predictor matrices, for example
 `factor_levels=(["low", "mid", "high"], None)`. Multiple explicit-level factor
-predictors are supported when `features_only=True`, where installed R returns
-only feature diagnostics. Final estimates for multiple factor predictors remain
-deferred because installed R probes can produce matching feature diagnostics
-while PyNNS final predictions diverge, and another probe errored inside
-R `NNS.reg`. Numeric `pred_int` is supported and
+predictors remain deferred because installed R probes can produce matching
+feature diagnostics in one case but diverge in another, final predictions also
+diverge, and another probe errored inside R `NNS.reg`. Numeric `pred_int` is supported and
 delegates to `nns_stack(pred_int=...)`, matching installed R; it is deterministic
 and does not use MC/meboot. `features_only=True` returns before the final stack
 fit and ignores `pred_int`, matching R. Classification `pred_int` is supported
@@ -384,6 +382,11 @@ interval tables.
 `nns_diff` maps to R's scalar callable `NNS.diff` path with plotting and trace
 output disabled. It returns a dictionary keyed by R's matrix row names and
 rounds results to `digits`, matching R's default output convention.
+`dy_dx(..., eval_point="overall")` maps to R's `dy.dx(..., eval.point =
+"overall")` path and returns the mean fitted gradient from unsmoothed
+`nns_reg`. Numeric `dy_dx` evaluation points and all `dy_d` finite-difference
+paths remain deferred because installed R evaluates those points through
+`NNS.reg(..., smooth = TRUE)`, which depends on R-compatible smoothing splines.
 
 ## ANOVA
 

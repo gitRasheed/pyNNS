@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
 DiffResult = dict[str, float]
+DyDxResult = float | dict[str, NDArray[np.float64]]
 
 _RESULT_KEYS = [
     "Value of f(x) at point",
@@ -161,6 +162,49 @@ def nns_diff(
             complex_step,
         ],
         digits,
+    )
+
+
+def dy_dx(
+    x: NDArray[Any],
+    y: NDArray[Any],
+    eval_point: str | float | NDArray[np.float64] | None = None,
+) -> DyDxResult:
+    """Partial derivative wrapper for R's dy.dx overall-gradient path."""
+    if isinstance(eval_point, str):
+        if eval_point.lower() != "overall":
+            raise ValueError("eval_point must be 'overall', numeric, or None.")
+        from pynns.regression import nns_reg
+
+        result = nns_reg(
+            np.asarray(x, dtype=np.float64),
+            np.asarray(y, dtype=np.float64),
+            plot=False,
+        )
+        fitted = result["Fitted.xy"]
+        if not isinstance(fitted, dict):
+            raise TypeError("nns_reg returned an unexpected fitted table.")
+        return float(np.mean(np.asarray(fitted["gradient"], dtype=np.float64)))
+    raise NotImplementedError(
+        "dy_dx eval_point values require R's smooth=True finite-difference path, "
+        "which depends on smooth.spline and is not yet ported."
+    )
+
+
+def dy_d(
+    x: NDArray[Any],
+    y: NDArray[Any],
+    wrt: int | NDArray[np.int64],
+    eval_points: str | float | NDArray[np.float64] = "obs",
+    *,
+    mixed: bool = False,
+    messages: bool = True,
+) -> dict[str, NDArray[np.float64]]:
+    """Placeholder for R's dy.d_ finite-difference derivative wrapper."""
+    del x, y, wrt, eval_points, mixed, messages
+    raise NotImplementedError(
+        "dy_d finite-difference derivatives require R's smooth=True NNS.reg path, "
+        "which depends on smooth.spline and is not yet ported."
     )
 
 

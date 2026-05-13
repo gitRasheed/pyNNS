@@ -4,10 +4,10 @@ from typing import Any
 
 import numpy as np
 import pytest
-from _r import nns_diff_custom
+from _r import dy_dx_overall, nns_diff_custom
 from _tolerances import EXACT
 
-from pynns import nns_diff
+from pynns import dy_dx, nns_diff
 
 DIFF_PARITY = 1e-5
 
@@ -37,6 +37,17 @@ def test_nns_diff_derivative_matches_r(
         expected["Value of f(x) at point"],
         atol=EXACT,
     )
+
+
+@pytest.mark.parity
+def test_dy_dx_overall_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    y = x + np.sin(x)
+
+    expected = float(np.asarray(dy_dx_overall(x.tolist(), y.tolist()), dtype=np.float64))
+    actual = dy_dx(x, y, eval_point="overall")
+
+    assert actual == pytest.approx(expected, abs=EXACT)
 
 
 def _r_nns_diff(name: str, point: float) -> dict[str, float]:

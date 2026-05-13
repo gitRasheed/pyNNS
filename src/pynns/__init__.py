@@ -12,6 +12,8 @@ _EXPORTS = {
     "co_upm_nd": ("pynns.dependence", "co_upm_nd"),
     "d_lpm": ("pynns.co_moments", "d_lpm"),
     "dpm_nd": ("pynns.dependence", "dpm_nd"),
+    "dy_d": ("pynns.diff", "dy_d"),
+    "dy_dx": ("pynns.diff", "dy_dx"),
     "d_upm": ("pynns.co_moments", "d_upm"),
     "ecdf_pm": ("pynns.classical", "ecdf_pm"),
     "encode_factor_codes": ("pynns.categorical", "encode_factor_codes"),

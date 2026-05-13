@@ -63,7 +63,6 @@ def nns_boost(
             x_input,
             x_test_input,
             factor_levels=factor_levels,
-            allow_multiple_factor_predictors=features_only,
         )
     elif x_input.dtype.kind in {"U", "S", "O"} or (
         x_test_input is not None and x_test_input.dtype.kind in {"U", "S", "O"}
@@ -295,7 +294,6 @@ def _encode_factor_predictors(
     x_test: NDArray[Any] | None,
     *,
     factor_levels: Sequence[object] | Sequence[Sequence[object] | None],
-    allow_multiple_factor_predictors: bool,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64] | None]:
     x_array = np.asarray(x)
     test_array = None if x_test is None else np.asarray(x_test)
@@ -317,14 +315,11 @@ def _encode_factor_predictors(
             test_array = test_array.reshape(1, -1)
         if test_array.ndim != 2 or test_array.shape[1] != x_array.shape[1]:
             raise ValueError("ivs_test must have the same column count as ivs_train.")
-    if (
-        _boost_factor_column_count(factor_levels, x_array.shape[1]) > 1
-        and not allow_multiple_factor_predictors
-    ):
+    if _boost_factor_column_count(factor_levels, x_array.shape[1]) > 1:
         raise NotImplementedError(
-            "nns_boost final estimates with multiple factor predictor columns are deferred "
-            "because installed R can return feature diagnostics that PyNNS matches while "
-            "final predictions diverge."
+            "nns_boost multiple factor predictor columns are deferred because installed R "
+            "can return feature diagnostics that PyNNS matches in one probe but diverges "
+            "in another, while final predictions also diverge."
         )
 
     train_columns: list[NDArray[np.float64]] = []

@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pynns import nns_diff
+from pynns import dy_d, dy_dx, nns_diff
 
 
 def test_nns_diff_constant_derivative_is_zero() -> None:
@@ -23,3 +23,19 @@ def test_nns_diff_smooth_function_derivative_has_bounded_error() -> None:
     result = nns_diff(np.sin, point)
 
     assert result["DERIVATIVE"] == pytest.approx(np.cos(point), abs=1e-6)
+
+
+def test_dy_dx_numeric_eval_point_remains_deferred() -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    y = x + np.sin(x)
+
+    with pytest.raises(NotImplementedError, match="dy_dx eval_point values"):
+        dy_dx(x, y, eval_point=0.0)
+
+
+def test_dy_d_remains_deferred() -> None:
+    x = np.column_stack((np.linspace(-2.0, 2.0, 24), np.linspace(0.0, 1.0, 24)))
+    y = x[:, 0] + x[:, 1]
+
+    with pytest.raises(NotImplementedError, match="dy_d finite-difference derivatives"):
+        dy_d(x, y, wrt=1)

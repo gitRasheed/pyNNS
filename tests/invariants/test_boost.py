@@ -66,44 +66,24 @@ def test_nns_boost_factor_predictor_requires_explicit_levels() -> None:
         nns_boost(variable, y, variable[:3], cv_size=0.25, feature_importance=False)
 
 
-def test_nns_boost_multiple_factor_predictor_final_estimates_remain_deferred() -> None:
+@pytest.mark.parametrize("features_only", [False, True])
+def test_nns_boost_multiple_factor_predictors_remain_deferred(features_only: bool) -> None:
     x = np.linspace(-2.0, 2.0, 24)
     first = np.where(x < -0.5, "low", np.where(x > 0.75, "high", "mid"))
     second = np.where(np.sin(x) > 0.0, "up", "down")
     variable = np.column_stack((first, x, second))
     y = x + np.where(first == "low", 1.0, np.where(first == "mid", 2.0, 3.0)) * 0.25
 
-    with pytest.raises(NotImplementedError, match="final estimates with multiple factor predictor"):
+    with pytest.raises(NotImplementedError, match="multiple factor predictor columns"):
         nns_boost(
             variable,
             y,
             variable[:4],
             cv_size=0.25,
             factor_levels=(["low", "mid", "high"], None, ["down", "up"]),
+            features_only=features_only,
             feature_importance=False,
         )
-
-
-def test_nns_boost_multiple_factor_predictor_features_only_is_supported() -> None:
-    x = np.linspace(-2.0, 2.0, 24)
-    first = np.where(x < -0.5, "low", np.where(x > 0.75, "high", "mid"))
-    second = np.where(np.sin(x) > 0.0, "up", "down")
-    variable = np.column_stack((first, x, second))
-    y = x + np.where(first == "low", 1.0, np.where(first == "mid", 2.0, 3.0)) * 0.25
-
-    result = nns_boost(
-        variable,
-        y,
-        variable[:4],
-        cv_size=0.25,
-        factor_levels=(["low", "mid", "high"], None, ["down", "up"]),
-        features_only=True,
-        feature_importance=False,
-    )
-
-    assert set(result) == {"feature.weights", "feature.frequency"}
-    assert np.sum(result["feature.weights"]) == pytest.approx(1.0)
-    assert np.sum(result["feature.frequency"]) > 0
 
 
 def test_nns_boost_numeric_pred_int_shape() -> None:

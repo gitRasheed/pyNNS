@@ -221,53 +221,6 @@ def nns_boost_factor_predictor(
         return result
 
 
-def nns_boost_multi_factor_features_only(
-    x_first: list[str],
-    x_numeric: list[float],
-    x_second: list[str],
-    y: list[float],
-    x_test_first: list[str],
-    x_test_numeric: list[float],
-    x_test_second: list[str],
-    *,
-    first_levels: Sequence[object],
-    second_levels: Sequence[object],
-    learner_trials: int,
-    cv_size: float,
-    depth: int | str | None,
-) -> RValue:
-    args = {
-        "x_first": x_first,
-        "x_numeric": x_numeric,
-        "x_second": x_second,
-        "y": y,
-        "x_test_first": x_test_first,
-        "x_test_numeric": x_test_numeric,
-        "x_test_second": x_test_second,
-        "first_levels": first_levels,
-        "second_levels": second_levels,
-        "learner_trials": learner_trials,
-        "cv_size": cv_size,
-        "depth": depth,
-    }
-    key = _cache_key("NNS.boost.multi_factor_features_only", (args,))
-    cache, refresh = _cache_state()
-    if key in cache:
-        return _decode(cache[key])
-    if _offline():
-        raise RuntimeError(f"R cache miss for NNS.boost.multi_factor_features_only with key {key}.")
-    with _cache_lock():
-        disk_cache, disk_refresh = _read_cache_from_disk()
-        if refresh or disk_refresh:
-            disk_cache = {}
-        if key in disk_cache:
-            return _decode(disk_cache[key])
-        result = _call_r_boost_multi_factor_features_only(args)
-        disk_cache[key] = _encode(result)
-        _write_cache(disk_cache)
-        return result
-
-
 def nns_reg_factor_predictor(
     x: list[str],
     y: list[float],
@@ -570,6 +523,26 @@ def nns_diff_custom(name: str, point: float) -> RValue:
         if key in disk_cache:
             return _decode(disk_cache[key])
         result = _call_r_diff_custom(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
+def dy_dx_overall(x: Sequence[float], y: Sequence[float]) -> RValue:
+    args = {"x": x, "y": y}
+    key = _cache_key("dy.dx.overall", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for dy.dx.overall with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_dy_dx_overall(args)
         disk_cache[key] = _encode(result)
         _write_cache(disk_cache)
         return result
@@ -1102,50 +1075,6 @@ def _call_r_boost_factor_predictor(args: dict[str, Any]) -> RValue:
     return _decode(json.loads(completed.stdout))
 
 
-def _call_r_boost_multi_factor_features_only(args: dict[str, Any]) -> RValue:
-    script = (
-        "library(NNS)\n"
-        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
-        "simplifyVector = FALSE)\n"
-        "depth_arg <- args$depth\n"
-        "if (length(depth_arg) == 0) depth_arg <- NULL\n"
-        "first_levels <- as.character(unlist(args$first_levels))\n"
-        "second_levels <- as.character(unlist(args$second_levels))\n"
-        "train <- data.frame("
-        "First = factor(as.character(unlist(args$x_first)), levels = first_levels), "
-        "Z = as.numeric(unlist(args$x_numeric)), "
-        "Second = factor(as.character(unlist(args$x_second)), levels = second_levels))\n"
-        "test <- data.frame("
-        "First = factor(as.character(unlist(args$x_test_first)), levels = first_levels), "
-        "Z = as.numeric(unlist(args$x_test_numeric)), "
-        "Second = factor(as.character(unlist(args$x_test_second)), levels = second_levels))\n"
-        "result <- NNS::NNS.boost("
-        "train, as.numeric(unlist(args$y)), IVs.test = test, "
-        "learner.trials = as.integer(args$learner_trials), "
-        "CV.size = as.numeric(args$cv_size), depth = depth_arg, "
-        "features.only = TRUE, feature.importance = FALSE, status = FALSE)\n"
-        "encode <- function(x) {\n"
-        "  if (is.null(x)) return(NULL)\n"
-        "  if (is.matrix(x)) {\n"
-        "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"
-        "  }\n"
-        "  if (is.list(x)) return(lapply(x, encode))\n"
-        "  if (is.character(x)) return(as.character(x))\n"
-        "  as.numeric(x)\n"
-        "}\n"
-        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA, null = 'null'))\n"
-    )
-    completed = subprocess.run(
-        ["Rscript", "-e", script],
-        check=True,
-        capture_output=True,
-        env=_r_env(),
-        input=json.dumps(args),
-        text=True,
-    )
-    return _decode(json.loads(completed.stdout))
-
-
 def _call_r_meboot_diagnostics(args: dict[str, Any]) -> RValue:
     script = (
         "library(NNS)\n"
@@ -1360,6 +1289,25 @@ def _call_r_diff_custom(args: dict[str, Any]) -> RValue:
         "payload <- as.numeric(result[, 1])\n"
         "names(payload) <- rownames(result)\n"
         "cat(jsonlite::toJSON(as.list(payload), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_dy_dx_overall(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
+        "result <- NNS::dy.dx(as.numeric(unlist(args$x)), as.numeric(unlist(args$y)), "
+        "eval.point = 'overall')\n"
+        "cat(jsonlite::toJSON(as.numeric(result), auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],
