@@ -301,6 +301,11 @@ installed R, including zero forecasts for automatic seasonality paths and `NaN`
 forecasts for some explicit numeric-lag paths. Character `weights` with numeric
 multi-lag seasonal factors is rejected because installed R errors during numeric
 multiplication on that path.
+`nns_arma_optim`, `nns_var`, and `nns_nowcast` are exported as explicit guarded
+stubs. Installed R's `NNS.ARMA.optim` evaluates `NNS.reg(..., smooth = TRUE)`,
+`NNS.VAR` delegates to `NNS.ARMA.optim`, and `NNS.nowcast` delegates to
+`NNS.VAR` after external macroeconomic data retrieval. These wrappers remain
+deferred until smooth regression and the VAR boundary are ported.
 
 ## Meboot
 

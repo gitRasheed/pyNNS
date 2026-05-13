@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -10,6 +11,44 @@ from pynns.mc import nns_mc
 from pynns.regression import nns_reg
 from pynns.seasonality import nns_seas
 from pynns.var import lpm_var, upm_var
+
+
+def nns_arma_optim(
+    variable: NDArray[np.float64],
+    h: int | None = None,
+    training_set: int | None = None,
+    seasonal_factor: NDArray[np.int64] | list[int] | None = None,
+    *,
+    lin_only: bool = False,
+    negative_values: bool = False,
+    obj_fn: Any = None,
+    objective: str = "min",
+    linear_approximation: bool = True,
+    ncores: int | None = None,
+    pred_int: float | None = 0.95,
+    print_trace: bool = True,
+    plot: bool = False,
+) -> dict[str, Any]:
+    """Guarded placeholder for R's NNS.ARMA.optim path."""
+    del (
+        variable,
+        h,
+        training_set,
+        seasonal_factor,
+        lin_only,
+        negative_values,
+        obj_fn,
+        objective,
+        linear_approximation,
+        ncores,
+        pred_int,
+        print_trace,
+        plot,
+    )
+    raise NotImplementedError(
+        "nns_arma_optim default optimizer path requires nns_reg smooth=True, "
+        "which depends on smooth.spline and is not yet ported."
+    )
 
 
 def nns_arma(

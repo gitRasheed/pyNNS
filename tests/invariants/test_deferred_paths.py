@@ -19,6 +19,9 @@ EXPECTED_DEFERRED_FRAGMENTS = {
     "dy_d finite-difference derivatives": "point-evaluated derivative wrappers",
     "direct nns_m_reg factor_2_dummy=True": "direct `factor_2_dummy=True` raw predictor path",
     "factor predictors with method 2": "factor predictor method-2 diagnostics",
+    "nns_arma_optim default optimizer path": "default optimizer path",
+    "nns_var default VAR path": "default VAR path",
+    "nns_nowcast depends on nns_var": "nowcast wrapper",
 }
 
 

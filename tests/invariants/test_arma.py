@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pynns import nns_arma
+from pynns import nns_arma, nns_arma_optim, nns_nowcast, nns_var
 
 
 def test_nns_arma_output_length_matches_h() -> None:
@@ -78,6 +78,30 @@ def test_nns_arma_pred_int_h_one_matches_installed_r_error() -> None:
 
     with pytest.raises(ValueError, match="incorrect number of dimensions"):
         nns_arma(variable, h=1, seasonal_factor=4, method="nonlin", pred_int=0.95)
+
+
+def test_nns_arma_optim_remains_deferred() -> None:
+    variable = np.sin(np.arange(1, 40, dtype=np.float64) / 3.0) + 2.0
+
+    with pytest.raises(NotImplementedError, match="nns_arma_optim default optimizer path"):
+        nns_arma_optim(variable, h=3, seasonal_factor=[4, 8])
+
+
+def test_nns_var_remains_deferred() -> None:
+    variables = np.column_stack(
+        (
+            np.sin(np.arange(1, 40, dtype=np.float64) / 3.0),
+            np.cos(np.arange(1, 40, dtype=np.float64) / 4.0),
+        )
+    )
+
+    with pytest.raises(NotImplementedError, match="nns_var default VAR path"):
+        nns_var(variables, h=3)
+
+
+def test_nns_nowcast_remains_deferred() -> None:
+    with pytest.raises(NotImplementedError, match="nns_nowcast depends on nns_var"):
+        nns_nowcast(h=1)
 
 
 @pytest.mark.parametrize("values", [np.array([1.0, np.nan, 3.0]), np.array([1.0, np.inf, 3.0])])
