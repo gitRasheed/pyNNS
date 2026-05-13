@@ -75,7 +75,8 @@ def nns_boost(
     if x_train.shape[1] > 10:
         raise NotImplementedError(
             "nns_boost for n_features > 10 requires R's stochastic epoch keeper loop, "
-            "which is not yet ported. Use <=10 features or port the epoch loop first."
+            "including R sample() feature draws from a weighted survivor pool, which is "
+            "not yet ported. Use <=10 features or port the epoch loop first."
         )
     rng = np.random.default_rng(random_seed)
     if balance:

@@ -232,7 +232,10 @@ supported for deterministic small-feature classification and uses the same
 R-style `downSample` + `upSample` structure as `nns_stack`; exact sampled-row
 parity with R is not expected because PyNNS uses NumPy's RNG, and `random_seed`
 is PyNNS-only. The stochastic epoch keeper path for `n_features > 10` is not yet
-ported and raises `NotImplementedError`. Factor predictors remain deferred:
+ported and raises `NotImplementedError`; installed R samples learner-trial
+feature sets and then samples epoch feature counts from a weighted survivor pool
+using R `sample()`, so a faithful port needs that sampling contract mapped first.
+Factor predictors remain deferred:
 installed R integer-codes them via `data.matrix`, but a direct code-port probe
 matched final predictions while diverging on deterministic feature-frequency
 diagnostics. Numeric `pred_int` is supported and
