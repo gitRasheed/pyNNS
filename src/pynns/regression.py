@@ -744,11 +744,6 @@ def _reject_deferred_paths(
         raise NotImplementedError(
             "smooth=True requires the smoothing-spline path, deferred to a later batch."
         )
-    if point_est is not None and np.asarray(point_est).ndim > 1:
-        raise NotImplementedError(
-            "matrix point_est is only supported for matrix x via nns_m_reg; univariate "
-            "nns_reg requires scalar or 1D point_est."
-        )
 
 
 def _validate_noise_reduction(value: str) -> NoiseReduction:
@@ -767,10 +762,7 @@ def _as_point_est(point_est: NDArray[np.float64] | float | None) -> NDArray[np.f
     if values.ndim == 0:
         values = values.reshape(1)
     if values.ndim != 1:
-        raise NotImplementedError(
-            "matrix point_est is only supported for matrix x via nns_m_reg; univariate "
-            "nns_reg requires scalar or 1D point_est."
-        )
+        values = values.reshape(-1, order="F")
     if not np.all(np.isfinite(values)):
         raise ValueError("point_est must contain only finite values.")
     return values

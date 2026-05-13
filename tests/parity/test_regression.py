@@ -249,6 +249,24 @@ def test_nns_reg_univariate_point_only_matches_r() -> None:
 
 
 @pytest.mark.parity
+def test_nns_reg_univariate_matrix_point_est_matches_r_flattening() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    y = np.sin(x)
+    point_est = np.array([[-1.0, 1.0], [0.0, 2.0]])
+
+    expected = _r_nns_reg(
+        x,
+        y,
+        order=None,
+        noise="off",
+        point_est=np.array([-1.0, 0.0, 1.0, 2.0]),
+    )
+    actual = nns_reg(x, y, point_est=point_est)
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
 def test_nns_reg_dim_red_degenerate_equal_projection_matches_r() -> None:
     x = np.array(
         [

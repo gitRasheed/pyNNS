@@ -88,7 +88,7 @@ def test_nns_reg_confidence_interval_none_output_unchanged() -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["smooth", "smooth_confidence", "matrix_point_est"],
+    ["smooth", "smooth_confidence"],
 )
 def test_nns_reg_deferred_paths_raise(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
@@ -99,8 +99,6 @@ def test_nns_reg_deferred_paths_raise(path: str) -> None:
             nns_reg(x, y, smooth=True)
         elif path == "smooth_confidence":
             nns_reg(x, y, smooth=True, confidence_interval=0.95)
-        elif path == "matrix_point_est":
-            nns_reg(x, y, point_est=np.array([[0.0], [1.0]]))
         else:
             nns_reg(x, y, multivariate_call=True)
 
@@ -114,6 +112,16 @@ def test_nns_reg_univariate_point_only_matches_regular_shape() -> None:
     assert result["Fitted.xy"]["x"].shape == x.shape
     assert result["regression.points"]["x"].ndim == 1
     assert result["Point.est"].shape == (3,)
+
+
+def test_nns_reg_univariate_matrix_point_est_flattens_like_r_matrix() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    y = np.sin(x)
+
+    matrix_result = nns_reg(x, y, point_est=np.array([[-1.0, 1.0], [0.0, 2.0]]))
+    vector_result = nns_reg(x, y, point_est=np.array([-1.0, 0.0, 1.0, 2.0]))
+
+    np.testing.assert_allclose(matrix_result["Point.est"], vector_result["Point.est"])
 
 
 def test_nns_reg_dimred_tau_ts_uses_fixed_uni_caus_lag() -> None:
