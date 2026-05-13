@@ -3,13 +3,13 @@ from __future__ import annotations
 import itertools
 import math
 import warnings
-from collections.abc import Callable
-from typing import Any, Literal
+from collections.abc import Callable, Sequence
+from typing import Any, Literal, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
-from pynns.categorical import _balance_class_training, _dense_factor_codes
+from pynns.categorical import _balance_class_training, _dense_factor_codes, encode_factor_codes
 from pynns.dependence import _gravity
 from pynns.regression import (
     Order,
@@ -47,14 +47,34 @@ def nns_boost(
     status: bool = False,
     random_seed: int | None = None,
     class_levels: list[object] | None = None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None] | None = None,
 ) -> BoostResult:
     """Deterministic NNS.boost port using real NNS.reg and NNS.stack internals."""
     del status
     type_value = _normalize_type(type)
     if balance:
         type_value = "class"
-    x_train = _as_matrix(ivs_train, "ivs_train")
-    x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
+    x_input: NDArray[Any] | NDArray[np.float64] = np.asarray(ivs_train)
+    x_test_input: NDArray[Any] | NDArray[np.float64] | None = (
+        None if ivs_test is None else np.asarray(ivs_test)
+    )
+    if factor_levels is not None:
+        x_input, x_test_input = _encode_factor_predictors(
+            x_input,
+            x_test_input,
+            factor_levels=factor_levels,
+        )
+    elif x_input.dtype.kind in {"U", "S", "O"} or (
+        x_test_input is not None and x_test_input.dtype.kind in {"U", "S", "O"}
+    ):
+        raise ValueError("string/object predictor values require explicit factor_levels.")
+
+    x_train = _as_matrix(x_input, "ivs_train")
+    x_test = (
+        x_train.copy()
+        if x_test_input is None
+        else _as_point_matrix(x_test_input, x_train.shape[1])
+    )
     ts_test_value = None if ts_test is None else int(ts_test)
     if ts_test_value is not None and ts_test_value <= 0:
         raise ValueError("ts_test must be a positive integer.")
@@ -136,6 +156,7 @@ def nns_boost(
             pred_int=pred_int,
             random_seed=random_seed,
             class_levels=class_levels,
+            factor_levels=factor_levels,
         )
 
 
@@ -266,6 +287,72 @@ def _all_feature_sets(n_cols: int) -> list[tuple[int, ...]]:
         for size in range(1, n_cols + 1)
         for combo in itertools.combinations(range(n_cols), size)
     ]
+
+
+def _encode_factor_predictors(
+    x: NDArray[Any],
+    x_test: NDArray[Any] | None,
+    *,
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None],
+) -> tuple[NDArray[np.float64], NDArray[np.float64] | None]:
+    x_array = np.asarray(x)
+    test_array = None if x_test is None else np.asarray(x_test)
+    if x_array.ndim == 1:
+        combined = (
+            x_array.reshape(-1)
+            if test_array is None
+            else np.concatenate((x_array.reshape(-1), test_array.reshape(-1)))
+        )
+        encoded = _encode_factor_column(combined, _boost_levels_for_column(factor_levels, 0, 1))
+        train = encoded[: x_array.shape[0]]
+        test = None if test_array is None else encoded[x_array.shape[0] :]
+        return train.reshape(-1, 1), None if test is None else test.reshape(-1, 1)
+
+    if x_array.ndim != 2:
+        raise ValueError("ivs_train must be a vector or 2D matrix.")
+    if test_array is not None:
+        if test_array.ndim == 1:
+            test_array = test_array.reshape(1, -1)
+        if test_array.ndim != 2 or test_array.shape[1] != x_array.shape[1]:
+            raise ValueError("ivs_test must have the same column count as ivs_train.")
+
+    train_columns: list[NDArray[np.float64]] = []
+    test_columns: list[NDArray[np.float64]] = []
+    for col in range(x_array.shape[1]):
+        column = x_array[:, col]
+        combined = column if test_array is None else np.concatenate((column, test_array[:, col]))
+        encoded = _encode_factor_column(
+            combined,
+            _boost_levels_for_column(factor_levels, col, x_array.shape[1]),
+        )
+        train_columns.append(encoded[: x_array.shape[0]])
+        if test_array is not None:
+            test_columns.append(encoded[x_array.shape[0] :])
+    train_matrix = np.column_stack(train_columns)
+    test_matrix = None if test_array is None else np.column_stack(test_columns)
+    return train_matrix, test_matrix
+
+
+def _encode_factor_column(
+    values: NDArray[Any],
+    levels: Sequence[object] | None,
+) -> NDArray[np.float64]:
+    if levels is None:
+        return np.asarray(values, dtype=np.float64).reshape(-1)
+    codes, _ = encode_factor_codes(values, levels=levels)
+    return codes
+
+
+def _boost_levels_for_column(
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None],
+    column: int,
+    n_cols: int,
+) -> Sequence[object] | None:
+    if n_cols == 1:
+        return factor_levels
+    if column >= len(factor_levels):
+        raise ValueError("factor_levels must provide levels for every predictor column.")
+    return cast(Sequence[Sequence[object] | None], factor_levels)[column]
 
 
 def _random_feature_set(

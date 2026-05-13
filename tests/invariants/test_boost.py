@@ -56,6 +56,16 @@ def test_nns_boost_ts_test_shape_and_feature_weights() -> None:
     assert np.all(np.isfinite(result["results"]))
 
 
+def test_nns_boost_factor_predictor_requires_explicit_levels() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    labels = np.where(x > 0.0, "B", "A")
+    variable = np.column_stack((labels, x))
+    y = x + np.where(labels == "B", 1.0, 0.0)
+
+    with pytest.raises(ValueError, match="explicit factor_levels"):
+        nns_boost(variable, y, variable[:3], cv_size=0.25, feature_importance=False)
+
+
 def test_nns_boost_numeric_pred_int_shape() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))

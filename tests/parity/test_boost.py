@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
-from _r import nns_boost_numeric
+from _r import nns_boost_factor_predictor, nns_boost_numeric
 from _tolerances import COMPOUND
 
 from pynns import nns_boost
@@ -209,6 +209,71 @@ def test_nns_boost_ts_test_features_only_matches_r() -> None:
         cv_size=0.25,
         features_only=True,
         ts_test=5,
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_boost_factor_predictor_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    labels = np.where(x < -0.5, "low", np.where(x > 0.75, "high", "mid"))
+    y = x + np.where(labels == "low", 1.0, np.where(labels == "mid", 2.0, 3.0)) * 0.25
+    variable = np.column_stack((labels, x))
+
+    expected = nns_boost_factor_predictor(
+        labels.tolist(),
+        x.tolist(),
+        y.tolist(),
+        labels[:5].tolist(),
+        x[:5].tolist(),
+        levels=["low", "mid", "high"],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=None,
+        features_only=False,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        factor_levels=(["low", "mid", "high"], None),
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_boost_factor_predictor_features_only_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    labels = np.where(x < -0.5, "low", np.where(x > 0.75, "high", "mid"))
+    y = x + np.where(labels == "low", 1.0, np.where(labels == "mid", 2.0, 3.0)) * 0.25
+    variable = np.column_stack((labels, x))
+
+    expected = nns_boost_factor_predictor(
+        labels.tolist(),
+        x.tolist(),
+        y.tolist(),
+        labels[:5].tolist(),
+        x[:5].tolist(),
+        levels=["low", "mid", "high"],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=None,
+        features_only=True,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        factor_levels=(["low", "mid", "high"], None),
+        features_only=True,
         feature_importance=False,
     )
 

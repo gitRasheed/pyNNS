@@ -238,19 +238,22 @@ is PyNNS-only. The stochastic epoch keeper path for `n_features > 10` is not yet
 ported and raises `NotImplementedError`; installed R samples learner-trial
 feature sets and then samples epoch feature counts from a weighted survivor pool
 using R `sample()`, so a faithful port needs that sampling contract mapped first.
-Factor predictors remain deferred:
-installed R integer-codes them via `data.matrix`, but a direct code-port probe
-matched final predictions while diverging on deterministic feature-frequency
-diagnostics. Numeric `pred_int` is supported and
+Simple explicit-level factor predictors are supported through `factor_levels=`.
+PyNNS integer-codes those columns before deterministic feature selection,
+matching installed R's `data.matrix` conversion. Pass `None` for numeric
+columns in mixed predictor matrices, for example
+`factor_levels=(["low", "mid", "high"], None)`. Broader factor predictor edge
+cases remain deferred because installed R probes with multiple factor predictors
+errored inside `NNS.reg`, and earlier broad probes diverged on deterministic
+feature-frequency diagnostics. Numeric `pred_int` is supported and
 delegates to `nns_stack(pred_int=...)`, matching installed R; it is deterministic
 and does not use MC/meboot. `features_only=True` returns before the final stack
 fit and ignores `pred_int`, matching R. Classification `pred_int` is supported
 and delegates to final stack `method=1`, so interval bounds remain raw numeric
-values. `ts_test` remains deferred and raises `NotImplementedError`. R requires
-usable column names for matrix inputs; PyNNS uses positional numeric columns. A
-direct deterministic `ts_test` split port was investigated and rejected because
-it diverged from installed R on boost keeper diagnostics and one final
-prediction. As with `nns_stack`, R
+values. Deterministic `ts_test` is supported for `n_features <= 10`; `ts_test`
+on the stochastic `n_features > 10` path remains blocked by the unmapped R
+`sample()` epoch loop. R requires usable column names for matrix inputs; PyNNS
+uses positional numeric columns. As with `nns_stack`, R
 samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
 `cv_size=0.25` unless specified. For classification boost, final predictions,
 feature weights, and feature frequencies are parity-tested against installed R
