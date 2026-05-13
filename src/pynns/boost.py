@@ -315,6 +315,11 @@ def _encode_factor_predictors(
             test_array = test_array.reshape(1, -1)
         if test_array.ndim != 2 or test_array.shape[1] != x_array.shape[1]:
             raise ValueError("ivs_test must have the same column count as ivs_train.")
+    if _boost_factor_column_count(factor_levels, x_array.shape[1]) > 1:
+        raise NotImplementedError(
+            "nns_boost multiple factor predictor columns are deferred because installed R "
+            "can return feature diagnostics that PyNNS matches while final predictions diverge."
+        )
 
     train_columns: list[NDArray[np.float64]] = []
     test_columns: list[NDArray[np.float64]] = []
@@ -353,6 +358,16 @@ def _boost_levels_for_column(
     if column >= len(factor_levels):
         raise ValueError("factor_levels must provide levels for every predictor column.")
     return cast(Sequence[Sequence[object] | None], factor_levels)[column]
+
+
+def _boost_factor_column_count(
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None],
+    n_cols: int,
+) -> int:
+    if n_cols == 1:
+        return 1
+    levels_by_column = cast(Sequence[Sequence[object] | None], factor_levels)
+    return sum(levels is not None for levels in levels_by_column)
 
 
 def _random_feature_set(
