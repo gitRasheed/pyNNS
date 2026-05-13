@@ -59,6 +59,19 @@ def test_nns_reg_dim_red_shapes_and_equation() -> None:
     assert result["Fitted.xy"]["x"].shape == y.shape
 
 
+def test_nns_reg_dim_red_multivariate_call_returns_regression_points() -> None:
+    x1 = np.linspace(-2.0, 2.0, 30)
+    x = np.column_stack((x1, np.sin(x1), np.cos(x1)))
+    y = x[:, 0] + x[:, 1] + 0.25 * x[:, 2]
+
+    result = nns_reg(x, y, dim_red_method="equal", multivariate_call=True)
+
+    assert set(result) == {"x", "y"}
+    assert result["x"].ndim == 1
+    assert result["y"].ndim == 1
+    assert result["x"].shape == result["y"].shape
+
+
 def test_nns_reg_confidence_interval_shapes_and_row_drop() -> None:
     x = np.linspace(-2.0, 2.0, 50)
     y = np.sin(x)

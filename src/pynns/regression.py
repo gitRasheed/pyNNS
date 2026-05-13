@@ -452,11 +452,6 @@ def _nns_reg_dimred(
         raise NotImplementedError(
             "smooth=True requires the smoothing-spline path, deferred to a later batch."
         )
-    if multivariate_call:
-        raise NotImplementedError(
-            "multivariate_call with dim_red_method is not used by R and is not supported."
-        )
-
     x_matrix, y_values = _validate_dimred_inputs(
         x,
         y,
@@ -486,7 +481,7 @@ def _nns_reg_dimred(
         noise=noise,
         point_values=projection.point_est,
         confidence_interval=confidence_interval,
-        multivariate_call=False,
+        multivariate_call=multivariate_call,
         class_mode=class_mode,
         equation=projection.equation,
         x_star={"x": projection.x_star},

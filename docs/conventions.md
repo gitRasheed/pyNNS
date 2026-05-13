@@ -123,7 +123,8 @@ supported: `"off"`, `"mean"`, `"median"`, `"mode"`, and `"mode_class"`.
 `factor.2.dummy = FALSE`, plotting disabled, and no smoothing. Return keys match R's list names, but data.table outputs are plain
 dictionaries of NumPy arrays. `multivariate_call=True` returns R's internal
 two-column regression-point structure as `{"x": ..., "y": ...}` for
-`nns_m_reg`. Matrix `x` without dimension reduction dispatches to `nns_m_reg`.
+`nns_m_reg`, including after dimension-reduction projection. Matrix `x` without
+dimension reduction dispatches to `nns_m_reg`.
 Classification is supported for numeric/logical/factor-like class-code targets.
 Smooth splines remain an explicit future batch and raise `NotImplementedError`.
 Factor predictor expansion is supported through the public `nns_reg` path.

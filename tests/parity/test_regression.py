@@ -237,6 +237,30 @@ def test_nns_reg_dim_red_point_only_matches_r() -> None:
 
 
 @pytest.mark.parity
+def test_nns_reg_dim_red_multivariate_call_matches_r() -> None:
+    x1 = np.linspace(-2.0, 2.0, 30)
+    x = np.column_stack((x1, np.sin(x1), np.cos(x1)))
+    y = x[:, 0] + x[:, 1] + 0.25 * x[:, 2]
+
+    expected = _r_nns_reg_dimred(
+        x,
+        y,
+        order=None,
+        dim_red_method="equal",
+        threshold=0.0,
+        point_est=None,
+        point_only=False,
+        multivariate_call=True,
+    )
+    actual = nns_reg(x, y, dim_red_method="equal", multivariate_call=True)
+
+    assert isinstance(expected, dict)
+    assert set(actual) == set(expected) == {"x", "y"}
+    np.testing.assert_allclose(actual["x"], _array(expected["x"]), atol=COMPOUND)
+    np.testing.assert_allclose(actual["y"], _array(expected["y"]), atol=COMPOUND)
+
+
+@pytest.mark.parity
 def test_nns_reg_univariate_point_only_matches_r() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     y = np.sin(x)
@@ -721,6 +745,7 @@ def _r_nns_reg_dimred(
     point_only: bool,
     confidence_interval: float | None = None,
     tau: object | None = None,
+    multivariate_call: bool = False,
 ) -> Any:
     return nns(
         "NNS.reg",
@@ -745,7 +770,7 @@ def _r_nns_reg_dimred(
         "L2",
         1,
         point_only,
-        False,
+        multivariate_call,
     )
 
 
