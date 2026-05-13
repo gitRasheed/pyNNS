@@ -1,7 +1,8 @@
 # Deferred Paths
 
-Every explicit `NotImplementedError` path is listed here so temporary scope
-limits stay visible.
+Deferred paths include explicit `NotImplementedError` guards plus public API
+surfaces that remain blocked by those guarded paths. Keep the dependency notes
+current so temporary scope limits stay visible.
 
 | Area | Deferred path | Reason | Dependency / next action |
 |---|---|---|---|
