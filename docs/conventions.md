@@ -64,7 +64,9 @@ peels `sd_efficient_set` results and returns a dictionary of `Cluster_1`,
 `Cluster_2`, ... memberships. The output contains variable names, not numeric
 cluster labels; when names are omitted, PyNNS uses R-style `X_1`, `X_2`, ...
 names. `type="continuous"` is supported for first-degree efficient sets.
-`dendrogram=True` is deferred because R returns an `hclust` object.
+`dendrogram=True` returns a plain dictionary mirroring R's `hclust` fields:
+`merge`, `height`, `order`, `labels`, `method`, `call`, and `dist.method`.
+PyNNS does not plot the dendrogram; it only returns the object data.
 
 `nns_cdf` maps to R's `NNS.CDF` deterministic non-plotting paths. It is a
 partial-moment distribution wrapper rather than a textbook ECDF: `degree = 0`

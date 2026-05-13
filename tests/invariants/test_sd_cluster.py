@@ -56,3 +56,27 @@ def test_nns_sd_cluster_duplicate_columns_can_share_cluster() -> None:
     result = nns_sd_cluster(data, degree=1, min_cluster=1, names=["A", "B", "C"])
 
     assert result["Clusters"]["Cluster_1"] == ["A", "C"]
+
+
+def test_nns_sd_cluster_dendrogram_hclust_fields_are_consistent() -> None:
+    data = np.column_stack(
+        [
+            np.arange(1, 6, dtype=np.float64),
+            np.arange(0, 5, dtype=np.float64),
+            np.sin(np.arange(1, 6, dtype=np.float64)),
+            np.arange(1, 6, dtype=np.float64),
+        ]
+    )
+
+    result = nns_sd_cluster(data, degree=1, min_cluster=1, dendrogram=True)
+
+    assert set(result) == {"Clusters", "Dendrogram"}
+    dendrogram = result["Dendrogram"]
+    assert isinstance(dendrogram, dict)
+    labels = dendrogram["labels"]
+    assert len(labels) == data.shape[1]
+    assert dendrogram["merge"].shape == (data.shape[1] - 1, 2)
+    assert dendrogram["height"].shape == (data.shape[1] - 1,)
+    assert dendrogram["order"].shape == (data.shape[1],)
+    assert dendrogram["method"] == "complete"
+    assert dendrogram["dist.method"] is None

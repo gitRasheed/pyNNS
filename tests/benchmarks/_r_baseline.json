@@ -41,6 +41,7 @@
     "nns_reg_dimred_200x3_seconds": 0.0426,
     "nns_reg_factor_predictor_200_seconds": 0.1194,
     "nns_sd_cluster_252x50_degree2_seconds": 0.0138,
+    "nns_sd_cluster_252x50_degree2_dendrogram_seconds": 0.02633333,
     "nns_seas_1000_seconds": 0.0011,
     "nns_seas_5000_seconds": 0.004,
     "nns_ss_1000_seconds": 0.0002,

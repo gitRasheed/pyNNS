@@ -15,6 +15,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `pm_matrix`, N=100, T_obs=500 | 2.343 ms | 16.800 ms | 0.14x |
 | `sd_efficient_set`, degree=2, N=50, T_obs=252 | 13.043 ms | 4.600 ms | 2.84x |
 | `nns_sd_cluster`, degree=2, N=50, T_obs=252 | 31.020 ms | 13.800 ms | 2.25x |
+| `nns_sd_cluster`, degree=2, N=50, T_obs=252, dendrogram=True | 39.100 ms | 26.333 ms | 1.48x |
 | `nns_sd_cluster`, degree=2, N=100, T_obs=252 | 688.179 ms | 131.200 ms | 5.25x |
 | `nns_sd_cluster`, degree=1 continuous, N=50, T_obs=252 | 47.505 ms | 21.600 ms | 2.20x |
 | `nns_cdf`, T_obs=1000, degree=0, type=CDF | 0.024 ms | 1.150 ms | 0.02x |

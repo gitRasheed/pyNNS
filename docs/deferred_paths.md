@@ -16,6 +16,5 @@ limits stay visible.
 | Regression | `multivariate_call=True` with `dim_red_method` | R does not use this combination and PyNNS has no faithful call path for it | Keep rejected unless an R path requiring it is found |
 | Regression | bare univariate `point_only=True` | R uses point-only through multivariate/dim-red callers; PyNNS supports those paths but not bare univariate point-only | Keep univariate-only guard unless R parity requires it |
 | Multivariate regression | `factor_2_dummy=True` | Factor target encoding is supported with `class_levels`, but factor predictor expansion is not wired | Enable predictor dummy expansion in `nns_m_reg` factor paths |
-| Public API | `NNS.SD.cluster(dendrogram=TRUE)` | Default efficient-set clustering is ported, but dendrogram output requires R `hclust`-compatible object construction | Port or shim the hclust object shape if callers need dendrograms |
 | Public API | `dy.dx` / `dy.d_` | Derivative helpers depend on finite-difference grids and `nns_reg(..., smooth=True)`, so they are not thin wrappers over existing derivative output | Port after R-compatible `smooth=True` |
 | VAR | default VAR path | Depends on `NNS.ARMA.optim` and `nns_stack(ts_test)`; `ts_test` is done, but `NNS.ARMA.optim` remains blocked by smooth regression | Port `smooth=True`, then `NNS.ARMA.optim`, then `NNS.VAR` |

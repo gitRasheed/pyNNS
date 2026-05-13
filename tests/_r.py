@@ -42,6 +42,36 @@ def nns(function: str, *args: Any) -> RValue:
     return _uncached_nns(function, args, key, refresh)
 
 
+def nns_sd_cluster_dendrogram(
+    data: list[list[float]],
+    degree: int,
+    type: str,
+    min_cluster: int,
+) -> RValue:
+    args = {
+        "data": data,
+        "degree": degree,
+        "type": type,
+        "min_cluster": min_cluster,
+    }
+    key = _cache_key("NNS.SD.cluster.dendrogram", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.SD.cluster.dendrogram with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_sd_cluster_dendrogram(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def nns_stack_numeric(
     x: list[list[float]],
     y: list[float],
@@ -673,6 +703,39 @@ def _call_r_stack_numeric(args: dict[str, Any]) -> RValue:
         "  as.numeric(x)\n"
         "}\n"
         "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA, null = 'null'))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_sd_cluster_dendrogram(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "mat <- do.call(rbind, lapply(args$data, as.numeric))\n"
+        "result <- NNS.SD.cluster(mat, degree = as.integer(args$degree), "
+        "type = as.character(args$type), min_cluster = as.integer(args$min_cluster), "
+        "dendrogram = TRUE)\n"
+        "if (!is.null(result$Dendrogram)) result$Dendrogram$call <- "
+        "deparse(result$Dendrogram$call)\n"
+        "encode <- function(x) {\n"
+        "  if (is.null(x)) return(NULL)\n"
+        "  if (is.matrix(x)) {\n"
+        "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"
+        "  }\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

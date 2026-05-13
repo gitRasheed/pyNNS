@@ -13,6 +13,8 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.cluster.hierarchy import linkage  # type: ignore[import-untyped]
+from scipy.spatial.distance import squareform  # type: ignore[import-untyped]
 
 from pynns.core import _as_1d_values, lpm
 
@@ -79,12 +81,6 @@ def nns_sd_cluster(
     names: Sequence[str] | None = None,
 ) -> dict[str, object]:
     """Cluster variables by iteratively peeling stochastic-dominance efficient sets."""
-    if dendrogram:
-        raise NotImplementedError(
-            "nns_sd_cluster(dendrogram=True) requires R hclust-compatible dendrogram "
-            "output, which is not yet ported."
-        )
-
     values = np.asarray(data, dtype=np.float64)
     if values.ndim != 2:
         raise ValueError("data must be a 2D array.")
@@ -138,7 +134,66 @@ def nns_sd_cluster(
             clusters[previous_cluster_name].extend(clusters[final_cluster_name])
             del clusters[final_cluster_name]
 
+    if dendrogram:
+        all_vars = [name for cluster in clusters.values() for name in cluster]
+        if len(all_vars) < 2:
+            return {"Clusters": clusters, "Order": None}
+        return {
+            "Clusters": clusters,
+            "Dendrogram": _sd_cluster_hclust(clusters, all_names),
+        }
+
     return {"Clusters": clusters}
+
+
+def _sd_cluster_hclust(
+    clusters: dict[str, list[str]],
+    original_names: Sequence[str],
+) -> dict[str, object]:
+    all_vars = [name for cluster in clusters.values() for name in cluster]
+    cluster_labels = np.asarray(
+        [
+            cluster_index
+            for cluster_index, cluster in enumerate(clusters.values(), start=1)
+            for _ in cluster
+        ],
+        dtype=np.float64,
+    )
+    extraction_order = np.arange(1, len(all_vars) + 1, dtype=np.float64)
+    epsilon = 0.0 if len(clusters) == 1 else 1e-3
+    n = len(original_names)
+    distances = n * np.abs(cluster_labels[:, np.newaxis] - cluster_labels[np.newaxis, :])
+    distances = distances + epsilon * np.abs(
+        extraction_order[:, np.newaxis] - extraction_order[np.newaxis, :]
+    )
+    condensed = squareform(distances, checks=False)
+    linked = linkage(condensed, method="complete")
+    merge = _r_hclust_merge(linked, len(all_vars))
+    original_positions = {name: index + 1 for index, name in enumerate(original_names)}
+    order = np.asarray([original_positions[name] for name in all_vars], dtype=np.int64)
+    return {
+        "merge": merge,
+        "height": linked[:, 2].astype(np.float64),
+        "order": order,
+        "labels": np.asarray(all_vars, dtype=str),
+        "method": "complete",
+        "call": 'hclust(d = dist_matrix, method = "complete")',
+        "dist.method": None,
+    }
+
+
+def _r_hclust_merge(linked: NDArray[np.float64], n_obs: int) -> NDArray[np.int64]:
+    out = np.empty((linked.shape[0], 2), dtype=np.int64)
+    cluster_to_r_id: dict[int, int] = {}
+    for row_index, row in enumerate(linked):
+        for col_index, cluster_id_value in enumerate(row[:2]):
+            cluster_id = int(cluster_id_value)
+            if cluster_id < n_obs:
+                out[row_index, col_index] = -(cluster_id + 1)
+            else:
+                out[row_index, col_index] = cluster_to_r_id[cluster_id]
+        cluster_to_r_id[n_obs + row_index] = row_index + 1
+    return out
 
 
 def sd_efficient_set(

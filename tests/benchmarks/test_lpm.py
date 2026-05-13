@@ -90,6 +90,21 @@ def test_nns_sd_cluster_252x50_degree2(
 
 
 @pytest.mark.benchmark
+def test_nns_sd_cluster_252x50_degree2_dendrogram(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    row = np.arange(252, dtype=np.float64)
+    data = np.column_stack([np.sin(row / (index + 2)) + 0.01 * index for index in range(50)])
+
+    result = benchmark(nns_sd_cluster, data, degree=2, min_cluster=1, dendrogram=True)
+
+    assert isinstance(result["Clusters"], dict)
+    assert isinstance(result["Dendrogram"], dict)
+    assert isinstance(r_baseline["nns_sd_cluster_252x50_degree2_dendrogram_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_cdf_1000_degree0(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-3.0, 3.0, 1000) + 0.1 * np.sin(np.arange(1000, dtype=np.float64))
 
