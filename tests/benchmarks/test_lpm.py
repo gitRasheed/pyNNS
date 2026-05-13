@@ -333,6 +333,30 @@ def test_nns_reg_factor_predictor_200(
 
 
 @pytest.mark.benchmark
+def test_nns_reg_factor_predictor_dimred_120(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    levels = ["a", "b", "c"]
+    factor = np.asarray([levels[index % len(levels)] for index in range(120)], dtype=object)
+    numeric = np.linspace(-2.0, 2.0, 120, dtype=np.float64).astype(object)
+    x = np.column_stack((factor, numeric))
+    y = np.sin(np.arange(120, dtype=np.float64) / 9.0) + (np.arange(120) % 3)
+
+    result = benchmark(
+        nns_reg,
+        x,
+        y,
+        factor_2_dummy=True,
+        factor_levels=[levels, None],
+        dim_red_method="cor",
+    )
+
+    assert result["equation"]["Coefficient"].shape == (5,)
+    assert isinstance(r_baseline["nns_reg_factor_dimred_120x2_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_reg_class_200(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-3.0, 3.0, 200)
     y = (np.arange(200, dtype=np.float64) % 3.0) + 1.0

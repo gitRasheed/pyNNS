@@ -191,3 +191,28 @@ def test_nns_reg_factor_predictor_expands_point_est_with_training_levels() -> No
     for column in rpm_columns:
         assert result["RPM"][column].shape == (3,)
     assert result["Point.est"].shape == (2,)
+
+
+def test_nns_reg_factor_predictor_dimred_expands_before_projection() -> None:
+    levels = ["a", "b", "c"]
+    factor = np.array(["b", "a", "b", "c", "a", "c"], dtype=object)
+    numeric = np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0], dtype=object)
+    x = np.column_stack((factor, numeric))
+    y = np.array([2.0, 1.0, 3.0, 4.0, 1.5, 4.5])
+
+    result = nns_reg(
+        x,
+        y,
+        factor_2_dummy=True,
+        factor_levels=[levels, None],
+        dim_red_method="equal",
+        point_est=np.array([["a", 1.5], ["c", 3.5]], dtype=object),
+    )
+
+    assert result["equation"]["Variable"].shape == (5,)
+    np.testing.assert_array_equal(
+        result["equation"]["Variable"].astype(str),
+        np.array(["X1_a", "X1_b", "X1_c", "X2", "DENOMINATOR"]),
+    )
+    assert result["x.star"]["x"].shape == y.shape
+    assert result["Point.est"].shape == (2,)

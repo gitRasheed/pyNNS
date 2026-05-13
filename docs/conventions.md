@@ -127,6 +127,9 @@ two-column regression-point structure as `{"x": ..., "y": ...}` for
 Classification is supported for numeric/logical/factor-like class-code targets.
 Smooth splines remain an explicit future batch and raise `NotImplementedError`.
 Factor predictor expansion is supported through the public `nns_reg` path.
+When combined with dimension reduction, factor predictors are expanded with
+R's full-rank dummy convention before synthetic `x.star` coefficients are
+computed.
 
 Numeric dimension reduction is supported for `"cor"`, `"NNS.dep"`,
 `"NNS.caus"`, `"all"`, `"equal"`, and numeric coefficient vectors. The

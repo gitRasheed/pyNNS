@@ -264,6 +264,20 @@ def _expand_factor_predictors(
     *,
     factor_levels: Sequence[object] | Sequence[Sequence[object]] | None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64] | None]:
+    train, points, _ = _expand_factor_predictors_with_names(
+        x,
+        point_est,
+        factor_levels=factor_levels,
+    )
+    return train, points
+
+
+def _expand_factor_predictors_with_names(
+    x: NDArray[Any],
+    point_est: NDArray[np.float64] | float | None,
+    *,
+    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None,
+) -> tuple[NDArray[np.float64], NDArray[np.float64] | None, list[str]]:
     x_array = np.asarray(x)
     point_array = None if point_est is None else np.asarray(point_est)
     if x_array.ndim == 0:
@@ -275,13 +289,13 @@ def _expand_factor_predictors(
             else np.concatenate((x_array.reshape(-1), point_array.reshape(-1)))
         )
         levels = _levels_for_column(factor_levels, 0, x_array.ndim)
-        expanded = _dummy_matrix_for_column(combined, levels=levels)
+        expanded, names = _dummy_matrix_for_column(combined, levels=levels, prefix="x")
         n_train = x_array.shape[0]
         train = expanded[:n_train]
         points = None if point_array is None else expanded[n_train:]
         if train.shape[1] == 1:
-            return train[:, 0], None if points is None else points[:, 0]
-        return train, points
+            return train[:, 0], None if points is None else points[:, 0], names
+        return train, points, names
 
     if x_array.ndim != 2:
         raise ValueError("x must be a vector or 2D matrix.")
@@ -295,6 +309,7 @@ def _expand_factor_predictors(
 
     train_blocks: list[NDArray[np.float64]] = []
     point_blocks: list[NDArray[np.float64]] = []
+    variable_names: list[str] = []
     for col in range(x_array.shape[1]):
         column = x_array[:, col]
         if point_array is None:
@@ -302,26 +317,41 @@ def _expand_factor_predictors(
         else:
             combined = np.concatenate((column, point_array[:, col]))
         levels = _levels_for_column(factor_levels, col, x_array.ndim)
-        expanded = _dummy_matrix_for_column(combined, levels=levels)
+        expanded, column_names = _dummy_matrix_for_column(
+            combined,
+            levels=levels,
+            prefix=f"X{col + 1}",
+        )
         train_blocks.append(expanded[: x_array.shape[0]])
+        variable_names.extend(column_names)
         if point_array is not None:
             point_blocks.append(expanded[x_array.shape[0] :])
     train_matrix = np.column_stack(train_blocks)
     point_matrix = None if point_array is None else np.column_stack(point_blocks)
-    return train_matrix, point_matrix
+    return train_matrix, point_matrix, variable_names
 
 
 def _dummy_matrix_for_column(
     values: NDArray[Any],
     *,
     levels: Sequence[object] | None,
-) -> NDArray[np.float64]:
-    if levels is None and not _is_fcl(values):
-        numeric = np.asarray(values, dtype=np.float64).reshape(-1, 1)
-        return numeric
+    prefix: str,
+) -> tuple[NDArray[np.float64], list[str]]:
+    if levels is None:
+        try:
+            numeric = np.asarray(values, dtype=np.float64).reshape(-1, 1)
+        except (TypeError, ValueError):
+            if not _is_fcl(values):
+                raise
+        else:
+            return numeric, [prefix]
     block = factor_2_dummy_fr(values, levels=levels)
     columns = [np.asarray(column, dtype=np.float64).reshape(-1) for column in block.values()]
-    return np.column_stack(columns)
+    names = [
+        prefix if name == "x" else f"{prefix}_{name}"
+        for name in block
+    ]
+    return np.column_stack(columns), names
 
 
 def _levels_for_column(
@@ -406,10 +436,13 @@ def _nns_reg_dimred(
 ) -> dict[str, Any]:
     del n_best
     if factor_2_dummy:
-        del factor_levels
-        raise NotImplementedError(
-            "factor_2_dummy=True is deferred until the factor dimension-reduction path is ported."
+        x, point_est, variable_names = _expand_factor_predictors_with_names(
+            x,
+            point_est,
+            factor_levels=factor_levels,
         )
+    else:
+        variable_names = None
     type_value = _normalize_type(type)
     if smooth:
         if confidence_interval is not None:
@@ -444,6 +477,7 @@ def _nns_reg_dimred(
         threshold=threshold,
         point_est=point_matrix,
         dist=dist,
+        variable_names=variable_names,
     )
     dimred_order = _dimred_order(projection.x_star, y_values, order)
     result = _nns_reg_univariate_core(
@@ -524,6 +558,7 @@ def _dimred_projection(
     threshold: float,
     point_est: NDArray[np.float64] | None,
     dist: str,
+    variable_names: Sequence[str] | None = None,
 ) -> _DimredProjection:
     coef = _dimred_coefficients(x, y, dim_red_method=dim_red_method, tau=tau)
     if coef.size != x.shape[1]:
@@ -556,8 +591,15 @@ def _dimred_projection(
             denominator = None
     if denominator is None:
         denominator = float(active_count)
+    names = (
+        [f"X{index + 1}" for index in range(x.shape[1])]
+        if variable_names is None
+        else list(variable_names)
+    )
+    if len(names) != x.shape[1]:
+        raise ValueError("variable_names must match the number of x columns.")
     equation = {
-        "Variable": np.asarray([f"X{index + 1}" for index in range(x.shape[1])] + ["DENOMINATOR"]),
+        "Variable": np.asarray([*names, "DENOMINATOR"]),
         "Coefficient": np.concatenate((coef, np.array([denominator], dtype=np.float64))),
     }
     return _DimredProjection(x_star=x_star, point_est=point_star, equation=equation)

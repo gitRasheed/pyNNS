@@ -209,6 +209,43 @@ def nns_reg_factor_predictor(
         return result
 
 
+def nns_reg_factor_dimred(
+    x: list[str],
+    z: list[float],
+    y: list[float],
+    point_factor: list[str],
+    point_z: list[float],
+    *,
+    levels: Sequence[object],
+    dim_red_method: str | list[float],
+) -> RValue:
+    args = {
+        "x": x,
+        "z": z,
+        "y": y,
+        "point_factor": point_factor,
+        "point_z": point_z,
+        "levels": levels,
+        "dim_red_method": dim_red_method,
+    }
+    key = _cache_key("NNS.reg.factor_dimred", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.reg.factor_dimred with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_reg_factor_dimred(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def nns_stack_factor_predictor(
     x: list[str],
     y: list[float],
@@ -761,6 +798,49 @@ def _call_r_reg_factor_predictor(args: dict[str, Any]) -> RValue:
         "x <- factor(unlist(args$x), levels = unlist(args$levels))\n"
         "result <- NNS.reg(x, as.numeric(unlist(args$y)), factor.2.dummy = TRUE, "
         "order = order_arg, point.est = point_arg, plot = FALSE, "
+        "residual.plot = FALSE, ncores = 1)\n"
+        "encode <- function(x) {\n"
+        "  if (is.data.frame(x) || data.table::is.data.table(x)) {\n"
+        "    col_encode <- function(nm) {\n"
+        "      z <- x[[nm]]\n"
+        "      if (is.character(z)) return(as.character(z))\n"
+        "      as.numeric(z)\n"
+        "    }\n"
+        "    return(stats::setNames(lapply(names(x), col_encode), names(x)))\n"
+        "  }\n"
+        "  if (is.matrix(x)) {\n"
+        "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"
+        "  }\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_reg_factor_dimred(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "dim_arg <- args$dim_red_method\n"
+        "if (is.list(dim_arg)) dim_arg <- as.numeric(unlist(dim_arg))\n"
+        "x <- data.frame(cat = factor(unlist(args$x), levels = unlist(args$levels)), "
+        "z = as.numeric(unlist(args$z)))\n"
+        "point_arg <- data.frame(cat = factor(unlist(args$point_factor), "
+        "levels = unlist(args$levels)), z = as.numeric(unlist(args$point_z)))\n"
+        "result <- NNS.reg(x, as.numeric(unlist(args$y)), factor.2.dummy = TRUE, "
+        "dim.red.method = dim_arg, point.est = point_arg, plot = FALSE, "
         "residual.plot = FALSE, ncores = 1)\n"
         "encode <- function(x) {\n"
         "  if (is.data.frame(x) || data.table::is.data.table(x)) {\n"

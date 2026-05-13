@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
-from _r import nns, nns_reg_factor_predictor
+from _r import nns, nns_reg_factor_dimred, nns_reg_factor_predictor
 from _tolerances import COMPOUND
 
 from pynns import nns_reg
@@ -337,6 +337,49 @@ def test_nns_reg_factor_predictor_matches_r_full_rank_dummy_path() -> None:
             _array(expected["Fitted.xy"][column]),
             atol=COMPOUND,
         )
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("method", ["cor", "equal", "NNS.dep"])
+def test_nns_reg_factor_predictor_dim_red_matches_r(method: str) -> None:
+    levels = ["a", "b", "c"]
+    factor = np.array(["b", "a", "b", "c", "a", "c"], dtype=object)
+    z = np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0], dtype=object)
+    x = np.column_stack((factor, z))
+    y = np.array([2.0, 1.0, 3.0, 4.0, 1.5, 4.5])
+    point_est = np.array([["a", 1.5], ["c", 3.5]], dtype=object)
+
+    expected = nns_reg_factor_dimred(
+        factor.tolist(),
+        [float(value) for value in z],
+        y.tolist(),
+        ["a", "c"],
+        [1.5, 3.5],
+        levels=levels,
+        dim_red_method=method,
+    )
+    actual = nns_reg(
+        x,
+        y,
+        factor_2_dummy=True,
+        factor_levels=[levels, None],
+        dim_red_method=method,
+        point_est=point_est,
+    )
+
+    assert isinstance(expected, dict)
+    assert isinstance(expected["equation"], dict)
+    assert isinstance(actual["equation"], dict)
+    np.testing.assert_allclose(
+        actual["equation"]["Coefficient"],
+        _array(expected["equation"]["Coefficient"]),
+        atol=5e-2,
+    )
+    assert isinstance(expected["x.star"], dict)
+    assert isinstance(actual["x.star"], dict)
+    np.testing.assert_allclose(actual["x.star"]["x"], _array(expected["x.star"]["x"]), atol=5e-2)
+    np.testing.assert_allclose(actual["Point.est"], _array(expected["Point.est"]), atol=5e-2)
+    np.testing.assert_allclose(actual["R2"], _array(expected["R2"]), atol=5e-2)
 
 
 @pytest.mark.parity

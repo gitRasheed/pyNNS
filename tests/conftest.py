@@ -150,6 +150,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_reg_dimred_200x3_seconds" not in cache:
         cache["nns_reg_dimred_200x3_seconds"] = _time_r_nns_reg_dimred()
         _write_benchmark_baseline(cache)
+    if "nns_reg_factor_dimred_120x2_seconds" not in cache:
+        cache["nns_reg_factor_dimred_120x2_seconds"] = _time_r_nns_reg_factor_dimred()
+        _write_benchmark_baseline(cache)
     if "nns_m_reg_200x3_seconds" not in cache:
         cache["nns_m_reg_200x3_seconds"] = _time_r_nns_m_reg()
         _write_benchmark_baseline(cache)
@@ -769,6 +772,29 @@ def _time_r_nns_reg_dimred() -> float:
         "times <- replicate(5, system.time(invisible(NNS::NNS.reg(X, y, "
         "factor.2.dummy = FALSE, dim.red.method = 'cor', plot = FALSE, "
         "ncores = 1)))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_reg_factor_dimred() -> float:
+    script = (
+        "library(NNS)\n"
+        "n <- 120\n"
+        "x <- data.frame(cat = factor(rep(c('a', 'b', 'c'), length.out = n), "
+        "levels = c('a', 'b', 'c')), z = seq(-2, 2, length.out = n))\n"
+        "y <- sin(seq_len(n) / 9) + as.numeric(x$cat)\n"
+        "run <- function() NNS::NNS.reg(x, y, factor.2.dummy = TRUE, "
+        "dim.red.method = 'cor', plot = FALSE, ncores = 1)\n"
+        "invisible(run())\n"
+        "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(
