@@ -126,7 +126,10 @@ two-column regression-point structure as `{"x": ..., "y": ...}` for
 `nns_m_reg`, including after dimension-reduction projection. Matrix `x` without
 dimension reduction dispatches to `nns_m_reg`.
 Classification is supported for numeric/logical/factor-like class-code targets.
-Smooth splines remain an explicit future batch and raise `NotImplementedError`.
+`smooth=True` follows installed R's ordinary piecewise fallback for univariate
+inputs with fewer than four observations; R does not call `smooth.spline` there.
+Spline-eligible smoothing remains an explicit future batch and raises
+`NotImplementedError`.
 Factor predictor expansion is supported through the public `nns_reg` path.
 When combined with dimension reduction, factor predictors are expanded with
 R's full-rank dummy convention before synthetic `x.star` coefficients are
@@ -165,8 +168,9 @@ for the lower column. Below-range univariate point estimates follow R's
 `findInterval`/data.table behavior: index `0` rows are dropped, so `pred.int`
 can have fewer rows than `Point.est`. For class mode, fitted confidence columns
 remain raw numeric values, while univariate `pred.int` columns are rounded with
-R's `x %% 1 < 0.5` rule. `smooth=True` with `confidence_interval` remains
-deferred because it depends on R-compatible smoothing splines.
+R's `x %% 1 < 0.5` rule. Spline-eligible `smooth=True` with
+`confidence_interval` remains deferred because it depends on R-compatible
+smoothing splines.
 
 ## Multivariate Regression
 

@@ -116,6 +116,22 @@ def test_nns_reg_deferred_paths_raise(path: str) -> None:
             nns_reg(x, y, multivariate_call=True)
 
 
+def test_nns_reg_small_smooth_falls_back_to_piecewise_path() -> None:
+    x = np.array([1.0, 2.0, 3.0])
+    y = np.array([1.0, 2.0, 1.0])
+    point = np.array([1.5, 2.5])
+
+    smoothed = nns_reg(x, y, point_est=point, smooth=True, confidence_interval=0.95)
+    ordinary = nns_reg(x, y, point_est=point, confidence_interval=0.95)
+
+    np.testing.assert_allclose(smoothed["Point.est"], ordinary["Point.est"])
+    np.testing.assert_allclose(
+        smoothed["regression.points"]["y"],
+        ordinary["regression.points"]["y"],
+    )
+    assert smoothed["pred.int"] is not None
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [

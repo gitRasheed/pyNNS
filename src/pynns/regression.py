@@ -124,6 +124,7 @@ def nns_reg(
         confidence_interval=confidence_interval,
         smooth=smooth,
         multivariate_call=multivariate_call,
+        allow_smooth_fallback=x_values.size < 4,
     )
     noise = _validate_noise_reduction(noise_reduction)
     point_values = _as_point_est(point_for_dispatch)
@@ -729,8 +730,9 @@ def _reject_deferred_paths(
     confidence_interval: float | None,
     smooth: bool,
     multivariate_call: bool,
+    allow_smooth_fallback: bool = False,
 ) -> None:
-    if smooth:
+    if smooth and not allow_smooth_fallback:
         if confidence_interval is not None:
             raise NotImplementedError(
                 "nns_reg confidence_interval with smooth=True requires R smooth.spline "

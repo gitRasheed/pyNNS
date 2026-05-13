@@ -81,6 +81,18 @@ def test_nns_reg_univariate_matches_r(
 
 
 @pytest.mark.parity
+def test_nns_reg_small_smooth_fallback_matches_r() -> None:
+    x = np.array([1.0, 2.0, 3.0])
+    y = np.array([1.0, 2.0, 1.0])
+    point = np.array([1.5, 2.5])
+
+    expected = _r_nns_reg_smooth(x, y, point_est=point, confidence_interval=0.95)
+    actual = nns_reg(x, y, point_est=point, smooth=True, confidence_interval=0.95)
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("relationship", MODE_RELATIONSHIPS)
 @pytest.mark.parametrize("order", MODE_ORDERS)
@@ -730,6 +742,41 @@ def _r_nns_reg(
         "L2",
         None,
         point_only,
+        False,
+    )
+
+
+def _r_nns_reg_smooth(
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    point_est: np.ndarray | None,
+    confidence_interval: float | None = None,
+) -> Any:
+    point_arg: list[float] | None = None if point_est is None else point_est.tolist()
+    return nns(
+        "NNS.reg",
+        x.tolist(),
+        y.tolist(),
+        False,
+        None,
+        None,
+        None,
+        None,
+        point_arg,
+        "top",
+        True,
+        False,
+        False,
+        False,
+        confidence_interval,
+        0,
+        None,
+        True,
+        "off",
+        "L2",
+        None,
+        False,
         False,
     )
 
