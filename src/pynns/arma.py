@@ -262,9 +262,9 @@ def _resolve_lags_and_weights(
     else:
         periods = np.asarray(table["Period"], dtype=np.int64).reshape(-1)
         coef = np.asarray(table["Coefficient.of.Variation"], dtype=np.float64).reshape(-1)
-        varcoef = np.asarray(
-            table["Variable.Coefficient.of.Variation"], dtype=np.float64
-        ).reshape(-1)
+        varcoef = np.asarray(table["Variable.Coefficient.of.Variation"], dtype=np.float64).reshape(
+            -1
+        )
         if bool(seasonal_factor):
             lags, lag_weights = _arma_seas_weighting(True, periods, coef, varcoef)
         else:
@@ -289,7 +289,7 @@ def _numeric_seasonal_weights(
 ) -> NDArray[np.float64]:
     output = np.empty(lags.size, dtype=np.float64)
     for index, lag in enumerate(lags):
-        rev_var = variable[::- int(lag)]
+        rev_var = variable[:: -int(lag)]
         output[index] = abs(np.float64(np.std(rev_var, ddof=1)) / np.float64(np.mean(rev_var)))
     relative = output / abs(np.float64(np.std(variable, ddof=1)) / np.float64(np.mean(variable)))
     seasonal_weighting = 1.0 / relative

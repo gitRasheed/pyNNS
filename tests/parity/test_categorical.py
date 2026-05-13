@@ -16,9 +16,13 @@ def test_factor_dummy_helpers_match_r_explicit_levels(full_rank: bool) -> None:
 
     expected = factor_dummy_custom(values, levels, full_rank=full_rank)
     assert isinstance(expected, dict)
-    actual = factor_2_dummy_fr(values, levels=levels) if full_rank else factor_2_dummy(
-        values,
-        levels=levels,
+    actual = (
+        factor_2_dummy_fr(values, levels=levels)
+        if full_rank
+        else factor_2_dummy(
+            values,
+            levels=levels,
+        )
     )
 
     assert list(actual) == list(expected)

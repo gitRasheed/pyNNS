@@ -52,9 +52,7 @@ def test_nns_arma_pred_int_returns_interval_dict() -> None:
 def test_nns_arma_pred_int_seed_reproducibility() -> None:
     variable = np.sin(np.arange(1, 45, dtype=np.float64) / 3.0) + 2.0
 
-    first = nns_arma(
-        variable, h=4, seasonal_factor=4, method="nonlin", pred_int=0.8, random_seed=1
-    )
+    first = nns_arma(variable, h=4, seasonal_factor=4, method="nonlin", pred_int=0.8, random_seed=1)
     second = nns_arma(
         variable, h=4, seasonal_factor=4, method="nonlin", pred_int=0.8, random_seed=1
     )

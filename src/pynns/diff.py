@@ -89,7 +89,6 @@ def nns_diff(
     inferred_h = np.nan
 
     while iteration >= 1:
-
         current_b = new_b
 
         def new_f(x: float, intercept: float = current_b) -> float:

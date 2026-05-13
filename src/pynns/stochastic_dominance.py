@@ -225,8 +225,7 @@ def _sd_efficient_active_indices(
     keep: list[int] = []
     for index in order:
         dominated = any(
-            _dominates_from_precomputed(kept, index, degree, precomputed)
-            for kept in keep
+            _dominates_from_precomputed(kept, index, degree, precomputed) for kept in keep
         )
         if not dominated:
             keep.append(index)

@@ -39,13 +39,7 @@ def nns_copula(
     n_dim_continuous_dep = abs(continuous_d_pm - 0.75) / 0.75
 
     return math.sqrt(
-        (
-            discrete_dep
-            + continuous_dep
-            + n_dim_discrete_dep
-            + n_dim_continuous_dep
-        )
-        / 4.0
+        (discrete_dep + continuous_dep + n_dim_discrete_dep + n_dim_continuous_dep) / 4.0
     )
 
 

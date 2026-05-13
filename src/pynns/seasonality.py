@@ -184,11 +184,7 @@ def _cv_stat(values: NDArray[np.float64], var_cov: float, exact_cv: bool) -> flo
     mean = _mean_exact(values) if exact_cv else _mean(values)
     sd = _sample_sd_from_mean(values, mean, exact=exact_cv)
     stat = abs(sd / mean) if mean != 0.0 else math.inf
-    if (
-        not exact_cv
-        and np.isfinite(stat)
-        and abs(stat - var_cov) <= 1e-12 * max(1.0, abs(var_cov))
-    ):
+    if not exact_cv and np.isfinite(stat) and abs(stat - var_cov) <= 1e-12 * max(1.0, abs(var_cov)):
         mean = _mean_exact(values)
         sd = _sample_sd_from_mean(values, mean, exact=True)
         stat = abs(sd / mean) if mean != 0.0 else math.inf

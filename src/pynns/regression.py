@@ -950,14 +950,12 @@ def _predict_points(
         upper_mask = point_est > np.max(x)
         lower_mask = point_est < np.min(x)
         if np.any(upper_mask):
-            out[upper_mask] = (
-                (point_est[upper_mask] - float(np.max(x))) * upper_slope
-                + float(nns_mode(y[np.flatnonzero(x == np.max(x))]))
+            out[upper_mask] = (point_est[upper_mask] - float(np.max(x))) * upper_slope + float(
+                nns_mode(y[np.flatnonzero(x == np.max(x))])
             )
         if np.any(lower_mask):
-            out[lower_mask] = (
-                (point_est[lower_mask] - float(np.min(x))) * lower_slope
-                + float(nns_mode(y[np.flatnonzero(x == np.min(x))]))
+            out[lower_mask] = (point_est[lower_mask] - float(np.min(x))) * lower_slope + float(
+                nns_mode(y[np.flatnonzero(x == np.min(x))])
             )
     return out.astype(np.float64)
 

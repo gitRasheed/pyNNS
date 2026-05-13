@@ -29,6 +29,8 @@ Set `PYNNS_OFFLINE=1` to force parity tests to use only the committed R cache.
 
 ```bash
 uv run pytest
+uv run ruff format .
+uv run ruff check . --fix
 uv run ruff check .
 uv run mypy
 ```

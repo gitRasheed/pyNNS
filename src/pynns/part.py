@@ -21,6 +21,8 @@ PartData = TypedDict(
         "prior.quadrant": NDArray[np.str_],
     },
 )
+
+
 class RegressionPoints(TypedDict):
     quadrant: NDArray[np.str_]
     x: NDArray[np.float64]

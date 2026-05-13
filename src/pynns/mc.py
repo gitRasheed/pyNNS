@@ -92,4 +92,3 @@ def _format_r_number(value: float) -> str:
     if value == 0.0:
         value = 0.0
     return f"{value:.15g}"
-

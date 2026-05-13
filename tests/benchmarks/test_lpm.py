@@ -180,9 +180,7 @@ def test_nns_norm_1000x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
 @pytest.mark.benchmark
 def test_nns_distance_1000x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
     row = np.arange(1, 1001, dtype=np.float64)
-    features = np.column_stack(
-        (np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 1000.0)
-    )
+    features = np.column_stack((np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 1000.0))
     rpm = np.column_stack((features, np.sin(row / 7.0)))
 
     result = benchmark(nns_distance, rpm, np.array([1.25, 2.75, 0.4]), 20)
@@ -197,9 +195,7 @@ def test_nns_distance_bulk_1000x3_100(
     r_baseline: dict[str, object],
 ) -> None:
     row = np.arange(1, 1001, dtype=np.float64)
-    features = np.column_stack(
-        (np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 1000.0)
-    )
+    features = np.column_stack((np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 1000.0))
     rpm = np.column_stack((features, np.sin(row / 7.0)))
     test_row = np.arange(1, 101, dtype=np.float64)
     x_test = np.column_stack(
@@ -215,9 +211,7 @@ def test_nns_distance_bulk_1000x3_100(
 @pytest.mark.benchmark
 def test_nns_distance_class_500x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
     row = np.arange(1, 501, dtype=np.float64)
-    features = np.column_stack(
-        (np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 500.0)
-    )
+    features = np.column_stack((np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 500.0))
     rpm = np.column_stack((features, (row % 3.0) + 1.0))
 
     result = benchmark(nns_distance, rpm, np.array([1.25, 2.75, 0.4]), 5, "class")
@@ -232,9 +226,7 @@ def test_nns_distance_bulk_class_500x3_50(
     r_baseline: dict[str, object],
 ) -> None:
     row = np.arange(1, 501, dtype=np.float64)
-    features = np.column_stack(
-        (np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 500.0)
-    )
+    features = np.column_stack((np.sin(row / 3.0) + 1.5, np.cos(row / 5.0) + 2.0, row / 500.0))
     rpm = np.column_stack((features, (row % 3.0) + 1.0))
     test_row = np.arange(1, 51, dtype=np.float64)
     x_test = np.column_stack(

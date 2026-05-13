@@ -125,9 +125,8 @@ def _anova_bin(
     if mean_of_means is None:
         control_stat = float(np.median(control) if medians else np.mean(control))
         treatment_stat = float(np.median(treatment) if medians else np.mean(treatment))
-        mean_of_means = (
-            (control.size * control_stat + treatment.size * treatment_stat)
-            / (control.size + treatment.size)
+        mean_of_means = (control.size * control_stat + treatment.size * treatment_stat) / (
+            control.size + treatment.size
         )
     else:
         control_stat = float(np.median(control) if medians else np.mean(control))

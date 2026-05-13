@@ -52,6 +52,8 @@ def test_nns_boost_deferred_paths_raise(path: str) -> None:
     with pytest.raises(NotImplementedError):
         if path == "ts":
             nns_boost(variable, y, ts_test=4)
+
+
 def test_nns_boost_numeric_pred_int_shape() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))

@@ -30,10 +30,12 @@ If an ignored docs file exists locally, read it but do not assume it is tracked.
 5. Add or update parity tests.
 6. Add or update invariant tests.
 7. Add or update property tests when behavior has useful general laws.
-8. Run `uv run pytest`.
-9. Run `uv run ruff check .`.
-10. Run `uv run mypy`.
-11. Report paths changed, checks passed/failed, and deviations from spec.
+8. Run `uv run ruff format .`.
+9. Run `uv run ruff check . --fix`.
+10. Run `uv run pytest`.
+11. Run `uv run ruff check .`.
+12. Run `uv run mypy`.
+13. Report paths changed, checks passed/failed, and deviations from spec.
 
 ## Hard Rules
 

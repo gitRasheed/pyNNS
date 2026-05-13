@@ -106,9 +106,7 @@ def _up_sample_rows(
     x_values, y_values, observed = _sampling_inputs(x, y_codes, classes)
     per_class = [np.flatnonzero(y_values == class_code) for class_code in observed]
     target = max(indices.size for indices in per_class)
-    picked = [
-        indices[rng.choice(indices.size, size=target, replace=True)] for indices in per_class
-    ]
+    picked = [indices[rng.choice(indices.size, size=target, replace=True)] for indices in per_class]
     rows = np.concatenate(picked) if picked else np.empty(0, dtype=np.int64)
     return x_values[rows].copy(), y_values[rows].copy()
 
