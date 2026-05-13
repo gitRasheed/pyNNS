@@ -220,8 +220,9 @@ Factor predictor expansion is supported for `nns_stack(method=1)` with explicit
 using the same full-rank dummy convention as installed R's aligned train/test
 builder. Method-2 factor diagnostics remain deferred: installed R decides
 method eligibility before dummy expansion for one-column factor inputs, while
-PyNNS expands first, so final stack predictions can agree while `reg` and
-`dim.red` diagnostics are assigned differently.
+mixed factor/numeric method-2 probes can match dim-red predictions while
+`threshold`, objective, and stacked method-1 diagnostics diverge. PyNNS rejects
+factor predictors when `method` includes 2 until that contract is mapped.
 
 ## Boost
 

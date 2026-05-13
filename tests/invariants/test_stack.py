@@ -69,6 +69,23 @@ def test_nns_stack_factor_predictor_expands_train_and_test() -> None:
     assert np.all(np.isfinite(result["stack"]))
 
 
+@pytest.mark.parametrize("method", [2, (1, 2)])
+def test_nns_stack_factor_predictor_method2_remains_deferred(method: object) -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"])
+    y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
+
+    with pytest.raises(NotImplementedError, match="factor predictors with method 2"):
+        nns_stack(
+            x,
+            y,
+            np.asarray(["a", "c", "b"]),
+            factor_levels=["a", "b", "c"],
+            cv_size=0.25,
+            folds=1,
+            method=method,
+        )
+
+
 def test_nns_stack_class_pred_int_shapes_and_rounding() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))

@@ -55,6 +55,13 @@ def nns_stack(
     type_value = _normalize_type(type)
     if balance:
         type_value = "class"
+    methods = _methods(method)
+    if factor_levels is not None and 2 in methods:
+        raise NotImplementedError(
+            "nns_stack factor predictors with method 2 are deferred because installed R "
+            "method-2 diagnostics and stacked method-1 internals diverge from the current "
+            "PyNNS expansion path."
+        )
 
     x_input: NDArray[Any] | NDArray[np.float64] = np.asarray(ivs_train)
     x_test_input: NDArray[Any] | NDArray[np.float64] | None = (
@@ -91,7 +98,6 @@ def nns_stack(
             classes=class_codes,
             rng=rng,
         )
-    methods = _methods(method)
     objective_l = objective.lower()
     if objective_l not in {"min", "max"}:
         raise ValueError("objective must be 'min' or 'max'.")
