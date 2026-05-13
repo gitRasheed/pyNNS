@@ -218,8 +218,10 @@ exact R parity.
 Factor predictor expansion is supported for `nns_stack(method=1)` with explicit
 `factor_levels=` metadata. PyNNS expands training and test predictors together
 using the same full-rank dummy convention as installed R's aligned train/test
-builder. Method-2 factor diagnostics remain deferred pending installed-R parity
-investigation.
+builder. Method-2 factor diagnostics remain deferred: installed R decides
+method eligibility before dummy expansion for one-column factor inputs, while
+PyNNS expands first, so final stack predictions can agree while `reg` and
+`dim.red` diagnostics are assigned differently.
 
 ## Boost
 
