@@ -116,6 +116,22 @@ def test_nns_reg_deferred_paths_raise(path: str) -> None:
             nns_reg(x, y, multivariate_call=True)
 
 
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"smooth": True},
+        {"smooth": True, "confidence_interval": 0.95},
+    ],
+)
+def test_nns_reg_dimred_smooth_deferred_paths_raise(kwargs: dict[str, object]) -> None:
+    x1 = np.linspace(-2.0, 2.0, 20)
+    x = np.column_stack((x1, np.sin(x1)))
+    y = x[:, 0] + x[:, 1]
+
+    with pytest.raises(NotImplementedError):
+        nns_reg(x, y, dim_red_method="equal", **kwargs)
+
+
 def test_nns_reg_univariate_point_only_matches_regular_shape() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     y = np.sin(x)
