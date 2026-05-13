@@ -130,8 +130,8 @@ def _validate_inputs(
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     if factor_2_dummy:
         raise NotImplementedError(
-            "factor_2_dummy=True with non-numeric inputs is deferred until "
-            "the factor path is ported."
+            "direct nns_m_reg factor_2_dummy=True is rejected because installed R's "
+            "internal NNS.M.reg raw factor path errors; use nns_reg factor expansion."
         )
     x_values = np.asarray(x, dtype=np.float64)
     if x_values.ndim == 1:

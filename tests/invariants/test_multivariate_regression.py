@@ -91,3 +91,19 @@ def test_nns_m_reg_class_confidence_interval_keeps_raw_bounds() -> None:
         np.round(result["pred.int"]["lower.pred.int"]),
     )
     assert set(result["Point.est"]).issubset(set(y))
+
+
+def test_nns_m_reg_direct_factor_dummy_path_stays_rejected() -> None:
+    x = np.array(
+        [
+            ["b", 0.0],
+            ["a", 1.0],
+            ["b", 2.0],
+            ["c", 3.0],
+        ],
+        dtype=object,
+    )
+    y = np.array([2.0, 1.0, 3.0, 4.0])
+
+    with pytest.raises(NotImplementedError, match=r"installed R.*raw factor path errors"):
+        nns_m_reg(x, y, factor_2_dummy=True)
