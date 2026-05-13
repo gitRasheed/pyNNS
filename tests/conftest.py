@@ -144,6 +144,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_reg_class_200_seconds" not in cache:
         cache["nns_reg_class_200_seconds"] = _time_r_nns_reg_class()
         _write_benchmark_baseline(cache)
+    if "nns_reg_class_200_ci_seconds" not in cache:
+        cache["nns_reg_class_200_ci_seconds"] = _time_r_nns_reg_class_ci()
+        _write_benchmark_baseline(cache)
     if "nns_reg_dimred_200x3_seconds" not in cache:
         cache["nns_reg_dimred_200x3_seconds"] = _time_r_nns_reg_dimred()
         _write_benchmark_baseline(cache)
@@ -155,6 +158,9 @@ def r_baseline() -> BenchmarkBaseline:
         _write_benchmark_baseline(cache)
     if "nns_m_reg_class_200x3_seconds" not in cache:
         cache["nns_m_reg_class_200x3_seconds"] = _time_r_nns_m_reg_class()
+        _write_benchmark_baseline(cache)
+    if "nns_m_reg_class_200x3_ci_seconds" not in cache:
+        cache["nns_m_reg_class_200x3_ci_seconds"] = _time_r_nns_m_reg_class_ci()
         _write_benchmark_baseline(cache)
     if "nns_stack_100x3_seconds" not in cache:
         cache["nns_stack_100x3_seconds"] = _time_r_nns_stack()
@@ -724,6 +730,28 @@ def _time_r_nns_reg_class() -> float:
     return float(completed.stdout)
 
 
+def _time_r_nns_reg_class_ci() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 200)\n"
+        "y <- rep(1:3, length.out = 200)\n"
+        "run <- function() NNS::NNS.reg(x, y, point.est = x[1:20], "
+        "factor.2.dummy = FALSE, type = 'class', plot = FALSE, "
+        "confidence.interval = 0.95)\n"
+        "invisible(run())\n"
+        "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
 def _time_r_nns_reg_dimred() -> float:
     script = (
         "library(NNS)\n"
@@ -802,6 +830,29 @@ def _time_r_nns_m_reg_class() -> float:
         "run <- function() NNS:::NNS.M.reg(X, y, point.est = X[1:20,], "
         "factor.2.dummy = FALSE, type = 'class', plot = FALSE, "
         "residual.plot = FALSE, ncores = 1)\n"
+        "invisible(run())\n"
+        "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_m_reg_class_ci() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 200)\n"
+        "X <- cbind(x, sin(x), cos(x))\n"
+        "y <- rep(1:3, length.out = 200)\n"
+        "run <- function() NNS:::NNS.M.reg(X, y, point.est = X[1:20,], "
+        "factor.2.dummy = FALSE, type = 'class', plot = FALSE, "
+        "residual.plot = FALSE, ncores = 1, confidence.interval = 0.95)\n"
         "invisible(run())\n"
         "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"

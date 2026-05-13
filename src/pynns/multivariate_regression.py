@@ -42,11 +42,6 @@ def nns_m_reg(
     """Multivariate numeric regression matching R's non-plotting NNS.M.reg path."""
     del plot, residual_plot, location, dist, return_values, plot_regions, ncores
     type_value = _normalize_type(type)
-    if type_value == "class" and confidence_interval is not None:
-        raise NotImplementedError(
-            "classification confidence intervals are deferred until class interval "
-            "parity is ported."
-        )
     x_values, y_values = _validate_inputs(
         x,
         y,

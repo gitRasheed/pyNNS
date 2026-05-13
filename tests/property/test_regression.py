@@ -131,3 +131,35 @@ def test_nns_reg_classification_bounds_hold(x: np.ndarray, n_classes: int) -> No
     assert result["Prediction.Accuracy"] is not None
     assert set(result["Fitted.xy"]["y.hat"]).issubset(set(classes))
     assert set(result["Point.est"]).issubset(set(classes))
+
+
+@given(
+    finite_arrays,
+    st.integers(min_value=2, max_value=4),
+    st.sampled_from([0.8, 0.95]),
+)
+def test_nns_reg_class_confidence_interval_shape_invariants_hold(
+    x: np.ndarray,
+    n_classes: int,
+    confidence_interval: float,
+) -> None:
+    assume(np.unique(x).size > 1)
+    classes = (np.arange(x.size) % n_classes + 1).astype(np.float64)
+    points = np.array([float(np.min(x)), float(np.mean(x)), float(np.max(x))])
+
+    result = nns_reg(
+        x,
+        classes,
+        order=1,
+        type="class",
+        point_est=points,
+        confidence_interval=confidence_interval,
+    )
+
+    assert result["Fitted.xy"]["conf.int.pos"].shape == (x.shape[0],)
+    assert result["Fitted.xy"]["conf.int.neg"].shape == (x.shape[0],)
+    assert result["pred.int"] is not None
+    assert set(result["pred.int"]) == {"pred.int.neg", "pred.int.pos"}
+    for values in result["pred.int"].values():
+        assert np.all(np.isfinite(values))
+        np.testing.assert_allclose(values, np.round(values))

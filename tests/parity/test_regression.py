@@ -322,6 +322,41 @@ def test_nns_reg_classification_matches_r(
 
 
 @pytest.mark.parity
+@pytest.mark.parametrize("confidence_interval", [0.8, 0.95])
+@pytest.mark.parametrize("order", [None, 1, 2])
+@pytest.mark.parametrize(("name", "classes", "point_est"), CLASS_REGRESSION_CASES)
+def test_nns_reg_class_confidence_interval_matches_r(
+    confidence_interval: float,
+    order: int | None,
+    name: str,
+    classes: np.ndarray,
+    point_est: np.ndarray,
+) -> None:
+    del name
+    x = np.linspace(0.0, float(classes.size - 1), classes.size)
+
+    expected = _r_nns_reg(
+        x,
+        classes,
+        order=order,
+        noise="off",
+        point_est=point_est,
+        confidence_interval=confidence_interval,
+        type="class",
+    )
+    actual = nns_reg(
+        x,
+        classes,
+        order=order,
+        type="class",
+        point_est=point_est,
+        confidence_interval=confidence_interval,
+    )
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
 def test_nns_reg_logical_auto_classification_matches_r() -> None:
     x = np.linspace(0.0, 5.0, 6)
     y = np.array([False, False, False, True, True, True])
@@ -334,6 +369,24 @@ def test_nns_reg_logical_auto_classification_matches_r() -> None:
         point_est=np.array([1.5, 4.5]),
     )
     actual = nns_reg(x, y, point_est=np.array([1.5, 4.5]))
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_reg_logical_auto_class_confidence_interval_matches_r() -> None:
+    x = np.linspace(0.0, 5.0, 6)
+    y = np.array([False, False, False, True, True, True])
+
+    expected = _r_nns_reg(
+        x,
+        y.astype(np.float64),
+        order=None,
+        noise="off",
+        point_est=np.array([1.5, 4.5]),
+        confidence_interval=0.95,
+    )
+    actual = nns_reg(x, y, point_est=np.array([1.5, 4.5]), confidence_interval=0.95)
 
     _assert_reg_matches(actual, expected)
 
@@ -363,6 +416,65 @@ def test_nns_reg_factor_levels_return_numeric_codes() -> None:
     )
 
     _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_reg_factor_levels_class_confidence_interval_matches_r() -> None:
+    x = np.linspace(0.0, 8.0, 9)
+    labels = np.array(["B", "B", "A", "A", "C", "C", "A", "B", "C"])
+    levels = ["A", "B", "C"]
+    encoded = np.array([2, 2, 1, 1, 3, 3, 1, 2, 3], dtype=np.float64)
+
+    expected = _r_nns_reg(
+        x,
+        encoded,
+        order=1,
+        noise="off",
+        point_est=np.array([1.5, 5.5]),
+        confidence_interval=0.95,
+        type="class",
+    )
+    actual = nns_reg(
+        x,
+        labels,
+        order=1,
+        type="class",
+        point_est=np.array([1.5, 5.5]),
+        confidence_interval=0.95,
+        class_levels=levels,
+    )
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_reg_class_confidence_interval_below_range_row_drop_matches_r() -> None:
+    x = np.linspace(0.0, 11.0, 12)
+    classes = np.array([1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2], dtype=np.float64)
+    point_est = np.array([-1.0, 2.5, 6.5, 11.5])
+
+    expected = _r_nns_reg(
+        x,
+        classes,
+        order=1,
+        noise="off",
+        point_est=point_est,
+        confidence_interval=0.95,
+        type="class",
+    )
+    actual = nns_reg(
+        x,
+        classes,
+        order=1,
+        type="class",
+        point_est=point_est,
+        confidence_interval=0.95,
+    )
+
+    _assert_reg_matches(actual, expected)
+    assert actual["Point.est"].shape == (4,)
+    assert actual["pred.int"] is not None
+    assert actual["pred.int"]["pred.int.neg"].shape == (3,)
 
 
 @pytest.mark.parity

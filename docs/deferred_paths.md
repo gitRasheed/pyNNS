@@ -12,7 +12,6 @@ limits stay visible.
 | Stack | class `pred_int` | Classification interval tables are not ported | Port class interval parity if an R caller requires it |
 | Regression | `confidence_interval` with `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility before interval tables can be generated on smoothed fits | Port a minimal R-compatible fixed-spar smoothing spline backend |
 | Regression | `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility; SciPy smoothers are not parity-compatible | Port a minimal R-compatible fixed-spar smoothing spline backend, then enable `nns_reg(smooth=True)` |
-| Regression | classification confidence intervals | Numeric class prediction is ported, but class interval parity is not covered yet | Port class interval parity if an R caller requires it |
 | Regression | factor/dummy predictor paths | Factor target encoding is supported with `class_levels`, but factor predictor expansion is not wired | Enable predictor dummy expansion in `nns_reg` factor paths |
 | Regression | `tau="ts"` in dimension reduction | `nns_seas` is ported, but NNS.seas-derived lags are not wired into dim-red regression | Reuse `nns_seas` period selection in the dim-red path |
 | Regression | `multivariate_call=True` with `dim_red_method` | R does not use this combination and PyNNS has no faithful call path for it | Keep rejected unless an R path requiring it is found |

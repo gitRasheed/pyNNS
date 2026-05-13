@@ -105,11 +105,6 @@ def nns_reg(
     class_mode = type_value == "class" or _should_auto_classify(y_values)
     if class_mode:
         noise_reduction = "mode_class"
-        if type_value == "class" and confidence_interval is not None:
-            raise NotImplementedError(
-                "classification confidence intervals are deferred until class interval parity "
-                "is ported."
-            )
     _reject_deferred_paths(
         x_values,
         dim_red_method=dim_red_method,
@@ -200,6 +195,7 @@ def _nns_reg_univariate_core(
         fitted,
         point_values,
         confidence_interval=confidence_interval,
+        class_mode=class_mode,
     )
     se = float(math.sqrt(float(np.sum((estimate - y_values) ** 2)) / (y_values.size - 1)))
     r2 = _r2(y_values, estimate)
@@ -346,11 +342,6 @@ def _nns_reg_dimred(
     class_mode = type_value == "class" or _should_auto_classify(y_values)
     if class_mode:
         noise_reduction = "mode_class"
-        if confidence_interval is not None:
-            raise NotImplementedError(
-                "classification confidence intervals are deferred until class interval parity "
-                "is ported."
-            )
     point_matrix = _as_dimred_point_est(point_est, x_matrix.shape[1])
     noise = _validate_noise_reduction(noise_reduction)
     projection = _dimred_projection(
@@ -1019,6 +1010,7 @@ def _apply_univariate_intervals(
     point_values: NDArray[np.float64] | None,
     *,
     confidence_interval: float | None,
+    class_mode: bool = False,
 ) -> dict[str, NDArray[np.float64]] | None:
     if confidence_interval is None:
         return None
@@ -1064,10 +1056,17 @@ def _apply_univariate_intervals(
             "pred.int.pos": np.array([], dtype=np.float64),
         }
     selected = np.asarray(row_indices, dtype=np.int64)
-    return {
+    pred_int = {
         "pred.int.neg": pred_neg[order][selected],
         "pred.int.pos": pred_pos[order][selected],
     }
+    if class_mode:
+        return {key: _round_class_interval(values) for key, values in pred_int.items()}
+    return pred_int
+
+
+def _round_class_interval(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    return np.where(values % 1.0 < 0.5, np.floor(values), np.ceil(values)).astype(np.float64)
 
 
 def _r2(y: NDArray[np.float64], y_hat: NDArray[np.float64]) -> float:

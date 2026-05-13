@@ -122,8 +122,9 @@ supported: `"off"`, `"mean"`, `"median"`, `"mode"`, and `"mode_class"`.
 dictionaries of NumPy arrays. `multivariate_call=True` returns R's internal
 two-column regression-point structure as `{"x": ..., "y": ...}` for
 `nns_m_reg`. Matrix `x` without dimension reduction dispatches to `nns_m_reg`.
-Classification, smooth splines, and factor dummy expansion
-are explicit future batches and raise `NotImplementedError`.
+Classification is supported for numeric/logical/factor-like class-code targets.
+Smooth splines and factor dummy expansion are explicit future batches and raise
+`NotImplementedError`.
 
 Numeric dimension reduction is supported for `"cor"`, `"NNS.dep"`,
 `"NNS.caus"`, `"all"`, `"equal"`, and numeric coefficient vectors. The
@@ -154,8 +155,10 @@ like an `LPM` candidate. Univariate `point_est` prediction intervals use
 `UPM.VaR(..., degree = 0)` for the upper column and `LPM.VaR(..., degree = 0)`
 for the lower column. Below-range univariate point estimates follow R's
 `findInterval`/data.table behavior: index `0` rows are dropped, so `pred.int`
-can have fewer rows than `Point.est`. `smooth=True` with `confidence_interval`
-remains deferred because it depends on R-compatible smoothing splines.
+can have fewer rows than `Point.est`. For class mode, fitted confidence columns
+remain raw numeric values, while univariate `pred.int` columns are rounded with
+R's `x %% 1 < 0.5` rule. `smooth=True` with `confidence_interval` remains
+deferred because it depends on R-compatible smoothing splines.
 
 ## Multivariate Regression
 
@@ -163,11 +166,13 @@ remains deferred because it depends on R-compatible smoothing splines.
 `factor.2.dummy = FALSE` and plotting disabled.
 Outputs use R's keys (`R2`, `rhs.partitions`, `RPM`, `Point.est`, `pred.int`,
 and `Fitted.xy`) with data.table objects represented as dictionaries of NumPy
-arrays. Numeric confidence intervals are deterministic and use the global
-residual `UPM.VaR(..., degree = 1)` offset from installed R. Classification mode
-(`type="class"`) is supported for numeric/logical/factor-like targets and
-returns numeric class codes. Factor predictor dummy expansion is deferred and
-raises `NotImplementedError`.
+arrays. Numeric and class confidence intervals are deterministic and use the
+global residual `UPM.VaR(..., degree = 1)` offset from installed R. In class
+mode, fitted predictions and point estimates are rounded/clamped to class codes,
+but `pred.int` lower/upper bounds and fitted confidence columns remain raw
+numeric values. Classification mode (`type="class"`) is supported for
+numeric/logical/factor-like targets and returns numeric class codes. Factor
+predictor dummy expansion is deferred and raises `NotImplementedError`.
 
 Point estimates match installed R, including the one-row outsider behavior in
 the multi-point path where R drops matrix dimensions before extrapolating.
@@ -326,8 +331,8 @@ factor-like targets. Use `class_levels=` when passing string/object labels so
 PyNNS can reproduce R factor codes explicitly. Raw string classification remains
 rejected where installed R errors or produces unusable `NA` conversions.
 Predictions and point estimates are numeric class codes, not original labels,
-matching installed R. Class-specific interval tables and `balance=True` remain
-deferred until the next classification batches.
+matching installed R. Class confidence intervals are supported in `nns_reg` and
+`nns_m_reg`; stack/boost class `pred_int` remains deferred until the next batch.
 
 ## Differentiation
 

@@ -73,3 +73,21 @@ def test_nns_m_reg_classification_outputs_numeric_codes() -> None:
     assert set(result["Fitted.xy"]["y.hat"]).issubset(set(y))
     assert result["Point.est"] is not None
     assert set(result["Point.est"]).issubset(set(y))
+
+
+def test_nns_m_reg_class_confidence_interval_keeps_raw_bounds() -> None:
+    x1 = np.linspace(-2.0, 2.0, 20)
+    x = np.column_stack((x1, np.sin(x1)))
+    y = np.where(x1 < 0.0, 1.0, 2.0)
+
+    result = nns_m_reg(x, y, type="class", point_est=x[:3], n_best=1, confidence_interval=0.95)
+
+    assert result["Fitted.xy"]["conf.int.pos"].shape == y.shape
+    assert result["Fitted.xy"]["conf.int.neg"].shape == y.shape
+    assert result["pred.int"] is not None
+    assert set(result["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert not np.allclose(
+        result["pred.int"]["lower.pred.int"],
+        np.round(result["pred.int"]["lower.pred.int"]),
+    )
+    assert set(result["Point.est"]).issubset(set(y))

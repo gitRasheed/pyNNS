@@ -192,6 +192,43 @@ def test_nns_m_reg_classification_matches_r(
 
 
 @pytest.mark.parity
+@pytest.mark.parametrize("n_best", [1, 2])
+@pytest.mark.parametrize(("n_cols", "classes", "point_est", "order"), MREG_CLASS_CASES)
+def test_nns_m_reg_class_confidence_interval_matches_r(
+    n_cols: int,
+    classes: np.ndarray,
+    point_est: np.ndarray,
+    order: int,
+    n_best: int,
+) -> None:
+    x, _ = _dataset(classes.size, n_cols, "mixed", np.random.default_rng(123))
+
+    expected = _r_nns_m_reg(
+        x,
+        classes,
+        order,
+        n_best,
+        point_est,
+        False,
+        "off",
+        confidence_interval=0.95,
+        type="class",
+    )
+    actual = nns_m_reg(
+        x,
+        classes,
+        order=order,
+        n_best=n_best,
+        type="class",
+        point_est=point_est,
+        confidence_interval=0.95,
+        ncores=1,
+    )
+
+    _assert_m_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
 def test_nns_m_reg_factor_levels_return_numeric_codes() -> None:
     x, _ = _dataset(9, 3, "mixed", np.random.default_rng(321))
     labels = np.array(["B", "B", "A", "A", "C", "C", "A", "B", "C"])
@@ -216,6 +253,39 @@ def test_nns_m_reg_factor_levels_return_numeric_codes() -> None:
         n_best=1,
         type="class",
         point_est=point_est,
+        class_levels=levels,
+    )
+
+    _assert_m_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_m_reg_factor_levels_class_confidence_interval_matches_r() -> None:
+    x, _ = _dataset(9, 3, "mixed", np.random.default_rng(321))
+    labels = np.array(["B", "B", "A", "A", "C", "C", "A", "B", "C"])
+    levels = ["A", "B", "C"]
+    encoded = np.array([2, 2, 1, 1, 3, 3, 1, 2, 3], dtype=np.float64)
+    point_est = x[:2]
+
+    expected = _r_nns_m_reg(
+        x,
+        encoded,
+        1,
+        1,
+        point_est,
+        False,
+        "off",
+        confidence_interval=0.95,
+        type="class",
+    )
+    actual = nns_m_reg(
+        x,
+        labels,
+        order=1,
+        n_best=1,
+        type="class",
+        point_est=point_est,
+        confidence_interval=0.95,
         class_levels=levels,
     )
 

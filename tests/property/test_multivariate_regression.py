@@ -83,3 +83,32 @@ def test_nns_m_reg_classification_bounds_hold(x: np.ndarray, n_classes: int) -> 
     assert set(result["Fitted.xy"]["y.hat"]).issubset(set(classes))
     assert result["Point.est"] is not None
     assert set(result["Point.est"]).issubset(set(classes))
+
+
+@given(matrix_arrays, st.integers(min_value=2, max_value=4), st.sampled_from([0.8, 0.95]))
+def test_nns_m_reg_class_confidence_interval_shape_invariants_hold(
+    x: np.ndarray,
+    n_classes: int,
+    confidence_interval: float,
+) -> None:
+    assume(all(np.unique(x[:, col]).size > 1 for col in range(x.shape[1])))
+    classes = (np.arange(x.shape[0]) % n_classes + 1).astype(np.float64)
+
+    result = nns_m_reg(
+        x,
+        classes,
+        order=1,
+        n_best=1,
+        type="class",
+        point_est=x[:3],
+        confidence_interval=confidence_interval,
+    )
+
+    assert result["Fitted.xy"]["conf.int.pos"].shape == (x.shape[0],)
+    assert result["Fitted.xy"]["conf.int.neg"].shape == (x.shape[0],)
+    assert result["pred.int"] is not None
+    assert set(result["pred.int"]) == {"lower.pred.int", "upper.pred.int"}
+    assert result["pred.int"]["lower.pred.int"].shape == (3,)
+    assert result["pred.int"]["upper.pred.int"].shape == (3,)
+    assert np.all(np.isfinite(result["pred.int"]["lower.pred.int"]))
+    assert np.all(np.isfinite(result["pred.int"]["upper.pred.int"]))

@@ -121,6 +121,31 @@ def test_nns_reg_classification_outputs_numeric_codes() -> None:
     assert set(result["Point.est"]).issubset(set(y))
 
 
+def test_nns_reg_class_confidence_interval_outputs_rounded_pred_int_only() -> None:
+    x = np.linspace(0.0, 11.0, 12)
+    y = np.array([1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2], dtype=np.float64)
+
+    result = nns_reg(
+        x,
+        y,
+        type="class",
+        point_est=np.array([2.5, 6.5, 11.5]),
+        confidence_interval=0.95,
+    )
+
+    assert result["Fitted.xy"]["conf.int.pos"].shape == y.shape
+    assert result["Fitted.xy"]["conf.int.neg"].shape == y.shape
+    assert result["pred.int"] is not None
+    assert set(result["pred.int"]) == {"pred.int.neg", "pred.int.pos"}
+    for values in result["pred.int"].values():
+        np.testing.assert_allclose(values, np.round(values))
+    assert not np.allclose(
+        result["Fitted.xy"]["conf.int.pos"],
+        np.round(result["Fitted.xy"]["conf.int.pos"]),
+    )
+    assert set(result["Point.est"]).issubset(set(y))
+
+
 def test_nns_reg_raw_string_class_labels_raise() -> None:
     x = np.linspace(0.0, 5.0, 6)
     y = np.array(["A", "A", "A", "B", "B", "B"])
