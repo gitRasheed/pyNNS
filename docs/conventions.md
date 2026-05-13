@@ -171,8 +171,12 @@ global residual `UPM.VaR(..., degree = 1)` offset from installed R. In class
 mode, fitted predictions and point estimates are rounded/clamped to class codes,
 but `pred.int` lower/upper bounds and fitted confidence columns remain raw
 numeric values. Classification mode (`type="class"`) is supported for
-numeric/logical/factor-like targets and returns numeric class codes. Factor
-predictor dummy expansion is deferred and raises `NotImplementedError`.
+numeric/logical/factor-like targets and returns numeric class codes. Direct
+`nns_m_reg(..., factor_2_dummy=True)` remains rejected for raw factor
+predictors because installed R errors on that path. Public `nns_reg` factor
+predictor expansion is supported with `factor_2_dummy=True` and explicit
+`factor_levels=` metadata; it combines training `x` and `point_est` before
+full-rank dummy expansion, matching installed R's `factor_2_dummy_FR` path.
 
 Point estimates match installed R, including the one-row outsider behavior in
 the multi-point path where R drops matrix dimensions before extrapolating.
@@ -203,6 +207,9 @@ the tail `ts_test` rows, while CV testing uses the earlier rows
 counterintuitive. R's `CV.size = NULL` samples a random value between 0.2 and
 1/3; PyNNS uses a deterministic default of `0.25`. Pass `cv_size` explicitly for
 exact R parity.
+Factor predictor expansion remains deferred for `nns_stack`; installed R uses a
+stack-specific aligned train/test full-rank dummy builder rather than the
+`nns_reg` preprocessing helper.
 
 ## Boost
 

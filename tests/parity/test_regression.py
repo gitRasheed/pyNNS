@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
-from _r import nns
+from _r import nns, nns_reg_factor_predictor
 from _tolerances import COMPOUND
 
 from pynns import nns_reg
@@ -225,6 +225,74 @@ def test_nns_reg_dim_red_degenerate_equal_projection_matches_r() -> None:
     actual = nns_reg(x, y, dim_red_method="equal")
 
     _assert_reg_matches(actual, expected, check_dimred=True)
+
+
+@pytest.mark.parity
+def test_nns_reg_factor_predictor_matches_r_full_rank_dummy_path() -> None:
+    x = np.array(["b", "a", "b", "c"])
+    y = np.array([2.0, 1.0, 3.0, 4.0])
+    point_est = np.array(["a", "c"])
+    levels = ["a", "b", "c"]
+
+    expected = nns_reg_factor_predictor(
+        x.tolist(),
+        y.tolist(),
+        point_est.tolist(),
+        levels=levels,
+        order=None,
+    )
+    actual = nns_reg(
+        x,
+        y,
+        factor_2_dummy=True,
+        factor_levels=levels,
+        point_est=point_est,
+    )
+
+    assert isinstance(expected, dict)
+    assert set(actual) == set(expected)
+    np.testing.assert_allclose(actual["R2"], _array(expected["R2"]), atol=COMPOUND)
+    np.testing.assert_allclose(actual["Point.est"], _array(expected["Point.est"]), atol=COMPOUND)
+    for key in ("rhs.partitions", "RPM"):
+        assert isinstance(actual[key], dict)
+        assert isinstance(expected[key], dict)
+        actual_items = list(actual[key].items())
+        expected_table = expected[key]
+        assert isinstance(expected_table, dict)
+        expected_items = list(expected_table.items())
+        assert len(actual_items) == len(expected_items)
+        for (_, values), (_, expected_values) in zip(
+            actual_items,
+            expected_items,
+            strict=True,
+        ):
+            np.testing.assert_allclose(values, _array(expected_values), atol=COMPOUND)
+
+    assert isinstance(actual["Fitted.xy"], dict)
+    assert isinstance(expected["Fitted.xy"], dict)
+    np.testing.assert_array_equal(
+        actual["Fitted.xy"]["NNS.ID"].astype(str),
+        _strings(expected["Fitted.xy"]["NNS.ID"]),
+    )
+    actual_predictors = [
+        values
+        for column, values in actual["Fitted.xy"].items()
+        if column not in {"y", "y.hat", "NNS.ID", "residuals"}
+    ]
+    expected_predictors = [
+        values
+        for column, values in expected["Fitted.xy"].items()
+        if column not in {"y", "y.hat", "NNS.ID", "residuals"}
+    ]
+    assert len(actual_predictors) == len(expected_predictors)
+    for values, expected_values in zip(actual_predictors, expected_predictors, strict=True):
+        np.testing.assert_allclose(values, _array(expected_values), atol=COMPOUND)
+    for column in ("y", "y.hat", "residuals"):
+        np.testing.assert_allclose(
+            actual["Fitted.xy"][column],
+            _array(expected["Fitted.xy"][column]),
+            atol=COMPOUND,
+        )
 
 
 @pytest.mark.parity

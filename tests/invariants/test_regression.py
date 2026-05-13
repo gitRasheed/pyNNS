@@ -152,3 +152,30 @@ def test_nns_reg_raw_string_class_labels_raise() -> None:
 
     with pytest.raises(ValueError, match="class_levels"):
         nns_reg(x, y, type="class")
+
+
+def test_nns_reg_factor_predictor_requires_levels_for_raw_strings() -> None:
+    x = np.array(["a", "b", "a"])
+    y = np.array([1.0, 2.0, 1.5])
+
+    with pytest.raises(ValueError, match="levels"):
+        nns_reg(x, y, factor_2_dummy=True)
+
+
+def test_nns_reg_factor_predictor_expands_point_est_with_training_levels() -> None:
+    x = np.array(["b", "a", "b", "c"])
+    y = np.array([2.0, 1.0, 3.0, 4.0])
+
+    result = nns_reg(
+        x,
+        y,
+        factor_2_dummy=True,
+        factor_levels=["a", "b", "c"],
+        point_est=np.array(["a", "c"]),
+    )
+
+    rpm_columns = [key for key in result["RPM"] if key != "y.hat"]
+    assert len(rpm_columns) == 3
+    for column in rpm_columns:
+        assert result["RPM"][column].shape == (3,)
+    assert result["Point.est"].shape == (2,)

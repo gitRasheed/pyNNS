@@ -146,6 +146,39 @@ def nns_boost_numeric(
         return result
 
 
+def nns_reg_factor_predictor(
+    x: list[str],
+    y: list[float],
+    point_est: list[str] | None,
+    *,
+    levels: Sequence[object],
+    order: int | str | None = None,
+) -> RValue:
+    args = {
+        "x": x,
+        "y": y,
+        "point_est": point_est,
+        "levels": levels,
+        "order": order,
+    }
+    key = _cache_key("NNS.reg.factor_predictor.v2", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.reg.factor_predictor with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_reg_factor_predictor(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def nns_meboot_diagnostics(
     x: list[float],
     *,
@@ -609,6 +642,49 @@ def _call_r_stack_numeric(args: dict[str, Any]) -> RValue:
     return _decode(json.loads(completed.stdout))
 
 
+def _call_r_reg_factor_predictor(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "point_arg <- args$point_est\n"
+        "if (length(point_arg) == 0) point_arg <- NULL else "
+        "point_arg <- factor(unlist(point_arg), levels = unlist(args$levels))\n"
+        "order_arg <- args$order\n"
+        "if (length(order_arg) == 0) order_arg <- NULL\n"
+        "x <- factor(unlist(args$x), levels = unlist(args$levels))\n"
+        "result <- NNS.reg(x, as.numeric(unlist(args$y)), factor.2.dummy = TRUE, "
+        "order = order_arg, point.est = point_arg, plot = FALSE, "
+        "residual.plot = FALSE, ncores = 1)\n"
+        "encode <- function(x) {\n"
+        "  if (is.data.frame(x) || data.table::is.data.table(x)) {\n"
+        "    col_encode <- function(nm) {\n"
+        "      z <- x[[nm]]\n"
+        "      if (is.character(z)) return(as.character(z))\n"
+        "      as.numeric(z)\n"
+        "    }\n"
+        "    return(stats::setNames(lapply(names(x), col_encode), names(x)))\n"
+        "  }\n"
+        "  if (is.matrix(x)) {\n"
+        "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"
+        "  }\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
 def _call_r_boost_numeric(args: dict[str, Any]) -> RValue:
     script = (
         "library(NNS)\n"
@@ -985,6 +1061,8 @@ def _decode(value: JsonValue) -> RValue:
     if isinstance(value, list) and all(isinstance(item, str) for item in value):
         return cast(list[str], value)
     if isinstance(value, list):
+        if any(isinstance(item, list | dict) for item in value):
+            return np.asarray([_decode(item) for item in value], dtype=np.float64)
         converted: list[JsonValue] = []
         has_numeric_special = False
         for item in value:

@@ -10,7 +10,7 @@ limits stay visible.
 | Boost | `ts_test` | Time-series boost evaluation not ported | Port after ARMA/time-series stack paths |
 | Regression | `confidence_interval` with `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility before interval tables can be generated on smoothed fits | Port a minimal R-compatible fixed-spar smoothing spline backend |
 | Regression | `smooth=True` | Requires R `stats::smooth.spline(..., spar=...)` fixed-spar compatibility; SciPy smoothers are not parity-compatible | Port a minimal R-compatible fixed-spar smoothing spline backend, then enable `nns_reg(smooth=True)` |
-| Regression | factor/dummy predictor paths | Factor target encoding is supported with `class_levels`, but factor predictor expansion is not wired | Enable predictor dummy expansion in `nns_reg` factor paths |
+| Stack | factor predictor paths | `nns_reg` factor predictor expansion is ported, but `nns_stack` needs R's aligned train/test full-rank dummy builder | Port stack-specific factor-X preprocessing |
 | Regression | `tau="ts"` in dimension reduction | `nns_seas` is ported, but NNS.seas-derived lags are not wired into dim-red regression | Reuse `nns_seas` period selection in the dim-red path |
 | Regression | `multivariate_call=True` with `dim_red_method` | R does not use this combination and PyNNS has no faithful call path for it | Keep rejected unless an R path requiring it is found |
 | Regression | bare univariate `point_only=True` | R uses point-only through multivariate/dim-red callers; PyNNS supports those paths but not bare univariate point-only | Keep univariate-only guard unless R parity requires it |

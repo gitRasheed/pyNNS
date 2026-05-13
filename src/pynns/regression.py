@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from typing import Any, Literal, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
 from pynns._helpers import _fast_lm, _is_fcl
-from pynns.categorical import encode_factor_codes
+from pynns.categorical import encode_factor_codes, factor_2_dummy_fr
 from pynns.causation import _uni_caus
 from pynns.central_tendencies import nns_mode
 from pynns.copula import _target
@@ -43,6 +44,7 @@ def nns_reg(
     point_only: bool = False,
     multivariate_call: bool = False,
     class_levels: list[object] | None = None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None = None,
 ) -> dict[str, Any]:
     """Univariate numeric port of R's NNS.reg."""
     del return_values, plot, plot_regions, residual_plot, ncores
@@ -66,13 +68,23 @@ def nns_reg(
             point_only=point_only,
             multivariate_call=multivariate_call,
             class_levels=class_levels,
+            factor_levels=factor_levels,
         )
 
     type_value = _normalize_type(type)
     if type_value == "class":
         noise_reduction = "mode_class"
 
-    if np.asarray(x).ndim == 2:
+    x_for_dispatch: NDArray[Any] | NDArray[np.float64] = np.asarray(x)
+    point_for_dispatch = point_est
+    if factor_2_dummy:
+        x_for_dispatch, point_for_dispatch = _expand_factor_predictors(
+            x,
+            point_est,
+            factor_levels=factor_levels,
+        )
+
+    if np.asarray(x_for_dispatch).ndim == 2:
         from pynns.multivariate_regression import nns_m_reg
 
         y_matrix_values, _ = _prepare_y_values(y, type_value=type_value, class_levels=class_levels)
@@ -80,13 +92,15 @@ def nns_reg(
         if type_value == "class" and dispatch_n_best is None:
             dispatch_n_best = 1
         return nns_m_reg(
-            np.asarray(x, dtype=np.float64),
+            np.asarray(x_for_dispatch, dtype=np.float64),
             y_matrix_values,
-            factor_2_dummy=factor_2_dummy,
+            factor_2_dummy=False,
             order=order,
             n_best=cast(Any, dispatch_n_best),
             type=type_value,
-            point_est=None if point_est is None else np.asarray(point_est, dtype=np.float64),
+            point_est=None
+            if point_for_dispatch is None
+            else np.asarray(point_for_dispatch, dtype=np.float64),
             point_only=point_only,
             noise_reduction=noise_reduction,
             dist=dist,
@@ -96,9 +110,9 @@ def nns_reg(
 
     del tau, threshold, n_best, dist
     x_values, y_values = _validate_univariate_inputs(
-        x,
+        x_for_dispatch,
         y,
-        factor_2_dummy,
+        False if factor_2_dummy else factor_2_dummy,
         type_value=type_value,
         class_levels=class_levels,
     )
@@ -108,14 +122,14 @@ def nns_reg(
     _reject_deferred_paths(
         x_values,
         dim_red_method=dim_red_method,
-        point_est=point_est,
+        point_est=point_for_dispatch,
         confidence_interval=confidence_interval,
         smooth=smooth,
         point_only=point_only,
         multivariate_call=multivariate_call,
     )
     noise = _validate_noise_reduction(noise_reduction)
-    point_values = _as_point_est(point_est)
+    point_values = _as_point_est(point_for_dispatch)
     return _nns_reg_univariate_core(
         x_values,
         y_values,
@@ -249,6 +263,87 @@ def _validate_univariate_inputs(
     return x_values, y_values
 
 
+def _expand_factor_predictors(
+    x: NDArray[Any],
+    point_est: NDArray[np.float64] | float | None,
+    *,
+    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None,
+) -> tuple[NDArray[np.float64], NDArray[np.float64] | None]:
+    x_array = np.asarray(x)
+    point_array = None if point_est is None else np.asarray(point_est)
+    if x_array.ndim == 0:
+        x_array = x_array.reshape(1)
+    if x_array.ndim == 1:
+        combined = (
+            x_array
+            if point_array is None
+            else np.concatenate((x_array.reshape(-1), point_array.reshape(-1)))
+        )
+        levels = _levels_for_column(factor_levels, 0, x_array.ndim)
+        expanded = _dummy_matrix_for_column(combined, levels=levels)
+        n_train = x_array.shape[0]
+        train = expanded[:n_train]
+        points = None if point_array is None else expanded[n_train:]
+        if train.shape[1] == 1:
+            return train[:, 0], None if points is None else points[:, 0]
+        return train, points
+
+    if x_array.ndim != 2:
+        raise ValueError("x must be a vector or 2D matrix.")
+    if point_array is not None:
+        if point_array.ndim == 1:
+            point_array = point_array.reshape(1, -1)
+        if point_array.ndim != 2:
+            raise ValueError("point_est must be a vector or 2D matrix.")
+        if point_array.shape[1] != x_array.shape[1]:
+            raise ValueError("point_est must have the same column count as x.")
+
+    train_blocks: list[NDArray[np.float64]] = []
+    point_blocks: list[NDArray[np.float64]] = []
+    for col in range(x_array.shape[1]):
+        column = x_array[:, col]
+        if point_array is None:
+            combined = column
+        else:
+            combined = np.concatenate((column, point_array[:, col]))
+        levels = _levels_for_column(factor_levels, col, x_array.ndim)
+        expanded = _dummy_matrix_for_column(combined, levels=levels)
+        train_blocks.append(expanded[: x_array.shape[0]])
+        if point_array is not None:
+            point_blocks.append(expanded[x_array.shape[0] :])
+    train_matrix = np.column_stack(train_blocks)
+    point_matrix = None if point_array is None else np.column_stack(point_blocks)
+    return train_matrix, point_matrix
+
+
+def _dummy_matrix_for_column(
+    values: NDArray[Any],
+    *,
+    levels: Sequence[object] | None,
+) -> NDArray[np.float64]:
+    if levels is None and not _is_fcl(values):
+        numeric = np.asarray(values, dtype=np.float64).reshape(-1, 1)
+        return numeric
+    block = factor_2_dummy_fr(values, levels=levels)
+    columns = [np.asarray(column, dtype=np.float64).reshape(-1) for column in block.values()]
+    return np.column_stack(columns)
+
+
+def _levels_for_column(
+    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None,
+    column: int,
+    x_ndim: int,
+) -> Sequence[object] | None:
+    if factor_levels is None:
+        return None
+    if x_ndim == 1:
+        return factor_levels
+    if column >= len(factor_levels):
+        raise ValueError("factor_levels must provide levels for every x column.")
+    levels = cast(Sequence[Sequence[object]], factor_levels)[column]
+    return levels
+
+
 def _normalize_type(type_value: str | None) -> str | None:
     if type_value is None:
         return None
@@ -312,9 +407,11 @@ def _nns_reg_dimred(
     point_only: bool,
     multivariate_call: bool,
     class_levels: list[object] | None = None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None = None,
 ) -> dict[str, Any]:
     del n_best
     if factor_2_dummy:
+        del factor_levels
         raise NotImplementedError(
             "factor_2_dummy=True is deferred until the factor dimension-reduction path is ported."
         )

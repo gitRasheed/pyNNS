@@ -295,6 +295,29 @@ def test_nns_reg_200_confidence_interval(benchmark: Any, r_baseline: dict[str, o
 
 
 @pytest.mark.benchmark
+def test_nns_reg_factor_predictor_200(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    levels = ["a", "b", "c"]
+    x = np.asarray([levels[index % len(levels)] for index in range(200)])
+    y = np.sin(np.arange(200, dtype=np.float64) / 11.0) + (np.arange(200) % 3)
+    point_est = np.asarray(["a", "c", "b", "a"])
+
+    result = benchmark(
+        nns_reg,
+        x,
+        y,
+        factor_2_dummy=True,
+        factor_levels=levels,
+        point_est=point_est,
+    )
+
+    assert result["Point.est"].shape == (4,)
+    assert isinstance(r_baseline["nns_reg_factor_predictor_200_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_reg_class_200(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-3.0, 3.0, 200)
     y = (np.arange(200, dtype=np.float64) % 3.0) + 1.0
