@@ -236,7 +236,10 @@ and does not use MC/meboot. `features_only=True` returns before the final stack
 fit and ignores `pred_int`, matching R. Classification `pred_int` is supported
 and delegates to final stack `method=1`, so interval bounds remain raw numeric
 values. `ts_test` remains deferred and raises `NotImplementedError`. R requires
-usable column names for matrix inputs; PyNNS uses positional numeric columns. As with `nns_stack`, R
+usable column names for matrix inputs; PyNNS uses positional numeric columns. A
+direct deterministic `ts_test` split port was investigated and rejected because
+it diverged from installed R on boost keeper diagnostics and one final
+prediction. As with `nns_stack`, R
 samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
 `cv_size=0.25` unless specified. For classification boost, final predictions,
 feature weights, and feature frequencies are parity-tested against installed R
