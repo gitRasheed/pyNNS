@@ -25,6 +25,13 @@ def test_production_notimplemented_guards_are_documented() -> None:
     docs = DEFERRED_PATHS.read_text(encoding="utf-8")
 
     assert messages
+    stale_mappings = [
+        message_fragment
+        for message_fragment in EXPECTED_DEFERRED_FRAGMENTS
+        if not any(message_fragment in message for message in messages)
+    ]
+    assert stale_mappings == []
+
     unmapped = [
         message
         for message in messages
