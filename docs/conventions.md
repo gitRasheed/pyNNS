@@ -250,10 +250,12 @@ Simple single-column explicit-level factor predictors are supported through
 `factor_levels=`. PyNNS integer-codes those columns before deterministic feature
 selection, matching installed R's `data.matrix` conversion. Pass `None` for
 numeric columns in mixed predictor matrices, for example
-`factor_levels=(["low", "mid", "high"], None)`. Broader factor predictor edge
-cases remain deferred because installed R probes with multiple factor predictors
-can produce matching feature diagnostics while PyNNS final predictions diverge,
-and another probe errored inside R `NNS.reg`. Numeric `pred_int` is supported and
+`factor_levels=(["low", "mid", "high"], None)`. Multiple explicit-level factor
+predictors are supported when `features_only=True`, where installed R returns
+only feature diagnostics. Final estimates for multiple factor predictors remain
+deferred because installed R probes can produce matching feature diagnostics
+while PyNNS final predictions diverge, and another probe errored inside
+R `NNS.reg`. Numeric `pred_int` is supported and
 delegates to `nns_stack(pred_int=...)`, matching installed R; it is deterministic
 and does not use MC/meboot. `features_only=True` returns before the final stack
 fit and ignores `pred_int`, matching R. Classification `pred_int` is supported

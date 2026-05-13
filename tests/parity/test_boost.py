@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
-from _r import nns_boost_factor_predictor, nns_boost_numeric
+from _r import nns_boost_factor_predictor, nns_boost_multi_factor_features_only, nns_boost_numeric
 from _tolerances import COMPOUND
 
 from pynns import nns_boost
@@ -273,6 +273,46 @@ def test_nns_boost_factor_predictor_features_only_matches_r() -> None:
         learner_trials=10,
         cv_size=0.25,
         factor_levels=(["low", "mid", "high"], None),
+        features_only=True,
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_boost_multi_factor_features_only_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    first = np.where(x < -0.5, "low", np.where(x > 0.75, "high", "mid"))
+    second = np.where(np.sin(x) > 0.0, "up", "down")
+    y = (
+        x
+        + np.where(first == "low", 1.0, np.where(first == "mid", 2.0, 3.0)) * 0.25
+        + np.where(second == "up", 0.1, -0.1)
+    )
+    variable = np.column_stack((first, x, second))
+
+    expected = nns_boost_multi_factor_features_only(
+        first.tolist(),
+        x.tolist(),
+        second.tolist(),
+        y.tolist(),
+        first[:5].tolist(),
+        x[:5].tolist(),
+        second[:5].tolist(),
+        first_levels=["low", "mid", "high"],
+        second_levels=["down", "up"],
+        learner_trials=10,
+        cv_size=0.25,
+        depth=None,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:5],
+        learner_trials=10,
+        cv_size=0.25,
+        factor_levels=(["low", "mid", "high"], None, ["down", "up"]),
         features_only=True,
         feature_importance=False,
     )
