@@ -43,15 +43,17 @@ def test_nns_boost_class_shapes_and_codes() -> None:
     assert result["pred.int"] is None
 
 
-@pytest.mark.parametrize("path", ["ts"])
-def test_nns_boost_deferred_paths_raise(path: str) -> None:
+def test_nns_boost_ts_test_shape_and_feature_weights() -> None:
     x = np.linspace(-2.0, 2.0, 20)
     variable = np.column_stack((x, np.sin(x)))
     y = x + np.sin(x)
 
-    with pytest.raises(NotImplementedError):
-        if path == "ts":
-            nns_boost(variable, y, ts_test=4)
+    result = nns_boost(variable, y, variable[:5], ts_test=4, cv_size=0.25, feature_importance=False)
+
+    assert result["results"].shape == (5,)
+    assert result["pred.int"] is None
+    assert np.sum(result["feature.weights"]) == pytest.approx(1.0)
+    assert np.all(np.isfinite(result["results"]))
 
 
 def test_nns_boost_numeric_pred_int_shape() -> None:

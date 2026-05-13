@@ -189,6 +189,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_boost_50x3_pred_int_seconds" not in cache:
         cache["nns_boost_50x3_pred_int_seconds"] = _time_r_nns_boost_pred_int()
         _write_benchmark_baseline(cache)
+    if "nns_boost_50x3_ts_test_seconds" not in cache:
+        cache["nns_boost_50x3_ts_test_seconds"] = _time_r_nns_boost_ts_test()
+        _write_benchmark_baseline(cache)
     if "nns_boost_class_50x3_seconds" not in cache:
         cache["nns_boost_class_50x3_seconds"] = _time_r_nns_boost_class()
         _write_benchmark_baseline(cache)
@@ -1070,6 +1073,29 @@ def _time_r_nns_boost_pred_int() -> float:
         "y <- x + sin(x) + 0.25 * cos(x)\n"
         "run <- function() NNS::NNS.boost(X, y, IVs.test = X[1:10,], "
         "learner.trials = 10, CV.size = 0.25, depth = 2, pred.int = 0.95, "
+        "feature.importance = FALSE, status = FALSE)\n"
+        "invisible(run())\n"
+        "times <- replicate(2, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_boost_ts_test() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-2, 2, length.out = 50)\n"
+        "X <- cbind(X1 = x, X2 = sin(x), X3 = cos(x))\n"
+        "y <- x + sin(x) + 0.25 * cos(x)\n"
+        "run <- function() NNS::NNS.boost(X, y, IVs.test = X[1:10,], "
+        "learner.trials = 10, CV.size = 0.25, ts.test = 8, "
         "feature.importance = FALSE, status = FALSE)\n"
         "invisible(run())\n"
         "times <- replicate(2, system.time(invisible(run()))[['elapsed']])\n"

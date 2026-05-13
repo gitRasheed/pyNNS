@@ -156,6 +156,66 @@ def test_nns_boost_features_only_matches_r() -> None:
 
 
 @pytest.mark.parity
+@pytest.mark.parametrize("ts_test", [3, 5, 8])
+def test_nns_boost_ts_test_deterministic_matches_r(ts_test: int) -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        variable[:4].tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=None,
+        features_only=False,
+        ts_test=ts_test,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:4],
+        learner_trials=10,
+        cv_size=0.25,
+        ts_test=ts_test,
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected)
+
+
+@pytest.mark.parity
+def test_nns_boost_ts_test_features_only_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    variable = np.column_stack((x, np.sin(x), np.cos(x)))
+    y = x + np.sin(x) + 0.25 * np.cos(x)
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        variable[:4].tolist(),
+        learner_trials=10,
+        cv_size=0.25,
+        depth=None,
+        features_only=True,
+        ts_test=5,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:4],
+        learner_trials=10,
+        cv_size=0.25,
+        features_only=True,
+        ts_test=5,
+        feature_importance=False,
+    )
+
+    _assert_boost_matches(actual, expected)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize(("depth", "pred_int"), [(1, 0.95), (2, 0.8)])
 def test_nns_boost_numeric_pred_int_matches_r(depth: int, pred_int: float) -> None:
     x = np.linspace(-2.0, 2.0, 40)

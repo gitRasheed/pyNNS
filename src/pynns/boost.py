@@ -53,11 +53,11 @@ def nns_boost(
     type_value = _normalize_type(type)
     if balance:
         type_value = "class"
-    if ts_test is not None:
-        raise NotImplementedError("ts_test requires the time-series boost path, deferred.")
-
     x_train = _as_matrix(ivs_train, "ivs_train")
     x_test = x_train.copy() if ivs_test is None else _as_point_matrix(ivs_test, x_train.shape[1])
+    ts_test_value = None if ts_test is None else int(ts_test)
+    if ts_test_value is not None and ts_test_value <= 0:
+        raise ValueError("ts_test must be a positive integer.")
     if balance:
         y_train, class_codes = _dense_factor_codes(dv_train, levels=class_levels)
     elif type_value == "class":
@@ -103,6 +103,7 @@ def nns_boost(
             features_only=features_only,
             feature_importance=feature_importance,
             pred_int=pred_int,
+            ts_test=ts_test_value,
             rng=rng,
         )
     except NotImplementedError:
@@ -154,6 +155,7 @@ def _nns_boost_core(
     features_only: bool,
     feature_importance: bool,
     pred_int: float | None,
+    ts_test: int | None,
     rng: np.random.Generator,
 ) -> BoostResult:
     objective_l = objective.lower()
@@ -187,6 +189,7 @@ def _nns_boost_core(
             objective_fn=objective_fn,
             rng=rng,
             type_value=type_value,
+            ts_test=ts_test,
         )
     else:
         scores = np.asarray([threshold], dtype=np.float64)
@@ -281,7 +284,15 @@ def _boost_cv_split(
     iteration: int,
     cv_size: float,
     rng: np.random.Generator,
+    ts_test: int | None = None,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    if ts_test is not None:
+        if ts_test >= n_rows:
+            raise ValueError("ts_test must be smaller than the training row count.")
+        test_idx = np.arange(0, n_rows - ts_test, dtype=np.int64)
+        train_idx = np.arange(n_rows - ts_test, n_rows, dtype=np.int64)
+        return train_idx, test_idx
+
     test_count = max(1, int(cv_size * n_rows))
     if iteration <= n_rows / 4.0:
         one_based = np.linspace(iteration, n_rows, test_count).astype(np.int64)
@@ -303,10 +314,11 @@ def _learner_scores(
     objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float],
     rng: np.random.Generator,
     type_value: str | None = None,
+    ts_test: int | None = None,
 ) -> NDArray[np.float64]:
     scores = np.empty(len(feature_sets), dtype=np.float64)
     for idx, features in enumerate(feature_sets, start=1):
-        train_idx, test_idx = _boost_cv_split(y_train.size, idx, cv_size, rng)
+        train_idx, test_idx = _boost_cv_split(y_train.size, idx, cv_size, rng, ts_test)
         aug_x, aug_y = _augmented_training(x_train[train_idx], y_train[train_idx])
         train_subset = aug_x[:, features]
         point_subset = x_train[test_idx][:, features]
