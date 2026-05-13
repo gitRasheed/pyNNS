@@ -123,7 +123,6 @@ def nns_reg(
         point_est=point_for_dispatch,
         confidence_interval=confidence_interval,
         smooth=smooth,
-        point_only=point_only,
         multivariate_call=multivariate_call,
     )
     noise = _validate_noise_reduction(noise_reduction)
@@ -734,7 +733,6 @@ def _reject_deferred_paths(
     point_est: NDArray[np.float64] | float | None,
     confidence_interval: float | None,
     smooth: bool,
-    point_only: bool,
     multivariate_call: bool,
 ) -> None:
     if smooth:
@@ -745,11 +743,6 @@ def _reject_deferred_paths(
             )
         raise NotImplementedError(
             "smooth=True requires the smoothing-spline path, deferred to a later batch."
-        )
-    if point_only:
-        raise NotImplementedError(
-            "bare univariate point_only=True is deferred; use nns_m_reg point_only or "
-            "dim_red_method point_only paths."
         )
     if point_est is not None and np.asarray(point_est).ndim > 1:
         raise NotImplementedError(
