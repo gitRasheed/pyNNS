@@ -26,7 +26,8 @@ def nns_var(
     """Guarded placeholder for R's NNS.VAR path."""
     del variables, h, tau, dim_red_method, naive_weights, obj_fn, objective, status, ncores, nowcast
     raise NotImplementedError(
-        "nns_var default VAR path depends on nns_arma_optim, which is not yet ported."
+        "nns_var default VAR path requires R named-data-frame stack semantics for lagged "
+        "variables, which are not yet ported."
     )
 
 
