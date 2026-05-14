@@ -69,12 +69,31 @@ def test_nns_stack_factor_predictor_expands_train_and_test() -> None:
     assert np.all(np.isfinite(result["stack"]))
 
 
-@pytest.mark.parametrize("method", [2, (1, 2)])
-def test_nns_stack_factor_predictor_method2_remains_deferred(method: object) -> None:
+def test_nns_stack_factor_predictor_method2_factor_only_falls_back_to_method1() -> None:
     x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"])
     y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
 
-    with pytest.raises(NotImplementedError, match="factor predictors with method 2"):
+    result = nns_stack(
+        x,
+        y,
+        np.asarray(["a", "c", "b"]),
+        factor_levels=["a", "b", "c"],
+        cv_size=0.25,
+        folds=1,
+        method=2,
+    )
+
+    assert result["reg"].shape == (3,)
+    assert np.asarray(result["dim.red"]).shape == (3,)
+    assert np.isnan(np.asarray(result["dim.red"], dtype=np.float64)).all()
+    np.testing.assert_allclose(result["stack"], result["reg"])
+
+
+def test_nns_stack_factor_predictor_method12_remains_deferred() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"])
+    y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
+
+    with pytest.raises(NotImplementedError, match=r"factor predictors with method \(1, 2\)"):
         nns_stack(
             x,
             y,
@@ -82,7 +101,7 @@ def test_nns_stack_factor_predictor_method2_remains_deferred(method: object) -> 
             factor_levels=["a", "b", "c"],
             cv_size=0.25,
             folds=1,
-            method=method,
+            method=(1, 2),
         )
 
 

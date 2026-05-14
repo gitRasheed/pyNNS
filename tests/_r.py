@@ -336,6 +336,53 @@ def nns_stack_factor_predictor(
         return result
 
 
+def nns_stack_mixed_factor_predictor(
+    x: list[str],
+    z: list[float],
+    y: list[float],
+    x_test: list[str],
+    z_test: list[float],
+    *,
+    levels: Sequence[object],
+    cv_size: float,
+    folds: int,
+    method: list[int],
+    order: int | str | None,
+    stack: bool,
+    dim_red_method: str | list[float],
+) -> RValue:
+    args = {
+        "x": x,
+        "z": z,
+        "y": y,
+        "x_test": x_test,
+        "z_test": z_test,
+        "levels": levels,
+        "cv_size": cv_size,
+        "folds": folds,
+        "method": method,
+        "order": order,
+        "stack": stack,
+        "dim_red_method": dim_red_method,
+    }
+    key = _cache_key("NNS.stack.mixed_factor_predictor.v1", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.stack.mixed_factor_predictor with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_stack_mixed_factor_predictor(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def nns_meboot_diagnostics(
     x: list[float],
     *,
@@ -949,6 +996,53 @@ def _call_r_stack_factor_predictor(args: dict[str, Any]) -> RValue:
         "if (is.list(dim_arg)) dim_arg <- as.numeric(unlist(dim_arg))\n"
         "x <- data.frame(x = factor(unlist(args$x), levels = unlist(args$levels)))\n"
         "x_test <- data.frame(x = factor(unlist(args$x_test), levels = unlist(args$levels)))\n"
+        "result <- NNS.stack(x, as.numeric(unlist(args$y)), IVs.test = x_test, "
+        "CV.size = as.numeric(args$cv_size), folds = as.integer(args$folds), "
+        "method = as.integer(unlist(args$method)), order = order_arg, "
+        "stack = as.logical(args$stack), dim.red.method = dim_arg, status = FALSE, "
+        "ncores = 1)\n"
+        "encode <- function(x) {\n"
+        "  if (length(x) == 0) return(NULL)\n"
+        "  if (is.data.frame(x) || data.table::is.data.table(x)) {\n"
+        "    col_encode <- function(nm) as.numeric(x[[nm]])\n"
+        "    return(stats::setNames(lapply(names(x), col_encode), names(x)))\n"
+        "  }\n"
+        "  if (is.matrix(x)) {\n"
+        "    return(unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))))\n"
+        "  }\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+        timeout=60,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_stack_mixed_factor_predictor(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "order_arg <- args$order\n"
+        "if (length(order_arg) == 0) order_arg <- NULL\n"
+        "dim_arg <- args$dim_red_method\n"
+        "if (is.list(dim_arg)) dim_arg <- as.numeric(unlist(dim_arg))\n"
+        "x <- data.frame("
+        "x = factor(unlist(args$x), levels = unlist(args$levels)), "
+        "z = as.numeric(unlist(args$z)))\n"
+        "x_test <- data.frame("
+        "x = factor(unlist(args$x_test), levels = unlist(args$levels)), "
+        "z = as.numeric(unlist(args$z_test)))\n"
         "result <- NNS.stack(x, as.numeric(unlist(args$y)), IVs.test = x_test, "
         "CV.size = as.numeric(args$cv_size), folds = as.integer(args$folds), "
         "method = as.integer(unlist(args$method)), order = order_arg, "

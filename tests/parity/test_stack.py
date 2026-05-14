@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from _r import nns_stack_factor_predictor, nns_stack_numeric
+from _r import nns_stack_factor_predictor, nns_stack_mixed_factor_predictor, nns_stack_numeric
 from _tolerances import COMPOUND
 
 from pynns import nns_stack
@@ -104,6 +104,80 @@ def test_nns_stack_factor_predictor_method1_matches_r() -> None:
         cv_size=0.25,
         folds=1,
         method=1,
+        stack=True,
+        dim_red_method="cor",
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+
+
+@pytest.mark.parity
+def test_nns_stack_factor_predictor_method2_factor_only_matches_r_fallback() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"])
+    y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
+    point = np.asarray(["a", "c", "b"])
+    levels = ["a", "b", "c"]
+
+    expected = nns_stack_factor_predictor(
+        x.tolist(),
+        y.tolist(),
+        point.tolist(),
+        levels=levels,
+        cv_size=0.25,
+        folds=1,
+        method=[2],
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+    )
+    actual = nns_stack(
+        x,
+        y,
+        point,
+        factor_levels=levels,
+        cv_size=0.25,
+        folds=1,
+        method=2,
+        stack=True,
+        dim_red_method="cor",
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+
+
+@pytest.mark.parity
+def test_nns_stack_mixed_factor_predictor_method2_matches_r() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"], dtype=object)
+    z = np.arange(1, x.size + 1, dtype=np.float64) / 10.0
+    variable = np.column_stack((x, z.astype(object)))
+    y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
+    point_factor = np.asarray(["a", "c", "b"], dtype=object)
+    point_z = np.asarray([0.15, 0.55, 0.75], dtype=object)
+    point = np.column_stack((point_factor, point_z))
+    levels = ["a", "b", "c"]
+
+    expected = nns_stack_mixed_factor_predictor(
+        x.tolist(),
+        z.tolist(),
+        y.tolist(),
+        point_factor.tolist(),
+        [0.15, 0.55, 0.75],
+        levels=levels,
+        cv_size=0.25,
+        folds=1,
+        method=[2],
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        factor_levels=(levels, None),
+        cv_size=0.25,
+        folds=1,
+        method=2,
         stack=True,
         dim_red_method="cor",
     )

@@ -44,7 +44,7 @@ def nns_reg(
     point_only: bool = False,
     multivariate_call: bool = False,
     class_levels: list[object] | None = None,
-    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None = None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None] | None = None,
 ) -> dict[str, Any]:
     """Univariate numeric port of R's NNS.reg."""
     del return_values, plot, plot_regions, residual_plot, ncores
@@ -262,7 +262,7 @@ def _expand_factor_predictors(
     x: NDArray[Any],
     point_est: NDArray[np.float64] | float | None,
     *,
-    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None] | None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64] | None]:
     train, points, _ = _expand_factor_predictors_with_names(
         x,
@@ -276,7 +276,7 @@ def _expand_factor_predictors_with_names(
     x: NDArray[Any],
     point_est: NDArray[np.float64] | float | None,
     *,
-    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None] | None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64] | None, list[str]]:
     x_array = np.asarray(x)
     point_array = None if point_est is None else np.asarray(point_est)
@@ -355,7 +355,7 @@ def _dummy_matrix_for_column(
 
 
 def _levels_for_column(
-    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None] | None,
     column: int,
     x_ndim: int,
 ) -> Sequence[object] | None:
@@ -365,7 +365,7 @@ def _levels_for_column(
         return factor_levels
     if column >= len(factor_levels):
         raise ValueError("factor_levels must provide levels for every x column.")
-    levels = cast(Sequence[Sequence[object]], factor_levels)[column]
+    levels = cast(Sequence[Sequence[object] | None], factor_levels)[column]
     return levels
 
 
@@ -432,7 +432,7 @@ def _nns_reg_dimred(
     point_only: bool,
     multivariate_call: bool,
     class_levels: list[object] | None = None,
-    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None = None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None] | None = None,
 ) -> dict[str, Any]:
     del n_best
     if factor_2_dummy:

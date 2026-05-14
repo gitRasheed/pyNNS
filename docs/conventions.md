@@ -219,14 +219,14 @@ the tail `ts_test` rows, while CV testing uses the earlier rows
 counterintuitive. R's `CV.size = NULL` samples a random value between 0.2 and
 1/3; PyNNS uses a deterministic default of `0.25`. Pass `cv_size` explicitly for
 exact R parity.
-Factor predictor expansion is supported for `nns_stack(method=1)` with explicit
-`factor_levels=` metadata. PyNNS expands training and test predictors together
-using the same full-rank dummy convention as installed R's aligned train/test
-builder. Method-2 factor diagnostics remain deferred: installed R decides
-method eligibility before dummy expansion for one-column factor inputs, while
-mixed factor/numeric method-2 probes can match dim-red predictions while
-`threshold`, objective, and stacked method-1 diagnostics diverge. PyNNS rejects
-factor predictors when `method` includes 2 until that contract is mapped.
+Factor predictor expansion is supported for `nns_stack(method=1)` and
+`nns_stack(method=2)` with explicit `factor_levels=` metadata. PyNNS expands
+training and test predictors together using the same full-rank dummy convention
+as installed R's aligned train/test builder. Pure factor-predictor `method=2`
+matches installed R's fallback to method 1. Mixed factor/numeric `method=2`
+uses the expanded numeric design directly. Stacked `method=(1,2)` factor
+predictors remain deferred because installed-R probes show divergent stacked
+method-1 internals after method-2 projection.
 
 ## Boost
 

@@ -47,7 +47,7 @@ def nns_stack(
     status: bool = False,
     ncores: int | None = None,
     class_levels: list[object] | None = None,
-    factor_levels: Sequence[object] | Sequence[Sequence[object]] | None = None,
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None] | None = None,
     random_seed: int | None = None,
 ) -> StackResult:
     """Port of R's deterministic numeric/classification NNS.stack orchestration."""
@@ -56,17 +56,20 @@ def nns_stack(
     if balance:
         type_value = "class"
     methods = _methods(method)
-    if factor_levels is not None and 2 in methods:
-        raise NotImplementedError(
-            "nns_stack factor predictors with method 2 are deferred because installed R "
-            "method-2 diagnostics and stacked method-1 internals diverge from the current "
-            "PyNNS expansion path."
-        )
-
     x_input: NDArray[Any] | NDArray[np.float64] = np.asarray(ivs_train)
     x_test_input: NDArray[Any] | NDArray[np.float64] | None = (
         None if ivs_test is None else np.asarray(ivs_test)
     )
+    if factor_levels is not None and methods == (1, 2):
+        raise NotImplementedError(
+            "nns_stack factor predictors with method (1, 2) are deferred because installed R "
+            "stacked method-1 internals diverge from the current PyNNS expansion path."
+        )
+    if factor_levels is not None and methods == (2,) and _all_predictors_are_factor(
+        x_input,
+        factor_levels,
+    ):
+        methods = (1,)
     if factor_levels is not None:
         x_input, x_test_input = _expand_factor_predictors(
             ivs_train,
@@ -906,6 +909,18 @@ def _methods(method: Method) -> tuple[int, ...]:
     if not values or any(item not in {1, 2} for item in values):
         raise ValueError("method must contain 1, 2, or both.")
     return values
+
+
+def _all_predictors_are_factor(
+    x: NDArray[Any],
+    factor_levels: Sequence[object] | Sequence[Sequence[object] | None],
+) -> bool:
+    if x.ndim <= 1:
+        return True
+    levels_by_column = cast(Sequence[Sequence[object] | None], factor_levels)
+    if len(levels_by_column) < x.shape[1]:
+        raise ValueError("factor_levels must provide levels for every predictor column.")
+    return all(levels_by_column[col] is not None for col in range(x.shape[1]))
 
 
 def _as_matrix(x: NDArray[np.float64], name: str) -> NDArray[np.float64]:
