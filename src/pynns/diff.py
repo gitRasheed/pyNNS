@@ -205,12 +205,64 @@ def dy_d(
     mixed: bool = False,
     messages: bool = True,
 ) -> dict[str, NDArray[np.float64]]:
-    """Placeholder for R's dy.d_ finite-difference derivative wrapper."""
-    del x, y, wrt, eval_points, mixed, messages
-    raise NotImplementedError(
-        "dy_d finite-difference derivatives require mapping R's multivariate "
-        "finite-difference wrapper around smooth nns_reg predictions, which is not yet ported."
-    )
+    """Partial derivative wrapper for R's ``dy.d_`` numeric matrix path."""
+    del messages
+    x_values = np.asarray(x, dtype=np.float64)
+    if x_values.ndim != 2:
+        raise ValueError("Please ensure (x) is a matrix or data.frame type object.")
+    if x_values.shape[1] < 2:
+        raise ValueError("Please use NNS::dy.dx(...) for univariate partial derivatives.")
+    y_values = np.asarray(y, dtype=np.float64).reshape(-1)
+    if y_values.size != x_values.shape[0]:
+        raise ValueError("x and y must have compatible row counts.")
+    if np.any(np.isnan(np.column_stack((x_values, y_values)))):
+        raise ValueError("You have some missing values, please address.")
+    wrt_values = np.asarray(wrt, dtype=np.int64).reshape(-1)
+    if wrt_values.size != 1:
+        raise NotImplementedError(
+            "dy_d finite-difference derivatives with vectorized wrt are not yet ported; "
+            "call dy_d once per regressor."
+        )
+    wrt_index = int(wrt_values[0]) - 1
+    if wrt_index < 0 or wrt_index >= x_values.shape[1]:
+        raise ValueError("wrt must select an existing regressor using R's 1-based indexing.")
+    if x_values.shape[1] != 2:
+        mixed = False
+
+    eval_values, vector_branch = _dy_d_eval_points(x_values, wrt_index, eval_points)
+    h_s = _derivative_bandwidths(x_values.shape[0])
+    results: list[dict[str, NDArray[np.float64]]] = []
+    for h_value in h_s:
+        if vector_branch:
+            first, second, mixed_values = _dy_d_vector_band(
+                x_values,
+                y_values,
+                wrt_index,
+                eval_values.reshape(-1),
+                int(h_value),
+                mixed=bool(mixed),
+            )
+        else:
+            first, second, mixed_values = _dy_d_matrix_band(
+                x_values,
+                y_values,
+                wrt_index,
+                _as_eval_matrix(eval_values, x_values.shape[1]),
+                int(h_value),
+                mixed=bool(mixed),
+            )
+        result = {"First": first, "Second": second}
+        if mixed_values is not None:
+            result["Mixed"] = mixed_values
+        results.append(result)
+
+    output = {
+        "First": _weighted_band_average([result["First"] for result in results]),
+        "Second": _weighted_band_average([result["Second"] for result in results]),
+    }
+    if mixed and "Mixed" in results[0]:
+        output["Mixed"] = _weighted_band_average([result["Mixed"] for result in results])
+    return output
 
 
 def _dy_dx_numeric(
@@ -283,6 +335,256 @@ def _dy_dx_numeric(
         "first.derivative": first_out,
         "second.derivative": second_out,
     }
+
+
+def _dy_d_eval_points(
+    x: NDArray[np.float64],
+    wrt_index: int,
+    eval_points: str | float | NDArray[np.float64],
+) -> tuple[NDArray[np.float64], bool]:
+    if isinstance(eval_points, str):
+        option = eval_points.lower()
+        if option == "median":
+            return np.median(x, axis=0).reshape(1, -1), False
+        if option == "last":
+            return x[-1:, :].copy(), False
+        if option == "mean":
+            return np.mean(x, axis=0).reshape(1, -1), False
+        if option == "apd":
+            return x[:, wrt_index].copy(), True
+        return x.copy(), False
+
+    values = np.asarray(eval_points, dtype=np.float64)
+    if values.ndim == 0:
+        return values.reshape(1), True
+    if values.ndim == 1:
+        return values.copy(), True
+    if values.ndim == 2:
+        return values.copy(), False
+    raise ValueError("eval_points must be a scalar, vector, matrix, or supported string.")
+
+
+def _dy_d_matrix_band(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    wrt_index: int,
+    eval_points: NDArray[np.float64],
+    h_value: int,
+    *,
+    mixed: bool,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64] | None]:
+    from pynns.dependence import _gravity
+    from pynns.regression import nns_reg
+
+    n = eval_points.shape[0]
+    h_step = _dy_d_h_step(x[:, wrt_index], h_value, _gravity)
+    lower_points = eval_points.copy()
+    upper_points = eval_points.copy()
+    lower_points[:, wrt_index] -= h_step
+    upper_points[:, wrt_index] += h_step
+    deriv_points = np.vstack((lower_points, eval_points, upper_points))
+    estimates = np.asarray(
+        nns_reg(
+            x,
+            y,
+            point_est=deriv_points,
+            dim_red_method="equal",
+            threshold=0.0,
+            order=None,
+            point_only=True,
+            smooth=True,
+            plot=False,
+        )["Point.est"],
+        dtype=np.float64,
+    )
+    lower = estimates[:n]
+    fx = estimates[n : 2 * n]
+    upper = estimates[2 * n :]
+    first = (upper - fx + fx - lower) / (2.0 * h_step)
+    second = (upper - 2.0 * fx + lower) / (h_step**2)
+    mixed_values = (
+        _dy_d_mixed(x, y, eval_points, h_value, matrix_points=True) if mixed else None
+    )
+    return first, second, mixed_values
+
+
+def _dy_d_vector_band(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    wrt_index: int,
+    eval_values: NDArray[np.float64],
+    h_value: int,
+    *,
+    mixed: bool,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64] | None]:
+    from pynns.copula import nns_copula
+    from pynns.dependence import _gravity, nns_dep
+    from pynns.norm import nns_norm
+    from pynns.regression import nns_reg
+    from pynns.var import lpm_var
+
+    eval_vector = eval_values.reshape(-1)
+    h_step = _dy_d_h_step(x[:, wrt_index], h_value, _gravity)
+    lower_eval = eval_vector - h_step
+    upper_eval = eval_vector + h_step
+    norm_col = nns_norm(x[:, wrt_index].reshape(-1, 1)).reshape(-1)
+    zz = max(
+        float(nns_dep(x[:, wrt_index], y, asym=True)["Dependence"]),
+        float(nns_copula(x[:, wrt_index], y)),
+        float(nns_copula(norm_col, y)),
+    )
+    seq_by = max(0.01, (1.0 - zz) / 2.0)
+    probs = _r_seq_0_1(seq_by)
+    base = np.column_stack(
+        [
+            np.asarray([lpm_var(float(prob), 1.0, x[:, col]) for prob in probs])
+            for col in range(x.shape[1])
+        ]
+    )
+    sampsize = probs.size
+    deriv_points = np.vstack([base.copy() for _ in range(3 * eval_vector.size)])
+    replacement = np.repeat(
+        np.ravel(np.vstack((lower_eval, eval_vector, upper_eval)), order="F"),
+        sampsize,
+    )[: deriv_points.shape[0]]
+    deriv_points[:, wrt_index] = replacement
+    estimates = np.asarray(
+        nns_reg(
+            x,
+            y,
+            point_est=deriv_points,
+            dim_red_method="equal",
+            threshold=0.0,
+            order=None,
+            point_only=True,
+            smooth=True,
+            plot=False,
+        )["Point.est"],
+        dtype=np.float64,
+    )
+    position = np.resize(
+        np.repeat(np.array(["l", "m", "u"], dtype=object), sampsize), estimates.size
+    )
+    ids = np.resize(np.repeat(np.arange(eval_vector.size), 3 * sampsize), estimates.size)
+    lower = np.empty(eval_vector.size, dtype=np.float64)
+    fx = np.empty(eval_vector.size, dtype=np.float64)
+    upper = np.empty(eval_vector.size, dtype=np.float64)
+    for index in range(eval_vector.size):
+        lower[index] = _gravity(estimates[(ids == index) & (position == "l")])
+        fx[index] = _gravity(estimates[(ids == index) & (position == "m")])
+        upper[index] = _gravity(estimates[(ids == index) & (position == "u")])
+    first = (upper - fx + fx - lower) / (2.0 * h_step)
+    second = (upper - 2.0 * fx + lower) / (h_step**2)
+    mixed_values = (
+        _dy_d_mixed(x, y, eval_vector, h_value, matrix_points=False) if mixed else None
+    )
+    return first, second, mixed_values
+
+
+def _dy_d_mixed(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    eval_points: NDArray[np.float64],
+    h_value: int,
+    *,
+    matrix_points: bool,
+) -> NDArray[np.float64]:
+    from pynns.dependence import _gravity
+    from pynns.regression import nns_reg
+
+    if x.shape[1] != 2:
+        raise ValueError("Mixed Derivatives are only for 2 IV")
+    if matrix_points:
+        points = _as_eval_matrix(eval_points, 2)
+        h1 = _dy_d_h_step(x[:, 0], h_value, _gravity)
+        h2 = _dy_d_h_step(x[:, 1], h_value, _gravity)
+        mixed_points = np.vstack(
+            (
+                np.column_stack((points[:, 0] + h1, points[:, 1] + h2)),
+                np.column_stack((points[:, 0] - h1, points[:, 1] + h2)),
+                np.column_stack((points[:, 0] + h1, points[:, 1] - h2)),
+                np.column_stack((points[:, 0] - h1, points[:, 1] - h2)),
+            )
+        )
+        denom: float | NDArray[np.float64] = 4.0 * h1 * h2
+        n = points.shape[0]
+    else:
+        vector = eval_points.reshape(-1)
+        if vector.size != 2:
+            raise ValueError("Mixed Derivatives are only for 2 IV")
+        h_step = _dy_d_h_step(x[:, 0], h_value, _gravity)
+        mixed_points = np.asarray(
+            [
+                vector + h_step,
+                [vector[0] - h_step, vector[1] + h_step],
+                [vector[0] + h_step, vector[1] - h_step],
+                vector - h_step,
+            ],
+            dtype=np.float64,
+        )
+        denom = 4.0 * h_step**2
+        n = 1
+    estimates = np.asarray(
+        nns_reg(
+            x,
+            y,
+            point_est=mixed_points,
+            dim_red_method="equal",
+            threshold=0.0,
+            order=None,
+            point_only=True,
+            smooth=True,
+            plot=False,
+        )["Point.est"],
+        dtype=np.float64,
+    )
+    z = estimates.reshape(4, n).T
+    return (z[:, 0] + z[:, 3] - z[:, 1] - z[:, 2]) / denom
+
+
+def _dy_d_h_step(
+    values: NDArray[np.float64],
+    h_value: int,
+    gravity_fn: Callable[[NDArray[np.float64]], float],
+) -> float:
+    h_step = float(gravity_fn(np.abs(np.diff(values)))) * float(h_value)
+    if h_step == 0.0:
+        h_step = (abs(float(np.max(values) - np.min(values))) / float(values.size)) * float(h_value)
+    return h_step
+
+
+def _as_eval_matrix(values: NDArray[np.float64], n_cols: int) -> NDArray[np.float64]:
+    matrix = np.asarray(values, dtype=np.float64)
+    if matrix.ndim == 1:
+        if matrix.size != n_cols:
+            raise ValueError("eval_points row length must match x column count.")
+        matrix = matrix.reshape(1, -1)
+    if matrix.ndim != 2 or matrix.shape[1] != n_cols:
+        raise ValueError("eval_points matrix must have one column per regressor.")
+    return matrix
+
+
+def _weighted_band_average(values: list[NDArray[np.float64]]) -> NDArray[np.float64]:
+    matrix = np.column_stack(values)
+    weights = np.arange(matrix.shape[1], 0, -1, dtype=np.int64)
+    return np.asarray(
+        [np.mean(np.repeat(row, weights)) for row in matrix],
+        dtype=np.float64,
+    )
+
+
+def _derivative_bandwidths(n: int) -> NDArray[np.int64]:
+    root_n = int(np.floor(np.sqrt(n)))
+    return np.rint(np.exp(np.linspace(np.log(2.0), np.log(float(root_n)), 5))).astype(np.int64)
+
+
+def _r_seq_0_1(by: float) -> NDArray[np.float64]:
+    values: list[float] = []
+    current = 0.0
+    while current <= 1.0 + np.finfo(float).eps:
+        values.append(min(current, 1.0))
+        current += by
+    return np.asarray(values, dtype=np.float64)
 
 
 def _finite_step(

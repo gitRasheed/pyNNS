@@ -12,7 +12,6 @@ EXPORT_SURFACE = ROOT / "docs" / "export_surface.md"
 GUARDED_EXPORTS = {
     "nns_var": "NNS.VAR",
     "nns_nowcast": "NNS.nowcast",
-    "dy_d": "dy.d_",
 }
 
 
@@ -35,7 +34,5 @@ def test_guarded_exports_raise_notimplemented(python_name: str) -> None:
             function([[1.0, 2.0], [2.0, 3.0]], h=1)
         elif python_name == "nns_nowcast":
             function(h=1)
-        elif python_name == "dy_d":
-            function([[1.0, 2.0], [2.0, 3.0]], [1.0, 2.0], wrt=1)
         else:  # pragma: no cover - keeps the parametrized dispatch exhaustive.
             raise AssertionError(f"Unhandled guarded export: {python_name}")

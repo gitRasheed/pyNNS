@@ -35,7 +35,8 @@ explicitly guarded while dependencies remain unresolved.
 | `NNS.seas` | `nns_seas` | Seasonality test |
 | `NNS.SS` | `nns_ss` | Stochastic superiority |
 | `NNS.stack` | `nns_stack` | Stack wrapper |
-| `dy.dx` | `dy_dx` | Only `eval_point="overall"` is implemented; point-evaluated derivatives are guarded |
+| `dy.dx` | `dy_dx` | `eval_point="overall"` and numeric `eval_point` vectors are implemented; multivariate form (`dy.d_`) |
+| `dy.d_` | `dy_d` | Scalar `wrt` is implemented; vectorized `wrt` (multiple regressors in one call) is deferred |
 | `factor_2_dummy`, `factor_2_dummy_FR` | `factor_2_dummy`, `factor_2_dummy_fr` | Categorical expansion helpers |
 | `ecdf.pm`, `mean.pm`, `var.pm`, `skew.pm`, `kurt.pm` | `ecdf_pm`, `mean_pm`, `var_pm`, `skew_pm`, `kurt_pm` | Partial-moment classical helpers |
 
@@ -48,7 +49,6 @@ These names are exported so callers get an explicit, documented
 |---|---|---|
 | `NNS.VAR` | `nns_var` | Delegates to `NNS.ARMA.optim` |
 | `NNS.nowcast` | `nns_nowcast` | Delegates to `NNS.VAR` after external data retrieval |
-| `dy.d_` | `dy_d` | Finite-difference wrapper grids and return tables not yet mapped |
 
 ## Internal Or Out Of Scope
 

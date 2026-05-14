@@ -41,5 +41,7 @@ def test_dy_d_remains_deferred() -> None:
     x = np.column_stack((np.linspace(-2.0, 2.0, 24), np.linspace(0.0, 1.0, 24)))
     y = x[:, 0] + x[:, 1]
 
-    with pytest.raises(NotImplementedError, match="dy_d finite-difference derivatives"):
-        dy_d(x, y, wrt=1)
+    with pytest.raises(
+        NotImplementedError, match="dy_d finite-difference derivatives with vectorized wrt"
+    ):
+        dy_d(x, y, wrt=np.array([1, 2]))

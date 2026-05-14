@@ -12,7 +12,9 @@ EXPECTED_DEFERRED_FRAGMENTS = {
     "threshold on the n_features > 10 stochastic epoch path": (
         "`threshold` on the `n_features > 10` stochastic path"
     ),
-    "dy_d finite-difference derivatives": "multivariate `dy.d_` wrapper",
+    "dy_d finite-difference derivatives with vectorized wrt": (
+        "multivariate `dy.d_` vectorized `wrt`"
+    ),
     "direct nns_m_reg factor_2_dummy=True": "direct `factor_2_dummy=True` raw predictor path",
     "mixed factor predictors with method (1, 2)": "factor predictor stacked method `(1, 2)`",
     "nns_var default VAR path": "default VAR path",
