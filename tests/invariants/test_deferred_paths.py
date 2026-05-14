@@ -11,8 +11,11 @@ DEFERRED_PATHS = ROOT / "docs" / "deferred_paths.md"
 EXPECTED_DEFERRED_FRAGMENTS = {
     "confidence_interval with smooth=True": "confidence_interval` with `smooth=True",
     "smooth=True requires the smoothing-spline path": "`smooth=True`",
-    "n_features > 10 requires R's stochastic epoch keeper loop": (
-        "`n_features > 10` stochastic epoch keeper loop"
+    "threshold on the n_features > 10 stochastic epoch path": (
+        "`threshold` / `ts_test` on the `n_features > 10` stochastic path"
+    ),
+    "ts_test on the n_features > 10 stochastic epoch path": (
+        "`threshold` / `ts_test` on the `n_features > 10` stochastic path"
     ),
     "multiple factor predictor columns": "broad factor predictor edge cases",
     "dy_dx eval_point values": "point-evaluated derivative wrappers",

@@ -141,6 +141,7 @@ def nns_boost_numeric(
     class_levels: Sequence[object] | None = None,
     balance: bool = False,
     ts_test: int | None = None,
+    epochs: int | None = None,
     seed: int | None = None,
 ) -> RValue:
     args = {
@@ -155,6 +156,7 @@ def nns_boost_numeric(
         "type": type,
         "class_levels": class_levels,
         "ts_test": ts_test,
+        "epochs": epochs,
     }
     if balance:
         args["balance"] = True
@@ -1007,6 +1009,7 @@ def _call_r_boost_numeric(args: dict[str, Any]) -> RValue:
         "CV.size = as.numeric(args$cv_size), depth = depth_arg, "
         "type = type_arg, "
         "ts.test = if (length(args$ts_test) == 0) NULL else as.integer(args$ts_test), "
+        "epochs = if (length(args$epochs) == 0) NULL else as.integer(args$epochs), "
         "pred.int = if (length(args$pred_int) == 0) NULL else as.numeric(args$pred_int), "
         "features.only = isTRUE(as.logical(unlist(args$features_only))), "
         "feature.importance = FALSE, "

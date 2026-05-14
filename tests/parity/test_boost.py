@@ -215,6 +215,44 @@ def test_nns_boost_ts_test_features_only_matches_r() -> None:
     _assert_boost_matches(actual, expected)
 
 
+@pytest.mark.stochastic
+def test_nns_boost_stochastic_epoch_path_matches_r_structure() -> None:
+    x = np.linspace(-2.0, 2.0, 64)
+    variable = np.column_stack([np.sin((idx + 1) * x) for idx in range(11)])
+    y = x + np.sin(x)
+
+    expected = nns_boost_numeric(
+        variable.tolist(),
+        y.tolist(),
+        variable[:3].tolist(),
+        learner_trials=4,
+        epochs=4,
+        cv_size=0.25,
+        depth=None,
+        features_only=False,
+    )
+    actual = nns_boost(
+        variable,
+        y,
+        variable[:3],
+        learner_trials=4,
+        epochs=4,
+        cv_size=0.25,
+        random_seed=4,
+        feature_importance=False,
+    )
+
+    assert set(actual) == set(cast(dict[str, object], expected))
+    assert np.asarray(actual["results"], dtype=np.float64).shape == np.asarray(
+        cast(dict[str, object], expected)["results"],
+        dtype=np.float64,
+    ).shape
+    assert np.asarray(actual["feature.weights"], dtype=np.float64).ndim == 1
+    assert np.asarray(actual["feature.frequency"], dtype=np.float64).ndim == 1
+    assert np.asarray(actual["n.best"], dtype=np.float64).size > 0
+    assert actual["pred.int"] is None
+
+
 @pytest.mark.parity
 def test_nns_boost_factor_predictor_matches_r() -> None:
     x = np.linspace(-2.0, 2.0, 24)

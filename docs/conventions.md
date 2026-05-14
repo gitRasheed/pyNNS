@@ -233,19 +233,19 @@ factor predictors when `method` includes 2 until that contract is mapped.
 `nns_boost` maps to R's numeric and deterministic classification `NNS.boost`
 paths and uses the real `nns_reg` and `nns_stack` implementations. The
 small-feature path (`n_features <= 10`, where R evaluates all feature
-combinations) is supported. `type="class"` returns numeric class codes, not
-labels; use `class_levels=` to reproduce R factor level ordering. Raw string
-labels remain rejected unless explicit levels are supplied. `balance=True` is
-supported for deterministic small-feature classification and uses the same
-R-style `downSample` + `upSample` structure as `nns_stack`; exact sampled-row
-parity with R is not expected because PyNNS uses NumPy's RNG, and `random_seed`
-is PyNNS-only. The stochastic epoch keeper path for `n_features > 10` is not yet
-ported and raises `NotImplementedError`; installed R samples learner-trial
-feature sets and then samples epoch feature counts from a weighted survivor pool
-using R `sample()`, so a faithful port needs that sampling contract mapped first.
-Installed R also errors for `threshold=` on this path because the threshold
-short-circuit leaves `test.features` undefined, so PyNNS keeps the guard before
-threshold handling.
+combinations) is supported. For `n_features > 10`, PyNNS follows R's stochastic
+epoch structure: it samples learner-trial feature sets, builds a weighted
+survivor feature pool, then samples epoch feature counts and survivor features
+from that pool. Exact sampled-feature parity with R is not expected because
+PyNNS uses NumPy's RNG, and `random_seed` is PyNNS-only. Installed R errors for
+`threshold=` on this path because the threshold short-circuit leaves
+`test.features` undefined, so PyNNS keeps that guard. `ts_test` on the
+stochastic path remains deferred because R uses a separate epoch holdout split
+there. `type="class"` returns numeric class codes, not labels; use
+`class_levels=` to reproduce R factor level ordering. Raw string labels remain
+rejected unless explicit levels are supplied. `balance=True` is supported for
+classification and uses the same R-style `downSample` + `upSample` structure as
+`nns_stack`; exact sampled-row parity with R is not expected.
 Simple single-column explicit-level factor predictors are supported through
 `factor_levels=`. PyNNS integer-codes those columns before deterministic feature
 selection, matching installed R's `data.matrix` conversion. Pass `None` for
@@ -258,9 +258,8 @@ delegates to `nns_stack(pred_int=...)`, matching installed R; it is deterministi
 and does not use MC/meboot. `features_only=True` returns before the final stack
 fit and ignores `pred_int`, matching R. Classification `pred_int` is supported
 and delegates to final stack `method=1`, so interval bounds remain raw numeric
-values. Deterministic `ts_test` is supported for `n_features <= 10`; `ts_test`
-on the stochastic `n_features > 10` path remains blocked by the unmapped R
-`sample()` epoch loop. R requires usable column names for matrix inputs; PyNNS
+values. Deterministic `ts_test` is supported for `n_features <= 10`; stochastic
+`ts_test` remains deferred. R requires usable column names for matrix inputs; PyNNS
 uses positional numeric columns. As with `nns_stack`, R
 samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
 `cv_size=0.25` unless specified. For classification boost, final predictions,

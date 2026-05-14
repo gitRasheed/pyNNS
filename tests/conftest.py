@@ -192,6 +192,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_boost_50x3_ts_test_seconds" not in cache:
         cache["nns_boost_50x3_ts_test_seconds"] = _time_r_nns_boost_ts_test()
         _write_benchmark_baseline(cache)
+    if "nns_boost_stochastic_64x11_seconds" not in cache:
+        cache["nns_boost_stochastic_64x11_seconds"] = _time_r_nns_boost_stochastic()
+        _write_benchmark_baseline(cache)
     if "nns_boost_factor_predictor_50x2_seconds" not in cache:
         cache["nns_boost_factor_predictor_50x2_seconds"] = _time_r_nns_boost_factor_predictor()
         _write_benchmark_baseline(cache)
@@ -1099,6 +1102,30 @@ def _time_r_nns_boost_ts_test() -> float:
         "y <- x + sin(x) + 0.25 * cos(x)\n"
         "run <- function() NNS::NNS.boost(X, y, IVs.test = X[1:10,], "
         "learner.trials = 10, CV.size = 0.25, ts.test = 8, "
+        "feature.importance = FALSE, status = FALSE)\n"
+        "invisible(run())\n"
+        "times <- replicate(2, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_boost_stochastic() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-2, 2, length.out = 64)\n"
+        "X <- sapply(1:11, function(i) sin(i*x) + cos((i+1)*x)/10)\n"
+        "colnames(X) <- paste0('X', seq_len(ncol(X)))\n"
+        "y <- x + sin(x)\n"
+        "run <- function() NNS::NNS.boost(X, y, IVs.test = X[1:3,], "
+        "learner.trials = 4, epochs = 4, CV.size = 0.25, "
         "feature.importance = FALSE, status = FALSE)\n"
         "invisible(run())\n"
         "times <- replicate(2, system.time(invisible(run()))[['elapsed']])\n"

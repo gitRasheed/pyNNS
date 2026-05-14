@@ -92,11 +92,15 @@ def nns_boost(
         class_codes = np.empty(0, dtype=np.float64)
     if x_train.shape[0] != y_train.size:
         raise ValueError("ivs_train and dv_train must have the same row count.")
-    if x_train.shape[1] > 10:
+    if x_train.shape[1] > 10 and ts_test_value is not None:
         raise NotImplementedError(
-            "nns_boost for n_features > 10 requires R's stochastic epoch keeper loop, "
-            "including R sample() feature draws from a weighted survivor pool, which is "
-            "not yet ported. Use <=10 features or port the epoch loop first."
+            "nns_boost ts_test on the n_features > 10 stochastic epoch path is deferred "
+            "because installed R uses a separate epoch holdout split there."
+        )
+    if x_train.shape[1] > 10 and threshold is not None:
+        raise NotImplementedError(
+            "nns_boost threshold on the n_features > 10 stochastic epoch path is deferred "
+            "because installed R errors before constructing test.features."
         )
     rng = np.random.default_rng(random_seed)
     if balance:
@@ -124,6 +128,7 @@ def nns_boost(
             feature_importance=feature_importance,
             pred_int=pred_int,
             ts_test=ts_test_value,
+            epochs=epochs,
             rng=rng,
         )
     except NotImplementedError:
@@ -177,6 +182,7 @@ def _nns_boost_core(
     feature_importance: bool,
     pred_int: float | None,
     ts_test: int | None,
+    epochs: int | None,
     rng: np.random.Generator,
 ) -> BoostResult:
     objective_l = objective.lower()
@@ -220,6 +226,23 @@ def _nns_boost_core(
         keepers = _keeper_sets(trial_sets, scores, threshold_value, objective_value, extreme)
     else:
         keepers = trial_sets
+    if not deterministic and threshold is None:
+        epoch_count = 2 * n_rows if epochs is None else int(epochs)
+        if epoch_count < 1:
+            raise ValueError("epochs must be >= 1.")
+        keepers = _epoch_keeper_sets(
+            x_train,
+            y_train,
+            keepers,
+            threshold_value,
+            objective_value,
+            depth=depth,
+            cv_size=0.25 if cv_size is None else float(cv_size),
+            objective_fn=objective_fn,
+            rng=rng,
+            type_value=type_value,
+            epochs=epoch_count,
+        )
     if not keepers:
         if threshold is not None:
             if objective_value == "min":
@@ -421,34 +444,61 @@ def _learner_scores(
 ) -> NDArray[np.float64]:
     scores = np.empty(len(feature_sets), dtype=np.float64)
     for idx, features in enumerate(feature_sets, start=1):
-        train_idx, test_idx = _boost_cv_split(y_train.size, idx, cv_size, rng, ts_test)
-        aug_x, aug_y = _augmented_training(x_train[train_idx], y_train[train_idx])
-        train_subset = aug_x[:, features]
-        point_subset = x_train[test_idx][:, features]
-        if len(features) == 1:
-            predicted = nns_reg(
-                train_subset.reshape(-1),
-                aug_y,
-                point_est=point_subset.reshape(-1),
-                order=depth,
-                point_only=False,
-                type=type_value,
-            )["Point.est"]
-        else:
-            predicted = nns_reg(
-                train_subset,
-                aug_y,
-                point_est=point_subset,
-                dim_red_method="equal",
-                order=depth,
-                point_only=False,
-                type=type_value,
-            )["Point.est"]
-        pred = _fill_nan_with_gravity(np.asarray(predicted, dtype=np.float64))
-        if type_value == "class":
-            pred = _round_clamp_classes(pred, y_train)
-        scores[idx - 1] = objective_fn(pred, y_train[test_idx])
+        scores[idx - 1] = _learner_score(
+            x_train,
+            y_train,
+            features,
+            iteration=idx,
+            depth=depth,
+            cv_size=cv_size,
+            objective_fn=objective_fn,
+            rng=rng,
+            type_value=type_value,
+            ts_test=ts_test,
+        )
     return scores
+
+
+def _learner_score(
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.float64],
+    features: tuple[int, ...],
+    *,
+    iteration: int,
+    depth: Order,
+    cv_size: float,
+    objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float],
+    rng: np.random.Generator,
+    type_value: str | None,
+    ts_test: int | None,
+) -> float:
+    train_idx, test_idx = _boost_cv_split(y_train.size, iteration, cv_size, rng, ts_test)
+    aug_x, aug_y = _augmented_training(x_train[train_idx], y_train[train_idx])
+    train_subset = aug_x[:, features]
+    point_subset = x_train[test_idx][:, features]
+    if len(features) == 1:
+        predicted = nns_reg(
+            train_subset.reshape(-1),
+            aug_y,
+            point_est=point_subset.reshape(-1),
+            order=depth,
+            point_only=False,
+            type=type_value,
+        )["Point.est"]
+    else:
+        predicted = nns_reg(
+            train_subset,
+            aug_y,
+            point_est=point_subset,
+            dim_red_method="equal",
+            order=depth,
+            point_only=False,
+            type=type_value,
+        )["Point.est"]
+    pred = _fill_nan_with_gravity(np.asarray(predicted, dtype=np.float64))
+    if type_value == "class":
+        pred = _round_clamp_classes(pred, y_train)
+    return objective_fn(pred, y_train[test_idx])
 
 
 def _augmented_training(
@@ -501,6 +551,61 @@ def _keeper_sets(
         if objective == "min" and score <= threshold:
             keepers.append(features)
     return keepers
+
+
+def _epoch_keeper_sets(
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.float64],
+    survivor_sets: list[tuple[int, ...]],
+    threshold: float,
+    objective: Objective,
+    *,
+    depth: Order,
+    cv_size: float,
+    objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float],
+    rng: np.random.Generator,
+    type_value: str | None,
+    epochs: int,
+) -> list[tuple[int, ...]]:
+    pool = _weighted_feature_pool(survivor_sets, x_train.shape[1])
+    if pool.size == 0:
+        return []
+    keepers: list[tuple[int, ...]] = []
+    for epoch in range(1, epochs + 1):
+        size = int(rng.integers(1, x_train.shape[1] + 1))
+        features = tuple(sorted(np.unique(rng.choice(pool, size=size, replace=True)).tolist()))
+        score = _learner_score(
+            x_train,
+            y_train,
+            features,
+            iteration=epoch,
+            depth=depth,
+            cv_size=cv_size,
+            objective_fn=objective_fn,
+            rng=rng,
+            type_value=type_value,
+            ts_test=None,
+        )
+        if not np.isfinite(score):
+            score = 0.99 * threshold if objective == "max" else 1.01 * threshold
+        if objective == "max" and score >= threshold:
+            keepers.append(features)
+        if objective == "min" and score <= threshold:
+            keepers.append(features)
+    return keepers
+
+
+def _weighted_feature_pool(
+    feature_sets: list[tuple[int, ...]],
+    n_cols: int,
+) -> NDArray[np.int64]:
+    counts = _feature_counts(feature_sets, n_cols)
+    positive = counts[counts > 0.0]
+    if positive.size == 0:
+        return np.empty(0, dtype=np.int64)
+    scaled = counts / float(np.min(positive))
+    repeats = np.where(scaled % 1.0 < 0.5, np.floor(scaled), np.ceil(scaled)).astype(np.int64)
+    return np.repeat(np.arange(n_cols, dtype=np.int64), repeats)
 
 
 def _feature_counts(feature_sets: list[tuple[int, ...]], n_cols: int) -> NDArray[np.float64]:
