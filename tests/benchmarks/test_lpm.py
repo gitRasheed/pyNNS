@@ -711,6 +711,32 @@ def test_nns_boost_stochastic_64x11(benchmark: Any, r_baseline: dict[str, object
 
 
 @pytest.mark.benchmark
+def test_nns_boost_stochastic_ts_test_64x11(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    x = np.linspace(-2.0, 2.0, 64)
+    variable = np.column_stack([np.sin((idx + 1) * x) for idx in range(11)])
+    y = x + np.sin(x)
+
+    result = benchmark(
+        nns_boost,
+        variable,
+        y,
+        variable[:3],
+        learner_trials=4,
+        epochs=4,
+        cv_size=0.25,
+        ts_test=5,
+        random_seed=5,
+        feature_importance=False,
+    )
+
+    assert result["results"].shape == (3,)
+    assert isinstance(r_baseline["nns_boost_stochastic_ts_test_64x11_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_boost_factor_predictor_50x2(
     benchmark: Any,
     r_baseline: dict[str, object],

@@ -273,16 +273,37 @@ def test_nns_boost_balance_does_not_enable_stochastic_epoch_path() -> None:
     assert np.all(np.isin(result["results"], np.unique(y)))
 
 
-def test_nns_boost_ts_test_remains_deferred_on_stochastic_epoch_path() -> None:
-    x = np.linspace(-2.0, 2.0, 20)
+def test_nns_boost_ts_test_stochastic_epoch_path_shape_and_seed_determinism() -> None:
+    x = np.linspace(-2.0, 2.0, 24)
     variable = np.column_stack([np.sin((idx + 1) * x) for idx in range(11)])
     y = x + np.sin(x)
 
-    with pytest.raises(
-        NotImplementedError,
-        match="ts_test on the n_features > 10 stochastic epoch path",
-    ):
-        nns_boost(variable, y, variable[:3], ts_test=4, random_seed=1)
+    first = nns_boost(
+        variable,
+        y,
+        variable[:3],
+        ts_test=4,
+        learner_trials=5,
+        epochs=5,
+        random_seed=1,
+        feature_importance=False,
+    )
+    second = nns_boost(
+        variable,
+        y,
+        variable[:3],
+        ts_test=4,
+        learner_trials=5,
+        epochs=5,
+        random_seed=1,
+        feature_importance=False,
+    )
+
+    assert first["results"].shape == (3,)
+    assert first["pred.int"] is None
+    assert np.sum(first["feature.weights"]) == pytest.approx(1.0)
+    np.testing.assert_allclose(first["results"], second["results"])
+    np.testing.assert_allclose(first["feature.frequency"], second["feature.frequency"])
 
 
 def test_nns_boost_balance_retries_ordinary_fit_error(monkeypatch: pytest.MonkeyPatch) -> None:

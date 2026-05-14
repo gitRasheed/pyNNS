@@ -92,11 +92,6 @@ def nns_boost(
         class_codes = np.empty(0, dtype=np.float64)
     if x_train.shape[0] != y_train.size:
         raise ValueError("ivs_train and dv_train must have the same row count.")
-    if x_train.shape[1] > 10 and ts_test_value is not None:
-        raise NotImplementedError(
-            "nns_boost ts_test on the n_features > 10 stochastic epoch path is deferred "
-            "because installed R uses a separate epoch holdout split there."
-        )
     if x_train.shape[1] > 10 and threshold is not None:
         raise NotImplementedError(
             "nns_boost threshold on the n_features > 10 stochastic epoch path is deferred "
@@ -242,6 +237,7 @@ def _nns_boost_core(
             rng=rng,
             type_value=type_value,
             epochs=epoch_count,
+            ts_test=ts_test,
         )
     if not keepers:
         if threshold is not None:
@@ -411,10 +407,19 @@ def _boost_cv_split(
     cv_size: float,
     rng: np.random.Generator,
     ts_test: int | None = None,
+    epoch_split: bool = False,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     if ts_test is not None:
         if ts_test >= n_rows:
             raise ValueError("ts_test must be smaller than the training row count.")
+        if epoch_split:
+            start = n_rows - (2 * ts_test) - 1
+            if start < 0:
+                raise ValueError("ts_test leaves too few epoch training rows.")
+            test_idx = np.arange(start, n_rows, dtype=np.int64)
+            mask = np.ones(n_rows, dtype=bool)
+            mask[test_idx] = False
+            return np.flatnonzero(mask).astype(np.int64), test_idx
         test_idx = np.arange(0, n_rows - ts_test, dtype=np.int64)
         train_idx = np.arange(n_rows - ts_test, n_rows, dtype=np.int64)
         return train_idx, test_idx
@@ -471,8 +476,16 @@ def _learner_score(
     rng: np.random.Generator,
     type_value: str | None,
     ts_test: int | None,
+    epoch_split: bool = False,
 ) -> float:
-    train_idx, test_idx = _boost_cv_split(y_train.size, iteration, cv_size, rng, ts_test)
+    train_idx, test_idx = _boost_cv_split(
+        y_train.size,
+        iteration,
+        cv_size,
+        rng,
+        ts_test,
+        epoch_split=epoch_split,
+    )
     aug_x, aug_y = _augmented_training(x_train[train_idx], y_train[train_idx])
     train_subset = aug_x[:, features]
     point_subset = x_train[test_idx][:, features]
@@ -566,6 +579,7 @@ def _epoch_keeper_sets(
     rng: np.random.Generator,
     type_value: str | None,
     epochs: int,
+    ts_test: int | None,
 ) -> list[tuple[int, ...]]:
     pool = _weighted_feature_pool(survivor_sets, x_train.shape[1])
     if pool.size == 0:
@@ -584,7 +598,8 @@ def _epoch_keeper_sets(
             objective_fn=objective_fn,
             rng=rng,
             type_value=type_value,
-            ts_test=None,
+            ts_test=ts_test,
+            epoch_split=True,
         )
         if not np.isfinite(score):
             score = 0.99 * threshold if objective == "max" else 1.01 * threshold

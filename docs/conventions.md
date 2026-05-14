@@ -239,9 +239,10 @@ survivor feature pool, then samples epoch feature counts and survivor features
 from that pool. Exact sampled-feature parity with R is not expected because
 PyNNS uses NumPy's RNG, and `random_seed` is PyNNS-only. Installed R errors for
 `threshold=` on this path because the threshold short-circuit leaves
-`test.features` undefined, so PyNNS keeps that guard. `ts_test` on the
-stochastic path remains deferred because R uses a separate epoch holdout split
-there. `type="class"` returns numeric class codes, not labels; use
+`test.features` undefined, so PyNNS keeps that guard. `ts_test` is supported on
+the stochastic path and follows R's separate epoch holdout split: initial
+learner trials test rows `1:(n - ts_test)`, while epochs test the final
+`2 * ts_test + 1` rows. `type="class"` returns numeric class codes, not labels; use
 `class_levels=` to reproduce R factor level ordering. Raw string labels remain
 rejected unless explicit levels are supplied. `balance=True` is supported for
 classification and uses the same R-style `downSample` + `upSample` structure as
@@ -258,9 +259,8 @@ delegates to `nns_stack(pred_int=...)`, matching installed R; it is deterministi
 and does not use MC/meboot. `features_only=True` returns before the final stack
 fit and ignores `pred_int`, matching R. Classification `pred_int` is supported
 and delegates to final stack `method=1`, so interval bounds remain raw numeric
-values. Deterministic `ts_test` is supported for `n_features <= 10`; stochastic
-`ts_test` remains deferred. R requires usable column names for matrix inputs; PyNNS
-uses positional numeric columns. As with `nns_stack`, R
+values. `ts_test` is supported for deterministic and stochastic boost paths. R
+requires usable column names for matrix inputs; PyNNS uses positional numeric columns. As with `nns_stack`, R
 samples a random CV size when `CV.size = NULL`; PyNNS uses deterministic
 `cv_size=0.25` unless specified. For classification boost, final predictions,
 feature weights, and feature frequencies are parity-tested against installed R

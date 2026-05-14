@@ -56,6 +56,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_boost`, N=3, T_obs=50, T_test=10, pred_int=0.95 | 125.194 ms | 3676.000 ms | 0.03x |
 | `nns_boost`, N=3, T_obs=50, T_test=10, ts_test=8 | 127.812 ms | 4128.000 ms | 0.03x |
 | `nns_boost`, N=11, T_obs=64, T_test=3, stochastic epochs=4 | 212.194 ms | 3311.667 ms | 0.06x |
+| `nns_boost`, N=11, T_obs=64, T_test=3, stochastic epochs=4, ts_test=5 | 230.165 ms | 5851.000 ms | 0.04x |
 | `nns_boost`, factor predictor, T_obs=50, T_test=10 | 122.398 ms | 4747.000 ms | 0.03x |
 | `nns_boost` class, N=3, T_obs=50, T_test=10 | 161.442 ms | 5790.000 ms | 0.03x |
 | `nns_boost` class, N=3, T_obs=50, T_test=10, pred_int=0.95 | 151.179 ms | 3827.000 ms | 0.04x |

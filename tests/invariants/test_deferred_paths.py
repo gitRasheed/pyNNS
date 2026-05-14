@@ -12,10 +12,7 @@ EXPECTED_DEFERRED_FRAGMENTS = {
     "confidence_interval with smooth=True": "confidence_interval` with `smooth=True",
     "smooth=True requires the smoothing-spline path": "`smooth=True`",
     "threshold on the n_features > 10 stochastic epoch path": (
-        "`threshold` / `ts_test` on the `n_features > 10` stochastic path"
-    ),
-    "ts_test on the n_features > 10 stochastic epoch path": (
-        "`threshold` / `ts_test` on the `n_features > 10` stochastic path"
+        "`threshold` on the `n_features > 10` stochastic path"
     ),
     "multiple factor predictor columns": "broad factor predictor edge cases",
     "dy_dx eval_point values": "point-evaluated derivative wrappers",
