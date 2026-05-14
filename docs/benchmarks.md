@@ -70,6 +70,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_arma`, T_obs=500, h=12, seasonal_factor=12, method=nonlin | 86.596 ms | 318.333 ms | 0.27x |
 | `nns_arma`, T_obs=200, h=5, seasonal_factor=c(3,4), method=lin, pred_int=0.95 | 153.921 ms | 207.800 ms | 0.74x |
 | `nns_arma`, T_obs=200, h=5, seasonal_factor=True, method=nonlin, pred_int=0.95 | 156.288 ms | 380.000 ms | 0.41x |
+| `nns_arma_optim`, T_obs=80, h=5, seasonal_factor=c(3:10), lin_only=True | 26.946 ms | 163.333 ms | 0.17x |
 | `nns_meboot`, T_obs=500, reps=100, rho=0 | 74.937 ms | 78.000 ms | 0.96x |
 | `nns_meboot`, T_obs=1000, reps=100, rho=0 | 115.564 ms | 108.000 ms | 1.07x |
 | `nns_mc`, T_obs=500, reps=30, by=0.2 | 319.045 ms | 736.000 ms | 0.43x |

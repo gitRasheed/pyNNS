@@ -9,6 +9,7 @@ from pynns import (
     lpm,
     nns_anova,
     nns_arma,
+    nns_arma_optim,
     nns_boost,
     nns_causation,
     nns_cdf,
@@ -1018,6 +1019,28 @@ def test_nns_arma_200_auto_nonlin_predint(
     assert isinstance(result, dict)
     assert result["Estimates"].shape == (5,)
     assert isinstance(r_baseline["nns_arma_200_auto_nonlin_predint_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_nns_arma_optim_80_small(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    t = np.arange(1, 81, dtype=np.float64)
+    variable = np.sin(2.0 * np.pi * t / 12.0) + 0.05 * np.cos(t / 3.0) + 2.0
+
+    result = benchmark(
+        nns_arma_optim,
+        variable,
+        5,
+        None,
+        [3, 4, 5, 6, 7, 8, 9, 10],
+        lin_only=True,
+        print_trace=False,
+    )
+
+    assert result["results"].shape == (5,)
+    assert isinstance(r_baseline["nns_arma_optim_80_small_seconds"], float)
 
 
 @pytest.mark.benchmark

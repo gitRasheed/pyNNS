@@ -706,6 +706,41 @@ def nns_arma_pred_int(
         return result
 
 
+def nns_arma_optim_custom(
+    variable: list[float],
+    *,
+    h: int | None = None,
+    training_set: int | None = None,
+    seasonal_factor: list[int],
+    lin_only: bool = False,
+    pred_int: float | None = 0.95,
+) -> RValue:
+    args = {
+        "variable": variable,
+        "h": h,
+        "training_set": training_set,
+        "seasonal_factor": seasonal_factor,
+        "lin_only": lin_only,
+        "pred_int": pred_int,
+    }
+    key = _cache_key("NNS.ARMA.optim.custom", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for NNS.ARMA.optim.custom with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_arma_optim_custom(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def nns_cdf_custom(
     variable: list[float] | list[list[float]],
     *,
@@ -1532,6 +1567,44 @@ def _call_r_arma_pred_int(args: dict[str, Any]) -> RValue:
         "  }\n"
         "  if (is.list(x)) return(lapply(x, encode))\n"
         "  if (is.character(x)) return(as.character(x))\n"
+        "  as.numeric(x)\n"
+        "}\n"
+        "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA, null = 'null'))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_arma_optim_custom(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "h_arg <- if (is.null(args$h)) NULL else as.integer(args$h)\n"
+        "training_arg <- if (is.null(args$training_set)) NULL else as.integer(args$training_set)\n"
+        "pred_arg <- if (is.null(args$pred_int)) NULL else as.numeric(args$pred_int)\n"
+        "result <- NNS::NNS.ARMA.optim("
+        "as.numeric(unlist(args$variable)), h = h_arg, training.set = training_arg, "
+        "seasonal.factor = as.integer(unlist(args$seasonal_factor)), "
+        "lin.only = isTRUE(args$lin_only), pred.int = pred_arg, ncores = 1, "
+        "print.trace = FALSE, plot = FALSE)\n"
+        "encode <- function(x) {\n"
+        "  if (is.null(x)) return(NULL)\n"
+        "  if (is.matrix(x) || is.data.frame(x)) {\n"
+        "    out <- lapply(seq_along(x), function(i) as.numeric(x[[i]]))\n"
+        "    names(out) <- names(x)\n"
+        "    return(out)\n"
+        "  }\n"
+        "  if (is.list(x)) return(lapply(x, encode))\n"
+        "  if (is.character(x)) return(as.character(x))\n"
+        "  if (is.logical(x)) return(as.numeric(x))\n"
         "  as.numeric(x)\n"
         "}\n"
         "cat(jsonlite::toJSON(encode(result), auto_unbox = TRUE, digits = NA, null = 'null'))\n"

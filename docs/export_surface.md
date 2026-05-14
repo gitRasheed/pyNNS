@@ -13,7 +13,8 @@ explicitly guarded while dependencies remain unresolved.
 | `LPM`, `UPM`, `LPM.ratio`, `UPM.ratio` | `lpm`, `upm`, `lpm_ratio`, `upm_ratio` | Core partial moments |
 | `LPM.VaR`, `UPM.VaR` | `lpm_var`, `upm_var` | Deterministic VaR helpers |
 | `NNS.ANOVA` | `nns_anova` | Binary and multi-group paths |
-| `NNS.ARMA` | `nns_arma` | Forecast path; optimizer is separate and deferred |
+| `NNS.ARMA` | `nns_arma` | Forecast path |
+| `NNS.ARMA.optim` | `nns_arma_optim` | Seasonal-factor optimizer |
 | `NNS.boost` | `nns_boost` | Deterministic small-feature path |
 | `NNS.caus` | `nns_causation` | Public causation wrapper |
 | `NNS.CDF` | `nns_cdf` | Partial-moment CDF wrapper |
@@ -45,7 +46,6 @@ These names are exported so callers get an explicit, documented
 
 | R export | PyNNS API | Blocker |
 |---|---|---|
-| `NNS.ARMA.optim` | `nns_arma_optim` | Optimizer loop and return object not yet mapped |
 | `NNS.VAR` | `nns_var` | Delegates to `NNS.ARMA.optim` |
 | `NNS.nowcast` | `nns_nowcast` | Delegates to `NNS.VAR` after external data retrieval |
 | `dy.d_` | `dy_d` | Finite-difference wrapper grids and return tables not yet mapped |

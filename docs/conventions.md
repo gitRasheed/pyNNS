@@ -302,11 +302,16 @@ installed R, including zero forecasts for automatic seasonality paths and `NaN`
 forecasts for some explicit numeric-lag paths. Character `weights` with numeric
 multi-lag seasonal factors is rejected because installed R errors during numeric
 multiplication on that path.
-`nns_arma_optim`, `nns_var`, and `nns_nowcast` are exported as explicit guarded
-stubs. Installed R's `NNS.ARMA.optim` evaluates `NNS.reg(..., smooth = TRUE)`,
-`NNS.VAR` delegates to `NNS.ARMA.optim`, and `NNS.nowcast` delegates to
-`NNS.VAR` after external macroeconomic data retrieval. These wrappers remain
-deferred until the ARMA optimizer loop and VAR boundary are ported.
+`nns_arma_optim` is supported for the installed-R optimizer path. It greedily
+selects seasonal factors, evaluates the default co-moment-normalized objective,
+then applies the same equal-weight, bias-shift, shrink, and smooth-regressed
+variable checks as R. The optimizer's prediction intervals are deterministic
+VaR bands around the in-sample optimizer errors; they are separate from
+`nns_arma(pred_int=...)`, which uses the Monte Carlo path. Custom Python
+`obj_fn` callables may be supplied, but R expression objects are not part of the
+Python API. `nns_var` and `nns_nowcast` remain guarded: installed R's `NNS.VAR`
+delegates to `NNS.ARMA.optim`, and `NNS.nowcast` delegates to `NNS.VAR` after
+external macroeconomic data retrieval.
 
 ## Meboot
 

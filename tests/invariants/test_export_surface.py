@@ -10,7 +10,6 @@ ROOT = Path(__file__).resolve().parents[2]
 EXPORT_SURFACE = ROOT / "docs" / "export_surface.md"
 
 GUARDED_EXPORTS = {
-    "nns_arma_optim": "NNS.ARMA.optim",
     "nns_var": "NNS.VAR",
     "nns_nowcast": "NNS.nowcast",
     "dy_d": "dy.d_",
@@ -32,9 +31,7 @@ def test_guarded_exports_raise_notimplemented(python_name: str) -> None:
     function = getattr(pynns, python_name)
 
     with pytest.raises(NotImplementedError):
-        if python_name == "nns_arma_optim":
-            function([1.0, 2.0, 3.0], h=1, seasonal_factor=[1])
-        elif python_name == "nns_var":
+        if python_name == "nns_var":
             function([[1.0, 2.0], [2.0, 3.0]], h=1)
         elif python_name == "nns_nowcast":
             function(h=1)

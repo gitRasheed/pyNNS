@@ -6,6 +6,7 @@
     "nns_arma_200_explicit4_lin_predint_seconds": 0.2078,
     "nns_arma_500_auto_nonlin_seconds": 0.3133333,
     "nns_arma_500_explicit12_nonlin_seconds": 0.3183333,
+    "nns_arma_optim_80_small_seconds": 0.1633333,
     "nns_boost_50x3_pred_int_seconds": 3.676,
     "nns_boost_50x3_seconds": 2.9195,
     "nns_boost_50x3_ts_test_seconds": 4.128,

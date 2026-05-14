@@ -7,6 +7,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from pynns._helpers import _fast_lm
+from pynns.co_moments import co_lpm, co_upm
+from pynns.dependence import _gravity
 from pynns.mc import nns_mc
 from pynns.regression import nns_reg
 from pynns.seasonality import nns_seas
@@ -29,26 +31,316 @@ def nns_arma_optim(
     print_trace: bool = True,
     plot: bool = False,
 ) -> dict[str, Any]:
-    """Guarded placeholder for R's NNS.ARMA.optim path."""
-    del (
-        variable,
-        h,
-        training_set,
-        seasonal_factor,
-        lin_only,
+    """Optimize seasonal factors for :func:`nns_arma` like R's ``NNS.ARMA.optim``."""
+    del ncores, print_trace, plot
+
+    values = _as_variable(variable)
+    original_values = values.copy()
+    n = values.size
+    objective_l = objective.lower()
+    if objective_l not in {"min", "max"}:
+        raise ValueError("objective must be 'min' or 'max'.")
+    if obj_fn is None:
+        objective_fn = _default_arma_optim_objective
+    elif callable(obj_fn):
+        objective_fn = obj_fn
+    else:
+        raise TypeError("obj_fn must be callable or None.")
+
+    if training_set is None and h is None:
+        raise ValueError(
+            "Please use the length of the variable less the desired forecast period as the "
+            "[training.set] value, or provide a value for [h]."
+        )
+    if float(np.min(values)) < 0.0:
+        negative_values = True
+
+    h_oos = int(h) if h is not None and int(h) > 0 else None
+    train_n = math.floor(0.8 * n) if training_set is None else int(training_set)
+    h_eval = int(n - train_n)
+    actual = values[-h_eval:]
+    if train_n <= 0.5 * n:
+        raise ValueError(
+            "Please provide a larger [training.set] value (integer) or a smaller [h]."
+        )
+    if train_n == n:
+        raise ValueError(
+            "Please provide a [training.set] value (integer) less than the length of the variable."
+        )
+    if h_eval < 1:
+        raise ValueError("training_set must leave at least one validation observation.")
+
+    seasonals = _valid_arma_optim_seasonals(seasonal_factor, train_n)
+    methods = ["lin"] if lin_only else ["lin", "nonlin", "both"]
+
+    previous_seasonals: list[list[NDArray[np.int64]]] = []
+    previous_estimates: list[NDArray[np.float64]] = []
+    overall_seasonals: list[NDArray[np.int64]] = []
+    overall_estimates: list[float] = []
+    nonlin_predicted = np.array([], dtype=np.float64)
+
+    for method in methods:
+        current_seasonals: list[NDArray[np.int64]] = []
+        current_estimates: list[float] = []
+
+        for step in range(1, seasonals.size + 1):
+            if step == 1:
+                if linear_approximation and method != "lin":
+                    if not overall_seasonals:
+                        break
+                    combs = overall_seasonals[0].reshape(-1, 1)
+                    current_seasonals = [overall_seasonals[0].astype(np.int64, copy=True)]
+                else:
+                    combs = seasonals.reshape(1, -1)
+            else:
+                if linear_approximation and method != "lin":
+                    continue
+                previous = current_seasonals[step - 2]
+                remaining = seasonals[~np.isin(seasonals, previous)]
+                if remaining.size == 0:
+                    break
+                combs = np.vstack((np.tile(previous.reshape(-1, 1), remaining.size), remaining))
+
+            if combs.ndim != 2 or combs.shape[1] == 0:
+                break
+
+            if method == "lin":
+                estimates = np.asarray(
+                    [
+                        _evaluate_arma_optim(
+                            values,
+                            actual,
+                            train_n,
+                            h_eval,
+                            combs[:, col],
+                            "lin",
+                            negative_values,
+                            None,
+                            objective_fn,
+                        )
+                        for col in range(combs.shape[1])
+                    ],
+                    dtype=np.float64,
+                )
+            elif method == "nonlin" and linear_approximation:
+                predicted = _arma_optim_prediction(
+                    values,
+                    train_n,
+                    h_eval,
+                    overall_seasonals[0],
+                    method,
+                    negative_values,
+                    None,
+                )
+                nonlin_predicted = predicted
+                estimates = np.asarray([float(objective_fn(predicted, actual))], dtype=np.float64)
+            elif method == "both" and linear_approximation:
+                lin_predicted = _arma_optim_prediction(
+                    values,
+                    train_n,
+                    h_eval,
+                    overall_seasonals[0],
+                    "lin",
+                    negative_values,
+                    None,
+                )
+                predicted = (lin_predicted + nonlin_predicted) / 2.0
+                estimates = np.asarray([float(objective_fn(predicted, actual))], dtype=np.float64)
+            else:
+                estimates = np.asarray(
+                    [
+                        _evaluate_arma_optim(
+                            values,
+                            actual,
+                            train_n,
+                            h_eval,
+                            combs[:, col],
+                            method,
+                            negative_values,
+                            None,
+                            objective_fn,
+                        )
+                        for col in range(combs.shape[1])
+                    ],
+                    dtype=np.float64,
+                )
+
+            estimates = _replace_nan_objectives(estimates, objective_l)
+            if objective_l == "min":
+                best_index = int(np.argmin(estimates))
+                best_score = float(np.min(estimates))
+                worsened = bool(current_estimates and best_score > current_estimates[-1])
+            else:
+                best_index = int(np.argmax(estimates))
+                best_score = float(np.max(estimates))
+                worsened = bool(current_estimates and best_score < current_estimates[-1])
+            if worsened:
+                break
+
+            if not (linear_approximation and method != "lin" and current_seasonals):
+                current_seasonals.append(combs[:, best_index].astype(np.int64, copy=True))
+            current_estimates.append(best_score)
+
+            method_index = ["lin", "nonlin", "both"].index(method)
+            if method_index > 0 and step - 1 < len(previous_seasonals[method_index - 1]):
+                previous = previous_seasonals[method_index - 1][step - 1]
+                current = current_seasonals[step - 1]
+                same_periods = (
+                    np.isin(current.astype(float), previous.astype(float)).sum() == current.size
+                )
+                if same_periods:
+                    previous_score = previous_estimates[method_index - 1][step - 1]
+                    if (objective_l == "min" and best_score >= previous_score) or (
+                        objective_l == "max" and best_score <= previous_score
+                    ):
+                        break
+
+            if method != "lin" and linear_approximation:
+                break
+
+        previous_seasonals.append(current_seasonals)
+        previous_estimates.append(np.asarray(current_estimates, dtype=np.float64))
+        if current_estimates:
+            overall_seasonals.append(current_seasonals[-1])
+            overall_estimates.append(current_estimates[-1])
+
+    if not overall_estimates:
+        raise ValueError("No ARMA optimizer candidates were evaluated.")
+
+    overall = np.asarray(overall_estimates, dtype=np.float64)
+    selected_index = int(np.argmin(overall) if objective_l == "min" else np.argmax(overall))
+    nns_periods = overall_seasonals[selected_index].astype(np.int64, copy=True)
+    nns_method = "lin" if lin_only else methods[selected_index]
+    nns_score = float(np.min(overall) if objective_l == "min" else np.max(overall))
+
+    predicted = _arma_optim_prediction(
+        values,
+        train_n,
+        h_eval,
+        nns_periods,
+        nns_method,
         negative_values,
-        obj_fn,
-        objective,
-        linear_approximation,
-        ncores,
-        pred_int,
-        print_trace,
-        plot,
+        None,
     )
-    raise NotImplementedError(
-        "nns_arma_optim default optimizer path is not yet ported; smooth=True "
-        "regression support is available, so this optimizer can be mapped next."
+    nns_weights: NDArray[np.float64] | None = None
+    errors = predicted - actual
+    bias = _finite_gravity(errors)
+    predicted_shifted = predicted - bias
+    bias_score = float(objective_fn(predicted_shifted, actual))
+
+    if nns_periods.size > 1:
+        weight_score = float(objective_fn(predicted, actual))
+        if _improves(weight_score, nns_score, objective_l):
+            nns_weights = np.full(nns_periods.size, 1.0 / float(nns_periods.size), dtype=np.float64)
+            predicted = _arma_optim_prediction(
+                values,
+                train_n,
+                h_eval,
+                nns_periods,
+                nns_method,
+                negative_values,
+                nns_weights,
+            )
+            errors = predicted - actual
+            bias = _finite_gravity(errors)
+            predicted_shifted = predicted - bias
+            bias_score = float(objective_fn(predicted_shifted, actual))
+            if not np.isfinite(bias_score) or not _improves(bias_score, weight_score, objective_l):
+                bias = 0.0
+        elif not np.isfinite(bias_score) or not _improves_or_ties_bias(
+            bias_score, nns_score, objective_l
+        ):
+            bias = 0.0
+    elif not np.isfinite(bias_score) or not _improves_or_ties_bias(
+        bias_score, nns_score, objective_l
+    ):
+        bias = 0.0
+
+    final_predicted = predicted
+
+    shrink_predicted = _arma_optim_prediction(
+        values,
+        train_n,
+        h_eval,
+        nns_periods,
+        nns_method,
+        negative_values,
+        nns_weights,
+        shrink=True,
     )
+    shrink_score = float(objective_fn(shrink_predicted, actual))
+    nns_shrink = _improves(shrink_score, nns_score, objective_l)
+    if nns_shrink:
+        final_predicted = shrink_predicted
+
+    regressed_values = _smooth_regressed_variable(values)
+    smooth_predicted = _arma_optim_prediction(
+        regressed_values,
+        train_n,
+        h_eval,
+        nns_periods,
+        nns_method,
+        negative_values,
+        nns_weights,
+        shrink=True,
+    )
+    smooth_score = float(objective_fn(smooth_predicted, actual))
+    nns_regress = _improves(smooth_score, nns_score, objective_l)
+    if nns_regress:
+        values = regressed_values
+        final_predicted = smooth_predicted
+
+    del final_predicted, values
+
+    if pred_int is None:
+        raise TypeError("non-numeric argument to mathematical function")
+    pi_width = abs(float(upm_var((1.0 - float(pred_int)) / 2.0, 0.0, errors))) + abs(bias)
+
+    if h_oos is None:
+        result_h = h_eval
+        model_results = _arma_optim_prediction(
+            original_values,
+            train_n,
+            result_h,
+            nns_periods,
+            nns_method,
+            negative_values,
+            nns_weights,
+            shrink=nns_shrink,
+        )
+    else:
+        result_h = h_oos
+        model_results = _arma_optim_prediction(
+            original_values,
+            None,
+            result_h,
+            nns_periods,
+            nns_method,
+            negative_values,
+            nns_weights,
+            shrink=nns_shrink,
+        )
+    model_results = model_results - bias
+    lower_pi = model_results - pi_width
+    upper_pi = model_results + pi_width
+    if not negative_values:
+        model_results = np.maximum(0.0, model_results)
+        lower_pi = np.maximum(0.0, lower_pi)
+        upper_pi = np.maximum(0.0, upper_pi)
+
+    return {
+        "periods": nns_periods,
+        "weights": nns_weights,
+        "obj.fn": nns_score,
+        "method": nns_method,
+        "shrink": bool(nns_shrink),
+        "nns.regress": bool(nns_regress),
+        "bias.shift": -float(bias),
+        "errors": errors,
+        "results": model_results,
+        "lower.pred.int": lower_pi,
+        "upper.pred.int": upper_pi,
+    }
 
 
 def nns_arma(
@@ -206,6 +498,141 @@ def nns_arma(
         pred_int=pred_int,
         random_seed=random_seed,
     )
+
+
+def _valid_arma_optim_seasonals(
+    seasonal_factor: NDArray[np.int64] | list[int] | None,
+    training_set: int,
+) -> NDArray[np.int64]:
+    if seasonal_factor is None:
+        raise ValueError("seasonal_factor must be provided.")
+    seasonals = np.asarray(seasonal_factor, dtype=np.int64).reshape(-1)
+    denominator = min(4, max(3, _r_round_half_up(float(training_set) / 100.0)))
+    limit = float(training_set) / float(denominator)
+    seasonals = np.unique(seasonals[seasonals <= limit])
+    if seasonals.size == 0:
+        raise ValueError(
+            "Please ensure [seasonal.factor] contains elements less than "
+            f"{limit}, otherwise use cross-validation of seasonal factors as demonstrated "
+            "in the vignette >>> Getting Started with NNS: Forecasting"
+        )
+    return seasonals
+
+
+def _r_round_half_up(value: float) -> int:
+    return int(math.floor(value) if value % 1.0 < 0.5 else math.ceil(value))
+
+
+def _arma_optim_prediction(
+    variable: NDArray[np.float64],
+    training_set: int | None,
+    h: int,
+    seasonal_factor: NDArray[np.int64],
+    method: str,
+    negative_values: bool,
+    weights: NDArray[np.float64] | None,
+    *,
+    shrink: bool = False,
+) -> NDArray[np.float64]:
+    result = nns_arma(
+        variable,
+        h=h,
+        training_set=training_set,
+        seasonal_factor=seasonal_factor,
+        method=method,
+        weights=weights,
+        negative_values=negative_values,
+        shrink=shrink,
+    )
+    if isinstance(result, dict):
+        return np.asarray(result["Estimates"], dtype=np.float64)
+    return np.asarray(result, dtype=np.float64)
+
+
+def _evaluate_arma_optim(
+    variable: NDArray[np.float64],
+    actual: NDArray[np.float64],
+    training_set: int,
+    h: int,
+    seasonal_factor: NDArray[np.int64],
+    method: str,
+    negative_values: bool,
+    weights: NDArray[np.float64] | None,
+    objective_fn: Any,
+) -> float:
+    predicted = _arma_optim_prediction(
+        variable,
+        training_set,
+        h,
+        seasonal_factor,
+        method,
+        negative_values,
+        weights,
+    )
+    return float(objective_fn(predicted, actual))
+
+
+def _default_arma_optim_objective(
+    predicted: NDArray[np.float64],
+    actual: NDArray[np.float64],
+) -> float:
+    predicted_values = np.asarray(predicted, dtype=np.float64)
+    actual_values = np.asarray(actual, dtype=np.float64)
+    denominator = float(
+        co_lpm(
+            1.0,
+            predicted_values,
+            actual_values,
+            float(np.mean(predicted_values)),
+            float(np.mean(actual_values)),
+        )
+        + co_upm(
+            1.0,
+            predicted_values,
+            actual_values,
+            float(np.mean(predicted_values)),
+            float(np.mean(actual_values)),
+        )
+    )
+    return float(np.mean((predicted_values - actual_values) ** 2) / denominator)
+
+
+def _replace_nan_objectives(values: NDArray[np.float64], objective: str) -> NDArray[np.float64]:
+    output = values.astype(np.float64, copy=True)
+    output[np.isnan(output)] = math.inf if objective == "min" else -math.inf
+    return output
+
+
+def _improves(candidate: float, baseline: float, objective: str) -> bool:
+    if not np.isfinite(candidate):
+        return False
+    return candidate < baseline if objective == "min" else candidate > baseline
+
+
+def _improves_or_ties_bias(candidate: float, baseline: float, objective: str) -> bool:
+    return candidate < baseline if objective == "min" else candidate > baseline
+
+
+def _finite_gravity(values: NDArray[np.float64]) -> float:
+    finite = np.asarray(values, dtype=np.float64)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return 0.0
+    bias = float(_gravity(finite))
+    return 0.0 if not np.isfinite(bias) else bias
+
+
+def _smooth_regressed_variable(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    result = nns_reg(
+        np.arange(1, values.size + 1, dtype=np.float64),
+        values,
+        smooth=True,
+        plot=False,
+    )
+    fitted = result["Fitted.xy"]
+    if not isinstance(fitted, dict):
+        raise TypeError("nns_reg returned an unexpected Fitted.xy structure.")
+    return np.asarray(fitted["y.hat"], dtype=np.float64)
 
 
 def _as_variable(variable: NDArray[np.float64]) -> NDArray[np.float64]:

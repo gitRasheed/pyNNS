@@ -4,10 +4,10 @@ from typing import Any
 
 import numpy as np
 import pytest
-from _r import RValue, nns, nns_arma_pred_int
+from _r import RValue, nns, nns_arma_optim_custom, nns_arma_pred_int
 from _tolerances import COMPOUND
 
-from pynns import nns_arma
+from pynns import nns_arma, nns_arma_optim
 
 
 @pytest.mark.parity
@@ -164,7 +164,7 @@ def test_nns_arma_pred_int_structure_matches_r() -> None:
     deterministic = nns_arma(variable, h=5, seasonal_factor=4, method="nonlin")
 
     assert isinstance(actual, dict)
-    assert list(actual) == list(expected)
+    assert set(actual) == set(expected)
     np.testing.assert_allclose(actual["Estimates"], expected["Estimates"], atol=COMPOUND)
     np.testing.assert_allclose(actual["Estimates"], deterministic, atol=COMPOUND)
     for value in actual.values():
@@ -210,6 +210,67 @@ def test_nns_arma_pred_int_statistical_summary_is_close_to_r() -> None:
     np.testing.assert_allclose(actual_summary, expected_summary, rtol=0.6, atol=0.6)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize(
+    ("name", "h", "training_set", "lin_only"),
+    [
+        ("lin-only-oos", 3, None, True),
+        ("default-internal", None, 32, False),
+    ],
+)
+def test_nns_arma_optim_matches_r(
+    name: str,
+    h: int | None,
+    training_set: int | None,
+    lin_only: bool,
+) -> None:
+    del name
+    variable = np.sin(np.arange(1, 41, dtype=np.float64) / 3.0) + 2.0
+    variable = variable + 0.02 * np.arange(1, 41, dtype=np.float64)
+    seasonal_factor = [3, 4, 5, 6, 7, 8]
+
+    expected = _dict_any(
+        nns_arma_optim_custom(
+            variable.tolist(),
+            h=h,
+            training_set=training_set,
+            seasonal_factor=seasonal_factor,
+            lin_only=lin_only,
+        )
+    )
+    actual = nns_arma_optim(
+        variable,
+        h=h,
+        training_set=training_set,
+        seasonal_factor=seasonal_factor,
+        lin_only=lin_only,
+        ncores=1,
+        print_trace=False,
+    )
+
+    assert set(actual) == set(expected)
+    assert actual["method"] == expected["method"]
+    assert actual["weights"] is None
+    assert expected["weights"] is None
+    assert bool(actual["shrink"]) == bool(_array_any(expected["shrink"]))
+    assert bool(actual["nns.regress"]) == bool(_array_any(expected["nns.regress"]))
+    for key in [
+        "periods",
+        "obj.fn",
+        "bias.shift",
+        "errors",
+        "results",
+        "lower.pred.int",
+        "upper.pred.int",
+    ]:
+        np.testing.assert_allclose(
+            _array_any(actual[key]),
+            _array_any(expected[key]),
+            atol=COMPOUND,
+            equal_nan=True,
+        )
+
+
 def test_nns_arma_known_linear_check() -> None:
     result = nns_arma(np.arange(1, 21, dtype=np.float64), h=5, seasonal_factor=4, method="lin")
 
@@ -228,3 +289,21 @@ def _dict(value: RValue) -> dict[str, np.ndarray]:
     if not isinstance(value, dict):
         raise AssertionError(f"Expected R dictionary, got {type(value)!r}")
     return {key: _array(item) for key, item in value.items()}
+
+
+def _dict_any(value: RValue) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise AssertionError(f"Expected R dictionary, got {type(value)!r}")
+    return dict(value)
+
+
+def _array_any(value: object) -> np.ndarray:
+    if value is None:
+        raise AssertionError("Unexpected None value.")
+    if isinstance(value, np.ndarray):
+        return value.astype(np.float64)
+    if isinstance(value, (float, int, np.floating, np.integer, bool, np.bool_)):
+        return np.asarray(value, dtype=np.float64)
+    if isinstance(value, list):
+        return np.asarray(value, dtype=np.float64)
+    raise AssertionError(f"Unexpected value type: {type(value)!r}")

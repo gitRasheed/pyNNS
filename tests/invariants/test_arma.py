@@ -80,11 +80,57 @@ def test_nns_arma_pred_int_h_one_matches_installed_r_error() -> None:
         nns_arma(variable, h=1, seasonal_factor=4, method="nonlin", pred_int=0.95)
 
 
-def test_nns_arma_optim_remains_deferred() -> None:
+def test_nns_arma_optim_returns_forecast_dictionary() -> None:
     variable = np.sin(np.arange(1, 40, dtype=np.float64) / 3.0) + 2.0
 
-    with pytest.raises(NotImplementedError, match="nns_arma_optim default optimizer path"):
-        nns_arma_optim(variable, h=3, seasonal_factor=[4, 8])
+    result = nns_arma_optim(
+        variable,
+        h=3,
+        seasonal_factor=[3, 4, 5, 6, 7],
+        lin_only=True,
+        print_trace=False,
+    )
+
+    assert list(result) == [
+        "periods",
+        "weights",
+        "obj.fn",
+        "method",
+        "shrink",
+        "nns.regress",
+        "bias.shift",
+        "errors",
+        "results",
+        "lower.pred.int",
+        "upper.pred.int",
+    ]
+    assert result["results"].shape == (3,)
+    assert result["lower.pred.int"].shape == (3,)
+    assert result["upper.pred.int"].shape == (3,)
+    assert np.all(np.isfinite(result["results"]))
+
+
+def test_nns_arma_optim_validation_matches_installed_r() -> None:
+    variable = np.sin(np.arange(1, 40, dtype=np.float64) / 3.0) + 2.0
+
+    with pytest.raises(ValueError, match=r"larger \[training.set\]"):
+        nns_arma_optim(
+            variable,
+            training_set=19,
+            seasonal_factor=[3, 4],
+            lin_only=True,
+            print_trace=False,
+        )
+
+    with pytest.raises(TypeError, match="non-numeric argument"):
+        nns_arma_optim(
+            variable,
+            h=3,
+            seasonal_factor=[3, 4, 5, 6, 7],
+            lin_only=True,
+            pred_int=None,
+            print_trace=False,
+        )
 
 
 def test_nns_var_remains_deferred() -> None:
