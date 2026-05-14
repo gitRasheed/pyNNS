@@ -89,16 +89,39 @@ def test_nns_stack_factor_predictor_method2_factor_only_falls_back_to_method1() 
     np.testing.assert_allclose(result["stack"], result["reg"])
 
 
-def test_nns_stack_factor_predictor_method12_remains_deferred() -> None:
+def test_nns_stack_factor_predictor_method12_factor_only_falls_back_to_method1() -> None:
     x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"])
     y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
 
-    with pytest.raises(NotImplementedError, match=r"factor predictors with method \(1, 2\)"):
+    result = nns_stack(
+        x,
+        y,
+        np.asarray(["a", "c", "b"]),
+        factor_levels=["a", "b", "c"],
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+    )
+
+    assert result["reg"].shape == (3,)
+    assert np.asarray(result["dim.red"]).shape == (3,)
+    assert np.isnan(np.asarray(result["dim.red"], dtype=np.float64)).all()
+    np.testing.assert_allclose(result["stack"], result["reg"])
+
+
+def test_nns_stack_mixed_factor_predictor_method12_remains_deferred() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"], dtype=object)
+    numeric = np.linspace(-1.0, 1.0, x.size)
+    y = numeric + np.where(x == "a", 0.0, np.where(x == "b", 0.5, 1.0))
+    variable = np.column_stack((x, numeric.astype(object)))
+    point = variable[:3]
+
+    with pytest.raises(NotImplementedError, match=r"mixed factor predictors with method \(1, 2\)"):
         nns_stack(
-            x,
+            variable,
             y,
-            np.asarray(["a", "c", "b"]),
-            factor_levels=["a", "b", "c"],
+            point,
+            factor_levels=(["a", "b", "c"], None),
             cv_size=0.25,
             folds=1,
             method=(1, 2),

@@ -223,10 +223,10 @@ Factor predictor expansion is supported for `nns_stack(method=1)` and
 `nns_stack(method=2)` with explicit `factor_levels=` metadata. PyNNS expands
 training and test predictors together using the same full-rank dummy convention
 as installed R's aligned train/test builder. Pure factor-predictor `method=2`
-matches installed R's fallback to method 1. Mixed factor/numeric `method=2`
-uses the expanded numeric design directly. Stacked `method=(1,2)` factor
-predictors remain deferred because installed-R probes show divergent stacked
-method-1 internals after method-2 projection.
+and `method=(1,2)` match installed R's fallback to method 1. Mixed
+factor/numeric `method=2` uses the expanded numeric design directly. Mixed
+factor/numeric `method=(1,2)` remains deferred because installed-R probes show
+divergent stacked method-1 internals after method-2 projection.
 
 ## Boost
 

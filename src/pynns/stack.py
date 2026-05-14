@@ -60,16 +60,16 @@ def nns_stack(
     x_test_input: NDArray[Any] | NDArray[np.float64] | None = (
         None if ivs_test is None else np.asarray(ivs_test)
     )
-    if factor_levels is not None and methods == (1, 2):
-        raise NotImplementedError(
-            "nns_stack factor predictors with method (1, 2) are deferred because installed R "
-            "stacked method-1 internals diverge from the current PyNNS expansion path."
-        )
-    if factor_levels is not None and methods == (2,) and _all_predictors_are_factor(
-        x_input,
-        factor_levels,
-    ):
-        methods = (1,)
+    if factor_levels is not None and 2 in methods:
+        all_factor_predictors = _all_predictors_are_factor(x_input, factor_levels)
+        if all_factor_predictors:
+            methods = (1,)
+        elif methods == (1, 2):
+            raise NotImplementedError(
+                "nns_stack mixed factor predictors with method (1, 2) are deferred because "
+                "installed R stacked method-1 internals diverge from the current PyNNS "
+                "expansion path."
+            )
     if factor_levels is not None:
         x_input, x_test_input = _expand_factor_predictors(
             ivs_train,
