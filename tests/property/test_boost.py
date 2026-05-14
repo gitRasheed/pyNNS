@@ -35,6 +35,29 @@ def test_nns_boost_numeric_bounds_hold(x: np.ndarray) -> None:
     assert np.sum(result["feature.weights"]) > 0.0
 
 
+@given(st.integers(min_value=16, max_value=35))
+def test_nns_boost_multiple_factor_predictor_shapes_hold(size: int) -> None:
+    x = np.linspace(-2.0, 2.0, size)
+    first = np.asarray(["low", "mid", "high"])[np.arange(size) % 3]
+    second = np.asarray(["down", "up"])[np.arange(size) % 2]
+    variable = np.column_stack((first, x.astype(object), second))
+    y = x + np.where(first == "low", 0.25, np.where(first == "mid", 0.5, 0.75))
+
+    result = nns_boost(
+        variable,
+        y,
+        variable[:3],
+        cv_size=0.25,
+        factor_levels=(["low", "mid", "high"], None, ["down", "up"]),
+        feature_importance=False,
+        random_seed=1,
+    )
+
+    assert result["results"].shape == (3,)
+    assert np.all(np.isfinite(result["results"]))
+    assert np.sum(result["feature.weights"]) == pytest.approx(1.0)
+
+
 @given(finite_matrices, st.sampled_from([1, 2]), st.sampled_from([0.8, 0.95]))
 def test_nns_boost_numeric_pred_int_shape_holds(
     x: np.ndarray,

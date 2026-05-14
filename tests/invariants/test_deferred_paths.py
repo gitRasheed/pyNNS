@@ -14,7 +14,6 @@ EXPECTED_DEFERRED_FRAGMENTS = {
     "threshold on the n_features > 10 stochastic epoch path": (
         "`threshold` on the `n_features > 10` stochastic path"
     ),
-    "multiple factor predictor columns": "broad factor predictor edge cases",
     "dy_dx eval_point values": "point-evaluated derivative wrappers",
     "dy_d finite-difference derivatives": "point-evaluated derivative wrappers",
     "direct nns_m_reg factor_2_dummy=True": "direct `factor_2_dummy=True` raw predictor path",

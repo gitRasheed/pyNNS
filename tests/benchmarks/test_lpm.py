@@ -794,6 +794,37 @@ def test_nns_boost_factor_predictor_50x2(
 
 
 @pytest.mark.benchmark
+def test_nns_boost_multi_factor_predictor_50x3(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    x = np.linspace(-2.0, 2.0, 50)
+    first = np.where(x < -0.5, "low", np.where(x > 0.75, "high", "mid"))
+    second = np.where(np.sin(x) > 0.0, "up", "down")
+    variable = np.column_stack((first, x.astype(object), second))
+    y = (
+        x
+        + np.where(first == "low", 1.0, np.where(first == "mid", 2.0, 3.0)) * 0.25
+        + np.where(second == "up", 0.1, -0.1)
+    )
+
+    result = benchmark(
+        nns_boost,
+        variable,
+        y,
+        variable[:10],
+        learner_trials=10,
+        cv_size=0.25,
+        factor_levels=(["low", "mid", "high"], None, ["down", "up"]),
+        feature_importance=False,
+        random_seed=1,
+    )
+
+    assert result["results"].shape == (10,)
+    assert isinstance(r_baseline["nns_boost_multi_factor_predictor_50x3_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_boost_class_50x3(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-2.0, 2.0, 50)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))

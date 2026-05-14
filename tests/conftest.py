@@ -201,6 +201,11 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_boost_factor_predictor_50x2_seconds" not in cache:
         cache["nns_boost_factor_predictor_50x2_seconds"] = _time_r_nns_boost_factor_predictor()
         _write_benchmark_baseline(cache)
+    if "nns_boost_multi_factor_predictor_50x3_seconds" not in cache:
+        cache["nns_boost_multi_factor_predictor_50x3_seconds"] = (
+            _time_r_nns_boost_multi_factor_predictor()
+        )
+        _write_benchmark_baseline(cache)
     if "nns_boost_class_50x3_seconds" not in cache:
         cache["nns_boost_class_50x3_seconds"] = _time_r_nns_boost_class()
         _write_benchmark_baseline(cache)
@@ -1176,6 +1181,32 @@ def _time_r_nns_boost_factor_predictor() -> float:
         "levels = c('low', 'mid', 'high'))\n"
         "X <- data.frame(F = f, Z = x)\n"
         "y <- x + as.numeric(f) * 0.25\n"
+        "run <- function() NNS::NNS.boost(X, y, IVs.test = X[1:10,], "
+        "learner.trials = 10, CV.size = 0.25, "
+        "feature.importance = FALSE, status = FALSE)\n"
+        "invisible(run())\n"
+        "times <- replicate(2, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_boost_multi_factor_predictor() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-2, 2, length.out = 50)\n"
+        "f1 <- factor(ifelse(x < -0.5, 'low', ifelse(x > 0.75, 'high', 'mid')), "
+        "levels = c('low', 'mid', 'high'))\n"
+        "f2 <- factor(ifelse(sin(x) > 0, 'up', 'down'), levels = c('down', 'up'))\n"
+        "X <- data.frame(X1 = f1, X2 = x, X3 = f2)\n"
+        "y <- x + as.numeric(f1) * 0.25 + ifelse(f2 == 'up', 0.1, -0.1)\n"
         "run <- function() NNS::NNS.boost(X, y, IVs.test = X[1:10,], "
         "learner.trials = 10, CV.size = 0.25, "
         "feature.importance = FALSE, status = FALSE)\n"

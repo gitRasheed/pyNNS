@@ -13,6 +13,7 @@
     "nns_boost_class_50x3_seconds": 5.79,
     "nns_boost_class_balance_80x3_seconds": 3.12,
     "nns_boost_factor_predictor_50x2_seconds": 4.747,
+    "nns_boost_multi_factor_predictor_50x3_seconds": 5.1864,
     "nns_boost_stochastic_64x11_seconds": 3.311667,
     "nns_boost_stochastic_ts_test_64x11_seconds": 5.851,
     "nns_causation_1000_seconds": 0.0976,

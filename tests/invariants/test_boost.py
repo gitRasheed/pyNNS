@@ -67,23 +67,32 @@ def test_nns_boost_factor_predictor_requires_explicit_levels() -> None:
 
 
 @pytest.mark.parametrize("features_only", [False, True])
-def test_nns_boost_multiple_factor_predictors_remain_deferred(features_only: bool) -> None:
+def test_nns_boost_multiple_factor_predictors_are_positional(features_only: bool) -> None:
     x = np.linspace(-2.0, 2.0, 24)
     first = np.where(x < -0.5, "low", np.where(x > 0.75, "high", "mid"))
     second = np.where(np.sin(x) > 0.0, "up", "down")
     variable = np.column_stack((first, x, second))
     y = x + np.where(first == "low", 1.0, np.where(first == "mid", 2.0, 3.0)) * 0.25
 
-    with pytest.raises(NotImplementedError, match="multiple factor predictor columns"):
-        nns_boost(
-            variable,
-            y,
-            variable[:4],
-            cv_size=0.25,
-            factor_levels=(["low", "mid", "high"], None, ["down", "up"]),
-            features_only=features_only,
-            feature_importance=False,
-        )
+    result = nns_boost(
+        variable,
+        y,
+        variable[:4],
+        cv_size=0.25,
+        factor_levels=(["low", "mid", "high"], None, ["down", "up"]),
+        features_only=features_only,
+        feature_importance=False,
+        random_seed=1,
+    )
+
+    assert set(result) == (
+        {"feature.weights", "feature.frequency"}
+        if features_only
+        else {"results", "pred.int", "feature.weights", "feature.frequency", "n.best"}
+    )
+    assert np.sum(result["feature.weights"]) == pytest.approx(1.0)
+    if not features_only:
+        assert result["results"].shape == (4,)
 
 
 def test_nns_boost_numeric_pred_int_shape() -> None:

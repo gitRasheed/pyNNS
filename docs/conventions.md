@@ -248,14 +248,15 @@ learner trials test rows `1:(n - ts_test)`, while epochs test the final
 rejected unless explicit levels are supplied. `balance=True` is supported for
 classification and uses the same R-style `downSample` + `upSample` structure as
 `nns_stack`; exact sampled-row parity with R is not expected.
-Simple single-column explicit-level factor predictors are supported through
-`factor_levels=`. PyNNS integer-codes those columns before deterministic feature
-selection, matching installed R's `data.matrix` conversion. Pass `None` for
-numeric columns in mixed predictor matrices, for example
-`factor_levels=(["low", "mid", "high"], None)`. Multiple explicit-level factor
-predictors remain deferred because installed R probes can produce matching
-feature diagnostics in one case but diverge in another, final predictions also
-diverge, and another probe errored inside R `NNS.reg`. Numeric `pred_int` is supported and
+Explicit-level factor predictors are supported through `factor_levels=`. PyNNS
+integer-codes those columns before deterministic feature selection, matching
+installed R's `data.matrix` conversion under PyNNS' positional-column
+convention. Pass `None` for numeric columns in mixed predictor matrices, for
+example `factor_levels=(["low", "mid", "high"], None)`. Multiple explicit-level
+factor predictor columns use positional `X1`, `X2`, ... semantics; installed R
+data frames with semantic column names sort columns alphabetically before
+fitting, so callers should order PyNNS columns explicitly when reproducing those
+named-data-frame cases. Numeric `pred_int` is supported and
 delegates to `nns_stack(pred_int=...)`, matching installed R; it is deterministic
 and does not use MC/meboot. `features_only=True` returns before the final stack
 fit and ignores `pred_int`, matching R. Classification `pred_int` is supported
