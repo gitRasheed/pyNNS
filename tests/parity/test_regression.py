@@ -111,6 +111,55 @@ def test_nns_reg_order_max_smooth_fallback_matches_r() -> None:
 
 
 @pytest.mark.parity
+def test_nns_reg_spline_eligible_smooth_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 40)
+    y = np.sin(x) + 0.2 * x**2
+    point = np.array([-1.5, 0.0, 1.5])
+
+    expected = _r_nns_reg_smooth(
+        x,
+        y,
+        order=2,
+        point_est=point,
+        confidence_interval=0.95,
+    )
+    actual = nns_reg(x, y, order=2, point_est=point, smooth=True, confidence_interval=0.95)
+
+    _assert_reg_matches(actual, expected, atol=5e-5)
+
+
+@pytest.mark.parity
+def test_nns_reg_dimred_smooth_matches_r() -> None:
+    x1 = np.linspace(-2.0, 2.0, 36)
+    x = np.column_stack((x1, np.sin(x1), np.cos(x1)))
+    y = x[:, 0] + x[:, 1] - 0.25 * x[:, 2]
+    point = x[::12]
+
+    expected = _r_nns_reg_dimred(
+        x,
+        y,
+        order=2,
+        dim_red_method="equal",
+        threshold=0.0,
+        point_est=point,
+        point_only=False,
+        confidence_interval=0.95,
+        smooth=True,
+    )
+    actual = nns_reg(
+        x,
+        y,
+        order=2,
+        dim_red_method="equal",
+        point_est=point,
+        confidence_interval=0.95,
+        smooth=True,
+    )
+
+    _assert_reg_matches(actual, expected, check_dimred=True, atol=5e-5)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("relationship", MODE_RELATIONSHIPS)
 @pytest.mark.parametrize("order", MODE_ORDERS)
@@ -812,12 +861,13 @@ def _r_nns_reg_dimred(
     confidence_interval: float | None = None,
     tau: object | None = None,
     multivariate_call: bool = False,
+    smooth: bool = False,
 ) -> Any:
     return nns(
         "NNS.reg",
         x.tolist(),
         y.tolist(),
-        False,
+        smooth,
         order,
         dim_red_method,
         tau,

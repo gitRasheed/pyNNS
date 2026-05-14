@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import cast
 
 import numpy as np
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
@@ -115,6 +115,28 @@ def test_nns_reg_confidence_interval_shape_invariants_hold(
     assert result["pred.int"] is not None
     assert set(result["pred.int"]) == {"pred.int.neg", "pred.int.pos"}
     assert result["pred.int"]["pred.int.neg"].shape == result["pred.int"]["pred.int.pos"].shape
+
+
+@given(
+    finite_arrays,
+    finite_arrays,
+)
+@settings(max_examples=5)
+def test_nns_reg_smooth_shape_invariants_hold(x: np.ndarray, y: np.ndarray) -> None:
+    size = min(x.size, y.size, 40)
+    x = x[:size]
+    y = y[:size]
+    assume(np.unique(x).size > 3)
+    assume(np.unique(y).size > 1)
+    points = np.array([float(np.min(x)), float(np.mean(x)), float(np.max(x))])
+
+    result = nns_reg(x, y, order=1, point_est=points, smooth=True)
+
+    assert result["Fitted.xy"]["y.hat"].shape == (size,)
+    assert result["Point.est"].shape == points.shape
+    assert result["regression.points"]["x"].size == result["regression.points"]["y"].size
+    assert np.all(np.isfinite(result["Fitted.xy"]["y.hat"]))
+    assert np.all(np.isfinite(result["Point.est"]))
 
 
 @given(

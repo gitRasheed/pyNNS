@@ -40,6 +40,7 @@
     "nns_norm_1000x3_seconds": 0.0015,
     "nns_part_500_seconds": 0.00375,
     "nns_reg_200_ci_seconds": 0.0934,
+    "nns_reg_200_smooth_seconds": 0.037,
     "nns_reg_500_seconds": 0.0372,
     "nns_reg_class_200_ci_seconds": 0.057,
     "nns_reg_class_200_seconds": 0.0332,

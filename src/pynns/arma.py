@@ -46,8 +46,8 @@ def nns_arma_optim(
         plot,
     )
     raise NotImplementedError(
-        "nns_arma_optim default optimizer path requires nns_reg smooth=True, "
-        "which depends on smooth.spline and is not yet ported."
+        "nns_arma_optim default optimizer path is not yet ported; smooth=True "
+        "regression support is available, so this optimizer can be mapped next."
     )
 
 

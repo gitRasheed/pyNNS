@@ -15,6 +15,7 @@ from pynns.copula import _target
 from pynns.dependence import _dpm_nd, _gravity, nns_dep
 from pynns.part import NoiseReduction, nns_part
 from pynns.pm_matrix import pm_matrix
+from pynns.smoothing import r_smooth_spline_fixed_spar
 from pynns.var import lpm_var, upm_var
 
 Order = int | Literal["max"] | None
@@ -124,7 +125,6 @@ def nns_reg(
         confidence_interval=confidence_interval,
         smooth=smooth,
         multivariate_call=multivariate_call,
-        allow_smooth_fallback=x_values.size < 4 or order == "max",
     )
     noise = _validate_noise_reduction(noise_reduction)
     point_values = _as_point_est(point_for_dispatch)
@@ -137,6 +137,7 @@ def nns_reg(
         confidence_interval=confidence_interval,
         multivariate_call=multivariate_call,
         class_mode=class_mode,
+        smooth=smooth,
         equation=None,
         x_star=None,
     )
@@ -154,6 +155,7 @@ def _nns_reg_univariate_core(
     class_mode: bool,
     equation: dict[str, NDArray[np.float64] | NDArray[np.str_]] | None,
     x_star: dict[str, NDArray[np.float64]] | None,
+    smooth: bool = False,
 ) -> dict[str, Any]:
 
     dependence = _regression_dependence(x_values, y_values)
@@ -175,6 +177,18 @@ def _nns_reg_univariate_core(
     )
     rp_x = np.minimum(np.max(x_values), np.maximum(np.min(x_values), rp_x))
     rp_y = np.minimum(np.max(y_values), np.maximum(np.min(y_values), rp_y))
+
+    spline_fit = None
+    smooth_condition = smooth and rp_x.size >= 4 and not isinstance(order, str)
+    if smooth_condition:
+        spline_fit = r_smooth_spline_fixed_spar(
+            rp_x,
+            rp_y,
+            spar=(dependence + 0.5) / 2.0,
+        )
+        rp_y = spline_fit.predict(rp_x)
+        rp_y = np.minimum(np.max(y_values), np.maximum(np.min(y_values), rp_y))
+
     rp_y_for_coeff = rp_y.copy()
     if class_mode:
         rp_y = _round_clamp_classes(rp_y, y_values)
@@ -183,12 +197,22 @@ def _nns_reg_univariate_core(
         return {"x": rp_x, "y": rp_y}
 
     coeff = _coefficients(rp_x, rp_y_for_coeff, x_values, y_values)
-    estimate = _fitted_values(x_values, y_values, rp_x, rp_y, coeff, order)
+    if smooth_condition and spline_fit is not None:
+        order_idx = np.argsort(x_values, kind="mergesort")
+        estimate = np.empty_like(x_values, dtype=np.float64)
+        estimate[order_idx] = spline_fit.predict(x_values[order_idx])
+    else:
+        estimate = _fitted_values(x_values, y_values, rp_x, rp_y, coeff, order)
     if class_mode:
         estimate = _round_clamp_classes(estimate, y_values)
 
     if point_values is None:
         point_est_y = np.array([], dtype=np.float64)
+    elif smooth_condition and spline_fit is not None:
+        point_est_y = spline_fit.predict(point_values)
+        point_est_y = _extrapolate_points(point_values, point_est_y, x_values, y_values, coeff)
+        if class_mode:
+            point_est_y = _round_clamp_classes(point_est_y, y_values)
     else:
         point_est_y = _predict_points(point_values, x_values, y_values, rp_x, rp_y, coeff)
         if class_mode:
@@ -444,15 +468,6 @@ def _nns_reg_dimred(
     else:
         variable_names = None
     type_value = _normalize_type(type)
-    if smooth:
-        if confidence_interval is not None:
-            raise NotImplementedError(
-                "nns_reg confidence_interval with smooth=True requires R smooth.spline "
-                "compatibility, which is not yet ported."
-            )
-        raise NotImplementedError(
-            "smooth=True requires the smoothing-spline path, deferred to a later batch."
-        )
     x_matrix, y_values = _validate_dimred_inputs(
         x,
         y,
@@ -484,6 +499,7 @@ def _nns_reg_dimred(
         confidence_interval=confidence_interval,
         multivariate_call=multivariate_call,
         class_mode=class_mode,
+        smooth=smooth,
         equation=projection.equation,
         x_star={"x": projection.x_star},
     )
@@ -732,15 +748,7 @@ def _reject_deferred_paths(
     multivariate_call: bool,
     allow_smooth_fallback: bool = False,
 ) -> None:
-    if smooth and not allow_smooth_fallback:
-        if confidence_interval is not None:
-            raise NotImplementedError(
-                "nns_reg confidence_interval with smooth=True requires R smooth.spline "
-                "compatibility, which is not yet ported."
-            )
-        raise NotImplementedError(
-            "smooth=True requires the smoothing-spline path, deferred to a later batch."
-        )
+    del point_est, confidence_interval, smooth, multivariate_call, allow_smooth_fallback
 
 
 def _validate_noise_reduction(value: str) -> NoiseReduction:
@@ -1066,6 +1074,33 @@ def _predict_points(
                 nns_mode(y[np.flatnonzero(x == np.min(x))])
             )
     return out.astype(np.float64)
+
+
+def _extrapolate_points(
+    point_est: NDArray[np.float64],
+    point_est_y: NDArray[np.float64],
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    coeff: dict[str, NDArray[np.float64]],
+) -> NDArray[np.float64]:
+    out = point_est_y.astype(np.float64).copy()
+    if not np.any((point_est > np.max(x)) | (point_est < np.min(x))):
+        return out
+    _, first = np.unique(coeff["Coefficient"], return_index=True)
+    unique_coef = coeff["Coefficient"][np.sort(first)]
+    upper_slope = float(np.mean(unique_coef[-2:]))
+    lower_slope = float(np.mean(unique_coef[:2]))
+    upper_mask = point_est > np.max(x)
+    lower_mask = point_est < np.min(x)
+    if np.any(upper_mask):
+        out[upper_mask] = (point_est[upper_mask] - float(np.max(x))) * upper_slope + float(
+            nns_mode(y[np.flatnonzero(x == np.max(x))])
+        )
+    if np.any(lower_mask):
+        out[lower_mask] = (point_est[lower_mask] - float(np.min(x))) * lower_slope + float(
+            nns_mode(y[np.flatnonzero(x == np.min(x))])
+        )
+    return out
 
 
 def _find_interval(

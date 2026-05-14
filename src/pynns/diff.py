@@ -186,8 +186,8 @@ def dy_dx(
             raise TypeError("nns_reg returned an unexpected fitted table.")
         return float(np.mean(np.asarray(fitted["gradient"], dtype=np.float64)))
     raise NotImplementedError(
-        "dy_dx eval_point values require R's smooth=True finite-difference path, "
-        "which depends on smooth.spline and is not yet ported."
+        "dy_dx eval_point values require mapping R's finite-difference wrapper around "
+        "smooth nns_reg predictions, which is not yet ported."
     )
 
 
@@ -203,8 +203,8 @@ def dy_d(
     """Placeholder for R's dy.d_ finite-difference derivative wrapper."""
     del x, y, wrt, eval_points, mixed, messages
     raise NotImplementedError(
-        "dy_d finite-difference derivatives require R's smooth=True NNS.reg path, "
-        "which depends on smooth.spline and is not yet ported."
+        "dy_d finite-difference derivatives require mapping R's multivariate "
+        "finite-difference wrapper around smooth nns_reg predictions, which is not yet ported."
     )
 
 

@@ -310,6 +310,26 @@ def test_nns_reg_200_confidence_interval(benchmark: Any, r_baseline: dict[str, o
 
 
 @pytest.mark.benchmark
+def test_nns_reg_200_smooth(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-3.0, 3.0, 200)
+    y = np.sin(x) + 0.05 * np.cos(7.0 * x)
+    point_est = np.linspace(-3.0, 3.0, 20)
+
+    result = benchmark(
+        nns_reg,
+        x,
+        y,
+        order=2,
+        point_est=point_est,
+        smooth=True,
+        confidence_interval=0.95,
+    )
+
+    assert result["pred.int"] is not None
+    assert isinstance(r_baseline["nns_reg_200_smooth_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_reg_factor_predictor_200(
     benchmark: Any,
     r_baseline: dict[str, object],

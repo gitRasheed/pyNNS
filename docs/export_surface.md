@@ -45,10 +45,10 @@ These names are exported so callers get an explicit, documented
 
 | R export | PyNNS API | Blocker |
 |---|---|---|
-| `NNS.ARMA.optim` | `nns_arma_optim` | Calls `NNS.reg(..., smooth = TRUE)` |
+| `NNS.ARMA.optim` | `nns_arma_optim` | Optimizer loop and return object not yet mapped |
 | `NNS.VAR` | `nns_var` | Delegates to `NNS.ARMA.optim` |
 | `NNS.nowcast` | `nns_nowcast` | Delegates to `NNS.VAR` after external data retrieval |
-| `dy.d_` | `dy_d` | Calls `NNS.reg(..., smooth = TRUE)` for finite differences |
+| `dy.d_` | `dy_d` | Finite-difference wrapper grids and return tables not yet mapped |
 
 ## Internal Or Out Of Scope
 

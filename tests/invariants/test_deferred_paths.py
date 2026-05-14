@@ -9,8 +9,6 @@ DEFERRED_PATHS = ROOT / "docs" / "deferred_paths.md"
 
 
 EXPECTED_DEFERRED_FRAGMENTS = {
-    "confidence_interval with smooth=True": "confidence_interval` with `smooth=True",
-    "smooth=True requires the smoothing-spline path": "`smooth=True`",
     "threshold on the n_features > 10 stochastic epoch path": (
         "`threshold` on the `n_features > 10` stochastic path"
     ),

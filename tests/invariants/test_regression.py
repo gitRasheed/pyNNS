@@ -103,17 +103,17 @@ def test_nns_reg_confidence_interval_none_output_unchanged() -> None:
     "path",
     ["smooth", "smooth_confidence"],
 )
-def test_nns_reg_deferred_paths_raise(path: str) -> None:
+def test_nns_reg_spline_eligible_smooth_paths_run(path: str) -> None:
     x = np.linspace(-2.0, 2.0, 20)
     y = np.sin(x)
 
-    with pytest.raises(NotImplementedError):
-        if path == "smooth":
-            nns_reg(x, y, smooth=True)
-        elif path == "smooth_confidence":
-            nns_reg(x, y, smooth=True, confidence_interval=0.95)
-        else:
-            nns_reg(x, y, multivariate_call=True)
+    if path == "smooth":
+        result = nns_reg(x, y, smooth=True)
+    else:
+        result = nns_reg(x, y, smooth=True, confidence_interval=0.95)
+
+    assert result["Fitted.xy"]["y.hat"].shape == x.shape
+    assert np.all(np.isfinite(result["Fitted.xy"]["y.hat"]))
 
 
 def test_nns_reg_small_smooth_falls_back_to_piecewise_path() -> None:
@@ -155,13 +155,15 @@ def test_nns_reg_order_max_smooth_falls_back_to_piecewise_path() -> None:
         {"smooth": True, "confidence_interval": 0.95},
     ],
 )
-def test_nns_reg_dimred_smooth_deferred_paths_raise(kwargs: dict[str, object]) -> None:
+def test_nns_reg_dimred_smooth_paths_run(kwargs: dict[str, object]) -> None:
     x1 = np.linspace(-2.0, 2.0, 20)
     x = np.column_stack((x1, np.sin(x1)))
     y = x[:, 0] + x[:, 1]
 
-    with pytest.raises(NotImplementedError):
-        nns_reg(x, y, dim_red_method="equal", **kwargs)
+    result = nns_reg(x, y, dim_red_method="equal", **kwargs)
+
+    assert result["Fitted.xy"]["y.hat"].shape == y.shape
+    assert np.all(np.isfinite(result["Fitted.xy"]["y.hat"]))
 
 
 def test_nns_reg_univariate_point_only_matches_regular_shape() -> None:

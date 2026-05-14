@@ -38,6 +38,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_anova`, binary, T_obs=100 | 6.271 ms | 4.400 ms | 1.43x |
 | `nns_reg`, dim-red cor, N=3, T_obs=200 | 31.526 ms | 42.600 ms | 0.74x |
 | `nns_reg`, T_obs=200, T_test=20, confidence_interval=0.95 | 54.557 ms | 93.400 ms | 0.58x |
+| `nns_reg`, T_obs=200, T_test=20, smooth=True, confidence_interval=0.95 | 11.504 ms | 37.000 ms | 0.31x |
 | `nns_reg`, factor predictor, T_obs=200, T_test=4 | 18.800 ms | 119.400 ms | 0.16x |
 | `nns_reg` class, T_obs=200, T_test=20 | 12.168 ms | 33.200 ms | 0.37x |
 | `nns_reg` class, T_obs=200, T_test=20, confidence_interval=0.95 | 21.035 ms | 57.000 ms | 0.37x |

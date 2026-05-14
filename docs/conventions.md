@@ -119,8 +119,8 @@ supported: `"off"`, `"mean"`, `"median"`, `"mode"`, and `"mode_class"`.
 
 ## Regression
 
-`nns_reg` currently maps to R's univariate numeric `NNS.reg` path with
-`factor.2.dummy = FALSE`, plotting disabled, and no smoothing. Return keys match R's list names, but data.table outputs are plain
+`nns_reg` maps to R's univariate numeric `NNS.reg` path with
+`factor.2.dummy = FALSE` and plotting disabled. Return keys match R's list names, but data.table outputs are plain
 dictionaries of NumPy arrays. `multivariate_call=True` returns R's internal
 two-column regression-point structure as `{"x": ..., "y": ...}` for
 `nns_m_reg`, including after dimension-reduction projection. Matrix `x` without
@@ -128,9 +128,10 @@ dimension reduction dispatches to `nns_m_reg`.
 Classification is supported for numeric/logical/factor-like class-code targets.
 `smooth=True` follows installed R's ordinary piecewise fallback for univariate
 inputs with fewer than four observations and for univariate `order="max"`; R
-does not call `smooth.spline` there. Spline-eligible smoothing remains an
-explicit future batch and raises
-`NotImplementedError`.
+does not call `smooth.spline` there. Spline-eligible inputs use a private
+fixed-`spar` cubic smoothing-spline adapter matching the `stats::smooth.spline`
+subset used by `NNS.reg`: `spar = (dependence + 0.5) / 2`, R-style knots, and
+R's interior-band trace ratio for lambda.
 Factor predictor expansion is supported through the public `nns_reg` path.
 When combined with dimension reduction, factor predictors are expanded with
 R's full-rank dummy convention before synthetic `x.star` coefficients are
@@ -169,9 +170,8 @@ for the lower column. Below-range univariate point estimates follow R's
 `findInterval`/data.table behavior: index `0` rows are dropped, so `pred.int`
 can have fewer rows than `Point.est`. For class mode, fitted confidence columns
 remain raw numeric values, while univariate `pred.int` columns are rounded with
-R's `x %% 1 < 0.5` rule. Spline-eligible `smooth=True` with
-`confidence_interval` remains deferred because it depends on R-compatible
-smoothing splines.
+R's `x %% 1 < 0.5` rule. Spline-eligible `smooth=True` interval tables use the
+same deterministic residual VaR logic after smoothing, matching installed R.
 
 ## Multivariate Regression
 
@@ -306,7 +306,7 @@ multiplication on that path.
 stubs. Installed R's `NNS.ARMA.optim` evaluates `NNS.reg(..., smooth = TRUE)`,
 `NNS.VAR` delegates to `NNS.ARMA.optim`, and `NNS.nowcast` delegates to
 `NNS.VAR` after external macroeconomic data retrieval. These wrappers remain
-deferred until smooth regression and the VAR boundary are ported.
+deferred until the ARMA optimizer loop and VAR boundary are ported.
 
 ## Meboot
 
@@ -391,8 +391,8 @@ rounds results to `digits`, matching R's default output convention.
 `dy_dx(..., eval_point="overall")` maps to R's `dy.dx(..., eval.point =
 "overall")` path and returns the mean fitted gradient from unsmoothed
 `nns_reg`. Numeric `dy_dx` evaluation points and all `dy_d` finite-difference
-paths remain deferred because installed R evaluates those points through
-`NNS.reg(..., smooth = TRUE)`, which depends on R-compatible smoothing splines.
+paths remain deferred until the R wrapper grids and return tables are mapped;
+the smooth `nns_reg` prerequisite is available.
 
 ## ANOVA
 

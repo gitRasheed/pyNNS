@@ -141,6 +141,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_reg_200_ci_seconds" not in cache:
         cache["nns_reg_200_ci_seconds"] = _time_r_nns_reg_ci()
         _write_benchmark_baseline(cache)
+    if "nns_reg_200_smooth_seconds" not in cache:
+        cache["nns_reg_200_smooth_seconds"] = _time_r_nns_reg_smooth()
+        _write_benchmark_baseline(cache)
     if "nns_reg_class_200_seconds" not in cache:
         cache["nns_reg_class_200_seconds"] = _time_r_nns_reg_class()
         _write_benchmark_baseline(cache)
@@ -720,6 +723,29 @@ def _time_r_nns_reg_ci() -> float:
         "point <- seq(-3, 3, length.out = 20)\n"
         "run <- function() NNS::NNS.reg(x, y, point.est = point, "
         "factor.2.dummy = FALSE, plot = FALSE, confidence.interval = 0.95)\n"
+        "invisible(run())\n"
+        "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_reg_smooth() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-3, 3, length.out = 200)\n"
+        "y <- sin(x) + 0.05 * cos(7 * x)\n"
+        "point <- seq(-3, 3, length.out = 20)\n"
+        "run <- function() NNS::NNS.reg(x, y, point.est = point, order = 2, "
+        "factor.2.dummy = FALSE, plot = FALSE, smooth = TRUE, "
+        "confidence.interval = 0.95)\n"
         "invisible(run())\n"
         "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
