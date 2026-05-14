@@ -35,6 +35,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_distance` class, N=3, T_obs=500 | 0.725 ms | 0.900 ms | 0.81x |
 | `nns_distance_bulk` class, N=3, T_obs=500, T_test=50 | 3.200 ms | 2.260 ms | 1.42x |
 | `nns_diff`, f=sin, point=1 | 1.356 ms | 4.050 ms | 0.33x |
+| `dy_dx`, T=100, eval_point=c(-1,0,1) | 26.480 ms | 53.333 ms | 0.50x |
 | `nns_anova`, binary, T_obs=100 | 6.271 ms | 4.400 ms | 1.43x |
 | `nns_reg`, dim-red cor, N=3, T_obs=200 | 31.526 ms | 42.600 ms | 0.74x |
 | `nns_reg`, T_obs=200, T_test=20, confidence_interval=0.95 | 54.557 ms | 93.400 ms | 0.58x |

@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from _r import dy_dx_overall, nns_diff_custom
+from _r import dy_dx_numeric, dy_dx_overall, nns_diff_custom
 from _tolerances import EXACT
 
 from pynns import dy_dx, nns_diff
@@ -50,6 +50,21 @@ def test_dy_dx_overall_matches_r() -> None:
     assert actual == pytest.approx(expected, abs=EXACT)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize("eval_point", [[0.0], [-1.0, 0.0, 1.0]])
+def test_dy_dx_numeric_eval_points_match_r(eval_point: list[float]) -> None:
+    x = np.linspace(-2.0, 2.0, 24)
+    y = x + np.sin(x)
+
+    expected = _dict_array(dy_dx_numeric(x.tolist(), y.tolist(), eval_point))
+    actual = dy_dx(x, y, eval_point=np.asarray(eval_point, dtype=np.float64))
+    assert isinstance(actual, dict)
+
+    assert list(actual) == list(expected)
+    for key in actual:
+        np.testing.assert_allclose(actual[key], expected[key], atol=5e-3, equal_nan=True)
+
+
 def _r_nns_diff(name: str, point: float) -> dict[str, float]:
     result = nns_diff_custom(name, point)
     assert isinstance(result, dict)
@@ -58,3 +73,9 @@ def _r_nns_diff(name: str, point: float) -> dict[str, float]:
         for key, value in result.items()
         if isinstance(value, np.ndarray)
     }
+
+
+def _dict_array(value: object) -> dict[str, np.ndarray]:
+    if not isinstance(value, dict):
+        raise AssertionError(f"Expected dictionary, got {type(value)!r}")
+    return {key: np.asarray(item, dtype=np.float64) for key, item in value.items()}

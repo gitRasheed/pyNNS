@@ -25,6 +25,7 @@
     "nns_dep_1000_seconds": 0.0113,
     "nns_dep_asym_1000_seconds": 0.0098,
     "nns_diff_sin_seconds": 0.00405,
+    "dy_dx_numeric_100_seconds": 0.0533333,
     "nns_distance_1000x3_seconds": 0.00116,
     "nns_distance_bulk_1000x3_100_seconds": 0.0092,
     "nns_distance_bulk_class_500x3_50_seconds": 0.00226,

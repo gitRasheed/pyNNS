@@ -671,6 +671,26 @@ def factor_dummy_custom(
         return result
 
 
+def dy_dx_numeric(x: Sequence[float], y: Sequence[float], eval_point: Sequence[float]) -> RValue:
+    args = {"x": list(x), "y": list(y), "eval_point": list(eval_point)}
+    key = _cache_key("dy.dx.numeric", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for dy.dx.numeric with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_dy_dx_numeric(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def nns_arma_pred_int(
     variable: list[float],
     *,
@@ -1534,6 +1554,28 @@ def _call_r_dy_dx_overall(args: dict[str, Any]) -> RValue:
         "result <- NNS::dy.dx(as.numeric(unlist(args$x)), as.numeric(unlist(args$y)), "
         "eval.point = 'overall')\n"
         "cat(jsonlite::toJSON(as.numeric(result), auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_dy_dx_numeric(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'), "
+        "simplifyVector = FALSE)\n"
+        "result <- NNS::dy.dx(as.numeric(unlist(args$x)), as.numeric(unlist(args$y)), "
+        "eval.point = as.numeric(unlist(args$eval_point)))\n"
+        "out <- lapply(seq_along(result), function(i) as.numeric(result[[i]]))\n"
+        "names(out) <- names(result)\n"
+        "cat(jsonlite::toJSON(out, auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],

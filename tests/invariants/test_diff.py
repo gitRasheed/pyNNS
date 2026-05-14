@@ -25,12 +25,16 @@ def test_nns_diff_smooth_function_derivative_has_bounded_error() -> None:
     assert result["DERIVATIVE"] == pytest.approx(np.cos(point), abs=1e-6)
 
 
-def test_dy_dx_numeric_eval_point_remains_deferred() -> None:
+def test_dy_dx_numeric_eval_point_returns_derivative_table() -> None:
     x = np.linspace(-2.0, 2.0, 24)
     y = x + np.sin(x)
 
-    with pytest.raises(NotImplementedError, match="dy_dx eval_point values"):
-        dy_dx(x, y, eval_point=0.0)
+    result = dy_dx(x, y, eval_point=np.array([-1.0, 0.0, 1.0]))
+
+    assert isinstance(result, dict)
+    assert list(result) == ["eval.point", "first.derivative", "second.derivative"]
+    assert all(value.shape == (3,) for value in result.values())
+    assert np.all(np.isfinite(result["first.derivative"]))
 
 
 def test_dy_d_remains_deferred() -> None:

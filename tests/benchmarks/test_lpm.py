@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from pynns import (
+    dy_dx,
     lpm,
     nns_anova,
     nns_arma,
@@ -261,6 +262,18 @@ def test_nns_diff_sin(benchmark: Any, r_baseline: dict[str, object]) -> None:
 
     assert result["DERIVATIVE"] == pytest.approx(np.cos(1.0), abs=1e-6)
     assert isinstance(r_baseline["nns_diff_sin_seconds"], float)
+
+
+@pytest.mark.benchmark
+def test_dy_dx_numeric_eval_points(benchmark: Any, r_baseline: dict[str, object]) -> None:
+    x = np.linspace(-2.0, 2.0, 100)
+    y = x + np.sin(x)
+
+    result = benchmark(dy_dx, x, y, np.array([-1.0, 0.0, 1.0]))
+
+    assert isinstance(result, dict)
+    assert result["eval.point"].shape == (3,)
+    assert isinstance(r_baseline["dy_dx_numeric_100_seconds"], float)
 
 
 @pytest.mark.benchmark

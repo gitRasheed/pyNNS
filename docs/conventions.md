@@ -395,9 +395,12 @@ output disabled. It returns a dictionary keyed by R's matrix row names and
 rounds results to `digits`, matching R's default output convention.
 `dy_dx(..., eval_point="overall")` maps to R's `dy.dx(..., eval.point =
 "overall")` path and returns the mean fitted gradient from unsmoothed
-`nns_reg`. Numeric `dy_dx` evaluation points and all `dy_d` finite-difference
-paths remain deferred until the R wrapper grids and return tables are mapped;
-the smooth `nns_reg` prerequisite is available.
+`nns_reg`. Numeric `dy_dx` evaluation points use R's finite-difference grid
+around smooth `nns_reg` point estimates and return a table-like dictionary with
+`eval.point`, `first.derivative`, and `second.derivative`. Boundary-point
+quirks follow installed R where covered by parity tests. Multivariate `dy_d`
+finite-difference paths remain deferred until their larger wrapper grids and
+return tables are mapped.
 
 ## ANOVA
 
