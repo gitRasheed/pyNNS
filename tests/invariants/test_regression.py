@@ -132,10 +132,26 @@ def test_nns_reg_small_smooth_falls_back_to_piecewise_path() -> None:
     assert smoothed["pred.int"] is not None
 
 
+def test_nns_reg_order_max_smooth_falls_back_to_piecewise_path() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    y = np.sin(x)
+    point = np.array([-1.5, 0.0, 1.5])
+
+    smoothed = nns_reg(x, y, order="max", point_est=point, smooth=True, confidence_interval=0.95)
+    ordinary = nns_reg(x, y, order="max", point_est=point, confidence_interval=0.95)
+
+    np.testing.assert_allclose(smoothed["Point.est"], ordinary["Point.est"])
+    np.testing.assert_allclose(
+        smoothed["regression.points"]["y"],
+        ordinary["regression.points"]["y"],
+    )
+    assert smoothed["pred.int"] is not None
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"smooth": True},
+        {"smooth": True, "order": 2},
         {"smooth": True, "confidence_interval": 0.95},
     ],
 )

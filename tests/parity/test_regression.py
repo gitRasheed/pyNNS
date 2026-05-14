@@ -93,6 +93,24 @@ def test_nns_reg_small_smooth_fallback_matches_r() -> None:
 
 
 @pytest.mark.parity
+def test_nns_reg_order_max_smooth_fallback_matches_r() -> None:
+    x = np.linspace(-2.0, 2.0, 20)
+    y = np.sin(x)
+    point = np.array([-1.5, 0.0, 1.5])
+
+    expected = _r_nns_reg_smooth(
+        x,
+        y,
+        order="max",
+        point_est=point,
+        confidence_interval=0.95,
+    )
+    actual = nns_reg(x, y, order="max", point_est=point, smooth=True, confidence_interval=0.95)
+
+    _assert_reg_matches(actual, expected)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("relationship", MODE_RELATIONSHIPS)
 @pytest.mark.parametrize("order", MODE_ORDERS)
@@ -750,6 +768,7 @@ def _r_nns_reg_smooth(
     x: np.ndarray,
     y: np.ndarray,
     *,
+    order: int | str | None = None,
     point_est: np.ndarray | None,
     confidence_interval: float | None = None,
 ) -> Any:
@@ -759,7 +778,7 @@ def _r_nns_reg_smooth(
         x.tolist(),
         y.tolist(),
         False,
-        None,
+        order,
         None,
         None,
         None,

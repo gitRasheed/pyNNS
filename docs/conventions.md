@@ -127,8 +127,9 @@ two-column regression-point structure as `{"x": ..., "y": ...}` for
 dimension reduction dispatches to `nns_m_reg`.
 Classification is supported for numeric/logical/factor-like class-code targets.
 `smooth=True` follows installed R's ordinary piecewise fallback for univariate
-inputs with fewer than four observations; R does not call `smooth.spline` there.
-Spline-eligible smoothing remains an explicit future batch and raises
+inputs with fewer than four observations and for univariate `order="max"`; R
+does not call `smooth.spline` there. Spline-eligible smoothing remains an
+explicit future batch and raises
 `NotImplementedError`.
 Factor predictor expansion is supported through the public `nns_reg` path.
 When combined with dimension reduction, factor predictors are expanded with

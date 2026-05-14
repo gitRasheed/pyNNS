@@ -124,7 +124,7 @@ def nns_reg(
         confidence_interval=confidence_interval,
         smooth=smooth,
         multivariate_call=multivariate_call,
-        allow_smooth_fallback=x_values.size < 4,
+        allow_smooth_fallback=x_values.size < 4 or order == "max",
     )
     noise = _validate_noise_reduction(noise_reduction)
     point_values = _as_point_est(point_for_dispatch)
