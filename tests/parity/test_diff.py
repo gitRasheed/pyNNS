@@ -103,6 +103,72 @@ def test_dy_d_nonlinear_wrt1_mean_matches_r() -> None:
         np.testing.assert_allclose(actual[key], expected[key], atol=DY_D_PARITY, equal_nan=True)
 
 
+@pytest.mark.parametrize(
+    ("wrt", "expected_first", "expected_second"),
+    [
+        (
+            [1, 2],
+            [3.990358, 1.995179],
+            [-0.004758276, -0.001189569],
+        ),
+        (
+            [1, 3],
+            [0.997524, 0.498762],
+            [-0.000848783, -0.000212196],
+        ),
+    ],
+)
+@pytest.mark.parity
+def test_dy_d_vectorized_wrt_mean_matches_r(
+    wrt: list[int],
+    expected_first: list[float],
+    expected_second: list[float],
+) -> None:
+    x = np.array([[-2, -1, 0, 1, 2], [1, 3, 5, 7, 9]]).T
+    y = 2 * x[:, 0] + 3 * x[:, 1]
+    if wrt == [1, 3]:
+        x = np.column_stack((x, np.array([2, 4, 6, 8, 10], dtype=float)))
+        y = x[:, 0] + 2 * x[:, 1] - x[:, 2]
+    expected = {
+        "First": np.array([expected_first], dtype=float),
+        "Second": np.array([expected_second], dtype=float),
+    }
+    actual = dy_d(x, y, wrt=wrt, eval_points="mean")
+
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        assert actual[key].shape == (1, len(wrt))
+        np.testing.assert_allclose(
+            actual[key],
+            expected[key],
+            atol=DY_D_PARITY,
+            equal_nan=True,
+        )
+
+
+@pytest.mark.parity
+def test_dy_d_vectorized_wrt_nonlinear_mean_matches_r() -> None:
+    x = np.column_stack(
+        (np.array([-2, -1, 0, 1, 2], dtype=float), np.array([1, 3, 5, 7, 9], dtype=float))
+    )
+    y = x[:, 0] ** 2 + np.sin(x[:, 1])
+    expected = {
+        "First": np.array([[-0.06712002, -0.03356001]], dtype=float),
+        "Second": np.array([[0.2593582, 0.06483955]], dtype=float),
+    }
+    actual = dy_d(x, y, wrt=[1, 2], eval_points="mean")
+
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        assert actual[key].shape == (1, 2)
+        np.testing.assert_allclose(
+            actual[key],
+            expected[key],
+            atol=DY_D_PARITY,
+            equal_nan=True,
+        )
+
+
 def _r_nns_diff(name: str, point: float) -> dict[str, float]:
     result = nns_diff_custom(name, point)
     assert isinstance(result, dict)

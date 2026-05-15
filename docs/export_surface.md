@@ -36,7 +36,7 @@ explicitly guarded while dependencies remain unresolved.
 | `NNS.SS` | `nns_ss` | Stochastic superiority |
 | `NNS.stack` | `nns_stack` | Stack wrapper |
 | `dy.dx` | `dy_dx` | `eval_point="overall"` and numeric `eval_point` vectors are implemented; multivariate form (`dy.d_`) |
-| `dy.d_` | `dy_d` | Scalar `wrt` is implemented; vectorized `wrt` (multiple regressors in one call) is deferred |
+| `dy.d_` | `dy_d` | Scalar `wrt` is implemented; vectorized `wrt` for `eval_points="mean"` and `mixed=False` is implemented; other vectorized modes remain deferred |
 | `factor_2_dummy`, `factor_2_dummy_FR` | `factor_2_dummy`, `factor_2_dummy_fr` | Categorical expansion helpers |
 | `ecdf.pm`, `mean.pm`, `var.pm`, `skew.pm`, `kurt.pm` | `ecdf_pm`, `mean_pm`, `var_pm`, `skew_pm`, `kurt_pm` | Partial-moment classical helpers |
 

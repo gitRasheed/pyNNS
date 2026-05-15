@@ -398,11 +398,12 @@ rounds results to `digits`, matching R's default output convention.
 `nns_reg`. Numeric `dy_dx` evaluation points use R's finite-difference grid
 around smooth `nns_reg` point estimates and return a table-like dictionary with
 `eval.point`, `first.derivative`, and `second.derivative`. Boundary-point
-quirks follow installed R where covered by parity tests. Scalar `dy_d` is implemented
-for single-`wrt` paths; `eval_points="obs"` is implemented but not parity-aligned
-with installed R yet. This is tracked as a parity gap and currently produces materially
-different values in deterministic cases because R applies cumulative perturbation
-updates to obs rows across bandwidths before averaging. Vectorized `wrt` remains deferred.
+quirks follow installed R where covered by parity tests. `dy_d` supports scalar
+`wrt` for all currently supported `eval_points`; `eval_points="mean"` also supports
+vectorized `wrt` with `mixed=False`, returning one row per eval point and one
+column per requested regressor. `eval_points="obs"` remains parity-divergent for
+scalar and vectorized `wrt` because R applies cumulative perturbation updates across
+bandwidths. Vectorized `wrt` with `mixed=True` is deferred.
 
 ## ANOVA
 

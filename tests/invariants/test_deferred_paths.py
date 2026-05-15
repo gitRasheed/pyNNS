@@ -12,8 +12,11 @@ EXPECTED_DEFERRED_FRAGMENTS = {
     "threshold on the n_features > 10 stochastic epoch path": (
         "`threshold` on the `n_features > 10` stochastic path"
     ),
-    "dy_d finite-difference derivatives with vectorized wrt": (
-        "multivariate `dy.d_` vectorized `wrt`"
+    "dy_d vectorized wrt is supported only for eval_points=\"mean\"": (
+        "`dy_d` vectorized `wrt`"
+    ),
+    "dy_d vectorized wrt is not implemented for mixed=True": (
+        "`dy_d` vectorized `wrt`"
     ),
     "direct nns_m_reg factor_2_dummy=True": "direct `factor_2_dummy=True` raw predictor path",
     "nns_var default VAR path": "default VAR path",

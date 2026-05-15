@@ -218,12 +218,47 @@ def dy_d(
     if np.any(np.isnan(np.column_stack((x_values, y_values)))):
         raise ValueError("You have some missing values, please address.")
     wrt_values = np.asarray(wrt, dtype=np.int64).reshape(-1)
-    if wrt_values.size != 1:
-        raise NotImplementedError(
-            "dy_d finite-difference derivatives with vectorized wrt are not yet ported; "
-            "call dy_d once per regressor."
-        )
+
+    if wrt_values.size > 1:
+        eval_points_is_mean = isinstance(eval_points, str) and eval_points.lower() == "mean"
+        if not eval_points_is_mean or mixed:
+            if mixed:
+                raise NotImplementedError(
+                    "dy_d vectorized wrt is not implemented for mixed=True; "
+                    "call dy_d per regressor for mixed=False first."
+                )
+            raise NotImplementedError(
+                "dy_d vectorized wrt is supported only for eval_points=\"mean\" "
+                "with mixed=False; call dy_d once per regressor for other eval points."
+            )
+        outputs = [
+            _dy_d_scalar(x_values, y_values, int(wrt_index) - 1, eval_points, mixed=False)
+            for wrt_index in wrt_values
+        ]
+        first_values = [np.asarray(output["First"], dtype=np.float64) for output in outputs]
+        second_values = [np.asarray(output["Second"], dtype=np.float64) for output in outputs]
+        return {
+            "First": np.column_stack(first_values),
+            "Second": np.column_stack(second_values),
+        }
+
     wrt_index = int(wrt_values[0]) - 1
+    return _dy_d_scalar(
+        x_values,
+        y_values,
+        wrt_index,
+        eval_points,
+        mixed=bool(mixed),
+    )
+
+
+def _dy_d_scalar(
+    x_values: NDArray[np.float64],
+    y_values: NDArray[np.float64],
+    wrt_index: int,
+    eval_points: str | float | NDArray[np.float64],
+    mixed: bool,
+) -> dict[str, NDArray[np.float64]]:
     if wrt_index < 0 or wrt_index >= x_values.shape[1]:
         raise ValueError("wrt must select an existing regressor using R's 1-based indexing.")
     if x_values.shape[1] != 2:

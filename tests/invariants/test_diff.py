@@ -42,6 +42,35 @@ def test_dy_d_remains_deferred() -> None:
     y = x[:, 0] + x[:, 1]
 
     with pytest.raises(
-        NotImplementedError, match="dy_d finite-difference derivatives with vectorized wrt"
+        NotImplementedError, match='vectorized wrt is supported only for eval_points="mean"'
     ):
         dy_d(x, y, wrt=np.array([1, 2]))
+
+
+def test_dy_d_vectorized_wrt_obs_remains_deferred() -> None:
+    x = np.random.RandomState(0).randn(40, 3)
+    y = x[:, 0] + 2.0 * x[:, 1] - x[:, 2]
+
+    with pytest.raises(
+        NotImplementedError, match="vectorized wrt is supported only for eval_points"
+    ):
+        dy_d(x, y, wrt=np.array([1, 2]), eval_points="obs")
+
+
+def test_dy_d_vectorized_wrt_mixed_remains_deferred() -> None:
+    x = np.random.RandomState(1).randn(40, 3)
+    y = x[:, 0] + x[:, 1] + x[:, 2]
+
+    with pytest.raises(NotImplementedError, match="vectorized wrt is not implemented for mixed"):
+        dy_d(x, y, wrt=np.array([1, 2]), eval_points="mean", mixed=True)
+
+
+def test_dy_d_vectorized_wrt_mean_is_implemented() -> None:
+    x = np.random.RandomState(2).randn(40, 2)
+    y = x[:, 0] * 2.0 - x[:, 1]
+    result = dy_d(x, y, wrt=np.array([1, 2]), eval_points="mean")
+
+    assert isinstance(result, dict)
+    assert result.keys() == {"First", "Second"}
+    assert result["First"].shape == (1, 2)
+    assert result["Second"].shape == (1, 2)
