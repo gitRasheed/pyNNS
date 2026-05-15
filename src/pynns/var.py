@@ -144,6 +144,160 @@ def _var_interpolate_and_extrapolate(
     }
 
 
+def _var_multivariate_stack_stage(
+    interpolated: NDArray[np.float64],
+    univariate: NDArray[np.float64],
+    h: int,
+    tau: int | Sequence[int] | Sequence[Sequence[int]] = 1,
+    names: Sequence[str] | None = None,
+    dim_red_method: str = "cor",
+    obj_fn: Any = None,
+    objective: str = "min",
+) -> dict[str, object]:
+    """Build multivariate R-compatible stack forecasts from interpolated VAR inputs."""
+
+    interpolated_matrix = np.asarray(interpolated, dtype=np.float64)
+    univariate_matrix = np.asarray(univariate, dtype=np.float64)
+    if interpolated_matrix.ndim != 2:
+        raise ValueError("interpolated must be a 2-D matrix.")
+    if univariate_matrix.ndim != 2:
+        raise ValueError("univariate must be a 2-D matrix.")
+    if h <= 0:
+        raise ValueError("h must be positive for multivariate stage.")
+    n_rows, n_vars = interpolated_matrix.shape
+    if n_rows == 0 or n_vars == 0:
+        raise ValueError("interpolated must be non-empty.")
+    if univariate_matrix.shape != (h, n_vars):
+        raise ValueError("univariate shape must be (h, n_variables).")
+
+    from pynns.co_moments import co_lpm, co_upm
+    from pynns.stack import _spearman_scores, nns_stack
+
+    if names is None:
+        names = [f"x{i + 1}" for i in range(n_vars)]
+    if len(names) != n_vars:
+        raise ValueError("names length must match number of variables.")
+    names_list = list(names)
+
+    h_cols = [
+        np.concatenate(
+            (interpolated_matrix[:, col], univariate_matrix[:, col]),
+            dtype=np.float64,
+        )
+        for col in range(n_vars)
+    ]
+    new_values = np.column_stack(h_cols)
+    lagged_new_values, lagged_names = _lag_mtx(new_values, tau, names=names_list)
+    if lagged_new_values.shape[0] < h:
+        raise ValueError("Not enough rows after lag construction for requested h.")
+
+    lagged_train = lagged_new_values[: lagged_new_values.shape[0] - h, :]
+    univariate_forecast = univariate_matrix.copy()
+    multivariate_outputs: list[np.ndarray] = []
+    relevant_variables: list[list[str]] = []
+
+    if lagged_train.shape[0] == 0:
+        raise ValueError("Lagged training block is empty after removing forecast horizon.")
+
+    if lagged_train.shape[0] < h:
+        raise ValueError("Not enough lagged training rows for this forecast horizon.")
+
+    objective_value = objective.lower()
+    if objective_value not in {"min", "max"}:
+        raise ValueError("objective must be 'min' or 'max'.")
+    dim_red_value = dim_red_method.lower()
+    if dim_red_value != "cor":
+        raise NotImplementedError(
+            "Only dim_red_method='cor' is currently implemented in the private multivariate helper."
+        )
+
+    dim_red_threshold_method = str(dim_red_method)
+    for i in range(n_vars):
+        lagged_iv = np.column_stack((lagged_train[:, :i], lagged_train[:, i + 1 :]))
+        lagged_dv = lagged_train[:, i]
+
+        if lagged_iv.size == 0:
+            ivs_test = np.empty((0, 0), dtype=np.float64)
+        else:
+            ivs_test = lagged_iv[-h:, :]
+
+        ts_test = max(2 * h, int(0.2 * lagged_dv.size))
+        def var_obj_fn(predicted: np.ndarray, actual: np.ndarray) -> float:
+            predicted_values = np.asarray(predicted, dtype=np.float64)
+            actual_values = np.asarray(actual, dtype=np.float64)
+            if not (predicted_values.size and actual_values.size):
+                return float("inf")
+            divisor = co_lpm(
+                1.0,
+                predicted_values,
+                actual_values,
+                float(np.mean(predicted_values)),
+                float(np.mean(actual_values)),
+            ) + co_upm(
+                1.0,
+                predicted_values,
+                actual_values,
+                float(np.mean(predicted_values)),
+                float(np.mean(actual_values)),
+            )
+            if divisor == 0.0:
+                return float("inf")
+            return float(np.mean((predicted_values - actual_values) ** 2) / divisor)
+
+        result = nns_stack(
+            lagged_iv,
+            lagged_dv,
+            ivs_test=ivs_test,
+            obj_fn=cast(Any, var_obj_fn),
+            objective=cast(Any, objective_value),
+            folds=1,
+            method=(1, 2),
+            order=None,
+            stack=True,
+            dim_red_method=cast(Any, dim_red_threshold_method),
+            ts_test=ts_test,
+        )
+
+        nns_dv = np.asarray(result["stack"], dtype=np.float64)
+        nns_dv = nns_dv[:h].copy()
+        missing = np.isnan(nns_dv)
+        if np.any(missing):
+            replacement = univariate_forecast[:, i]
+            nns_dv[missing] = replacement[missing]
+        multivariate_outputs.append(nns_dv)
+
+        threshold = float(np.asarray(result["NNS.dim.red.threshold"], dtype=np.float64))
+        threshold = 0.0 if not np.isfinite(threshold) else threshold
+
+        lagged_target_name = lagged_names[i]
+        lagged_iv_names = lagged_names[:i] + lagged_names[i + 1 :]
+        lagged_iv_matrix = np.column_stack((lagged_dv, lagged_iv))
+
+        rel = _spearman_scores(lagged_iv_matrix, lagged_iv_matrix[:, 0])[1:]
+
+        rel_vars: list[str] = [
+            name
+            for name, value in zip(lagged_iv_names, rel.tolist(), strict=False)
+            if value > threshold and name != lagged_target_name
+        ]
+
+        if len(rel_vars) == 0:
+            rel_vars = lagged_names.copy()
+
+        relevant_variables.append(rel_vars)
+
+    max_relevant = max((len(col) for col in relevant_variables), default=0)
+    rv_matrix = np.full((max_relevant, n_vars), None, dtype=object)
+    for col_idx, col in enumerate(relevant_variables):
+        rv_matrix[: len(col), col_idx] = col
+
+    return {
+        "multivariate": np.column_stack(multivariate_outputs),
+        "relevant_variables": rv_matrix,
+        "names": names_list,
+    }
+
+
 def _var_tau_for_variable(
     tau: int | Sequence[int] | Sequence[Sequence[int]],
     index: int,

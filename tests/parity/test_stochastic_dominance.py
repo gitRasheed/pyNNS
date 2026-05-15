@@ -178,7 +178,7 @@ def _strings(value: RValue) -> list[str]:
     if isinstance(value, str):
         return [value]
     if isinstance(value, list):
-        return value
+        return [str(item) for item in value]
     if isinstance(value, np.ndarray):
         return [str(item) for item in value.tolist()]
     raise TypeError("Expected an R character vector.")

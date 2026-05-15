@@ -19,7 +19,9 @@ _SCHEMA_VERSION = 1
 _NNS_VERSION = "12.0"
 
 JsonValue: TypeAlias = None | str | float | list["JsonValue"] | dict[str, "JsonValue"]
-RValue: TypeAlias = None | float | str | list[str] | NDArray[np.float64] | dict[str, "RValue"]
+RValue: TypeAlias = (
+    None | float | str | list[str | None] | NDArray[np.float64] | dict[str, "RValue"]
+)
 Cache: TypeAlias = dict[str, JsonValue]
 
 _CACHE: Cache | None = None
@@ -1775,8 +1777,8 @@ def _decode(value: JsonValue) -> RValue:
         if value == "-Inf":
             return float("-inf")
         return value
-    if isinstance(value, list) and all(isinstance(item, str) for item in value):
-        return cast(list[str], value)
+    if isinstance(value, list) and all(isinstance(item, str) or item is None for item in value):
+        return cast(list[str | None], [None if item is None else item for item in value])
     if isinstance(value, list):
         if any(isinstance(item, list | dict) for item in value):
             return np.asarray([_decode(item) for item in value], dtype=np.float64)

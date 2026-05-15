@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from _r import nns
 
-from pynns.var import _lag_mtx, _var_interpolate_and_extrapolate
+from pynns.var import _lag_mtx, _var_interpolate_and_extrapolate, _var_multivariate_stack_stage
 
 
 def _to_matrix(result: object, names: list[str], key: str) -> np.ndarray:
@@ -94,6 +94,55 @@ def _expected_var_reference(
     return expected
 
 
+def _to_relevant_matrix(result: dict[str, Any], key: str) -> np.ndarray:
+    table = result[key]
+    assert isinstance(table, dict)
+    columns = list(table.keys())
+    values = [
+        np.asarray(table[name], dtype=object)
+        if np.ndim(table[name]) != 0
+        else np.array([table[name]], dtype=object)
+        for name in columns
+    ]
+    max_length = max((value.size for value in values), default=0)
+    matrix = np.full((max_length, len(columns)), None, dtype=object)
+    for col, data in enumerate(values):
+        matrix[: data.size, col] = data
+    return matrix
+
+
+def _expected_var_multivariate_reference(
+    variables: np.ndarray,
+    h: int,
+    tau: int | list[int] | list[list[int]],
+    dim_red_method: str,
+) -> dict[str, Any]:
+    result = cast(
+        dict[str, Any],
+        nns(
+            "NNS.VAR",
+            _json_safe_data(variables),
+            h,
+            tau,
+            dim_red_method,
+        ),
+    )
+    names = list(result["interpolated_and_extrapolated"].keys())
+    assert isinstance(result["univariate"], dict)
+    assert isinstance(result["multivariate"], dict)
+    assert isinstance(result["relevant_variables"], dict)
+    return {
+        "interpolated_and_extrapolated": _to_matrix(result, names, "interpolated_and_extrapolated"),
+        "univariate": _to_matrix(result, names, "univariate"),
+        "multivariate": _to_matrix(result, names, "multivariate"),
+        "relevant_variables": _to_relevant_matrix(
+            result,
+            "relevant_variables",
+        ),
+        "relevant_names": names,
+    }
+
+
 @pytest.mark.parametrize(
     ("name", "h"),
     [
@@ -161,3 +210,77 @@ def test_var_interpolate_and_extrapolate_h0_matches_r() -> None:
 
     np.testing.assert_allclose(actual_interpolated, expected_interpolated, equal_nan=True)
     assert "univariate" not in actual_result
+
+
+@pytest.mark.parametrize(
+    ("name", "tau", "dim_red_method"),
+    [
+        ("complete", 2, "cor"),
+        ("tau1", 1, "cor"),
+        ("nested", ([1, 2], [1]), "cor"),
+    ],
+)
+def test_var_multivariate_stack_stage_matches_r(
+    name: str,
+    tau: int | list[int] | list[list[int]],
+    dim_red_method: str,
+) -> None:
+    del name
+    variables = np.column_stack(
+        (
+            np.arange(-2.0, 18.0, 1.0, dtype=float),
+            np.arange(1.0, 40.0, 2.0, dtype=float),
+        )
+    )
+
+    expected_result = _expected_var_multivariate_reference(variables, 3, tau, dim_red_method)
+    names = cast(list[str], expected_result["relevant_names"])
+    first_stage = _var_interpolate_and_extrapolate(variables, 3, tau=tau, names=names)
+    actual_result = _var_multivariate_stack_stage(
+        cast(np.ndarray, first_stage["interpolated_and_extrapolated"]),
+        cast(np.ndarray, first_stage["univariate"]),
+        h=3,
+        tau=tau,
+        names=names,
+        dim_red_method=dim_red_method,
+    )
+
+    actual_multivariate = cast(np.ndarray, actual_result["multivariate"])
+    actual_relevant = cast(np.ndarray, actual_result["relevant_variables"])
+    expected_multivariate = cast(np.ndarray, expected_result["multivariate"])
+    expected_relevant = cast(np.ndarray, expected_result["relevant_variables"])
+
+    np.testing.assert_allclose(actual_multivariate, expected_multivariate, equal_nan=True)
+    assert actual_relevant.shape == expected_relevant.shape
+    assert actual_result["names"] == names
+    assert np.array_equal(actual_relevant, expected_relevant)
+
+
+@pytest.mark.parametrize(
+    ("tau", "dim_red_method"),
+    [
+        (2, "NNS.dep"),
+        (2, "NNS.caus"),
+        (2, "all"),
+    ],
+)
+def test_var_multivariate_stack_stage_cor_only_for_non_cor_methods(
+    tau: int | list[int] | list[list[int]],
+    dim_red_method: str,
+) -> None:
+    variables = np.column_stack(
+        (
+            np.arange(-2.0, 18.0, 1.0, dtype=float),
+            np.arange(1.0, 40.0, 2.0, dtype=float),
+        )
+    )
+    first_stage = _var_interpolate_and_extrapolate(variables, 3, tau=tau, names=["x1", "x2"])
+    with pytest.raises(NotImplementedError):
+        _var_multivariate_stack_stage(
+            cast(np.ndarray, first_stage["interpolated_and_extrapolated"]),
+            cast(np.ndarray, first_stage["univariate"]),
+            h=3,
+            tau=tau,
+            names=["x1", "x2"],
+            dim_red_method=dim_red_method,
+        )

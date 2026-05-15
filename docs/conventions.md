@@ -310,11 +310,15 @@ VaR bands around the in-sample optimizer errors; they are separate from
 `nns_arma(pred_int=...)`, which uses the Monte Carlo path. Custom Python
 `obj_fn` callables may be supplied, but R expression objects are not part of the
 Python API. `nns_var` and `nns_nowcast` remain guarded: `nns_var` requires
-installed-R named lagged-data-frame / stack semantics before full multivariate
-orchestration can be matched. The first-stage interpolation/extrapolation helper
+the final public assembly path not yet ported. The first-stage interpolation/extrapolation helper
 `_var_interpolate_and_extrapolate` is implemented to match R's
-missing-value handling and per-variable `NNS.ARMA.optim` forecasts. `nns_nowcast`
-still delegates to `NNS.VAR` after external macroeconomic data retrieval.
+missing-value handling and per-variable `NNS.ARMA.optim` forecasts. The private
+multivariate stage `_var_multivariate_stack_stage` is implemented with
+`lag.mtx` reconstruction, `NNS.stack(method=(1,2), ts.test, dim.red.method)`
+logic, and R-style relevance extraction. The function returns `multivariate`
+and `relevant_variables` in the same shape/naming pattern expected by
+`NNS.VAR`. `nns_nowcast` still delegates to `NNS.VAR` after external
+macroeconomic data retrieval.
 
 ## Meboot
 

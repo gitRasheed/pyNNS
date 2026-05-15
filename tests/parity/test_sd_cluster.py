@@ -169,7 +169,7 @@ def _normalize_clusters(value: RValue) -> dict[str, dict[str, list[str]]]:
         if isinstance(item, str):
             normalized[key] = [item]
         elif isinstance(item, list):
-            normalized[key] = item
+            normalized[key] = ["" if element is None else str(element) for element in item]
         else:
             normalized[key] = [str(element) for element in np.asarray(item).tolist()]
     return {"Clusters": normalized}

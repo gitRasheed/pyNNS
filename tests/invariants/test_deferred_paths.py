@@ -18,6 +18,9 @@ EXPECTED_DEFERRED_FRAGMENTS = {
     "dy_d vectorized wrt is not implemented for mixed=True": (
         "`dy_d` vectorized `wrt`"
     ),
+    "Only dim_red_method='cor' is currently implemented": (
+        "multivariate stack stage supports only `dim_red_method=\"cor\"` currently"
+    ),
     "direct nns_m_reg factor_2_dummy=True": "direct `factor_2_dummy=True` raw predictor path",
     "nns_var default VAR path": "default VAR path",
     "nns_nowcast depends on nns_var": "nowcast wrapper",
