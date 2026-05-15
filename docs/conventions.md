@@ -399,8 +399,10 @@ rounds results to `digits`, matching R's default output convention.
 around smooth `nns_reg` point estimates and return a table-like dictionary with
 `eval.point`, `first.derivative`, and `second.derivative`. Boundary-point
 quirks follow installed R where covered by parity tests. Scalar `dy_d` is implemented
-for single-`wrt` paths; `eval_points="obs"` is not yet parity-validated against
-installed R and is tracked as a parity gap. Vectorized `wrt` remains deferred.
+for single-`wrt` paths; `eval_points="obs"` is implemented but not parity-aligned
+with installed R yet. This is tracked as a parity gap and currently produces materially
+different values in deterministic cases because R applies cumulative perturbation
+updates to obs rows across bandwidths before averaging. Vectorized `wrt` remains deferred.
 
 ## ANOVA
 
