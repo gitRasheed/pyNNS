@@ -27,7 +27,7 @@ Set `PYNNS_OFFLINE=1` to force parity tests to use only the committed R cache.
 
 Deferred paths:
 - nns_var / nns_nowcast
-- vectorized `dy_d` wrt
+- vectorized `dy_d` wrt for non-mean modes (`obs`, other eval points)
 - `dy_d` `eval_points="obs"` parity gap (implemented but not yet R-parity compatible)
 - direct raw-factor `nns_m_reg`
 - boost threshold on stochastic path (`n_features > 10`)

@@ -47,7 +47,7 @@ These names are exported so callers get an explicit, documented
 
 | R export | PyNNS API | Blocker |
 |---|---|---|
-| `NNS.VAR` | `nns_var` | Delegates to `NNS.ARMA.optim` |
+| `NNS.VAR` | `nns_var` | Requires installed-R named lagged-data-frame / stack semantics for VAR orchestration |
 | `NNS.nowcast` | `nns_nowcast` | Delegates to `NNS.VAR` after external data retrieval |
 
 ## Internal Or Out Of Scope
