@@ -115,7 +115,10 @@ def test_edge_cases_match_r_category(
         with pytest.raises(ValueError):
             function(degree, target, edge_case.values)
         expected = nns(function_name, degree, target, edge_case.values.tolist())
-        assert isinstance(expected, np.ndarray)
+        if isinstance(expected, np.ndarray):
+            assert np.isnan(expected)
+            return
+        assert np.isscalar(expected)
         assert np.isnan(expected)
         return
 
