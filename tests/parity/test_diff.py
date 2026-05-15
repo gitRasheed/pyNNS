@@ -4,12 +4,13 @@ from typing import Any
 
 import numpy as np
 import pytest
-from _r import dy_dx_numeric, dy_dx_overall, nns_diff_custom
+from _r import dy_d_scalar, dy_dx_numeric, dy_dx_overall, nns_diff_custom
 from _tolerances import EXACT
 
-from pynns import dy_dx, nns_diff
+from pynns import dy_d, dy_dx, nns_diff
 
 DIFF_PARITY = 1e-5
+DY_D_PARITY = 1e-3
 
 
 @pytest.mark.parity
@@ -63,6 +64,43 @@ def test_dy_dx_numeric_eval_points_match_r(eval_point: list[float]) -> None:
     assert list(actual) == list(expected)
     for key in actual:
         np.testing.assert_allclose(actual[key], expected[key], atol=5e-3, equal_nan=True)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize(
+    ("wrt",),
+    [
+        (1,),
+        (2,),
+    ],
+)
+def test_dy_d_mean_wrt_match_r(wrt: int) -> None:
+    x = np.column_stack(
+        (np.array([-2, -1, 0, 1, 2], dtype=float), np.array([1, 3, 5, 7, 9], dtype=float))
+    )
+    y = 2 * x[:, 0] + 3 * x[:, 1]
+
+    expected = _dict_array(dy_d_scalar(x.tolist(), y.tolist(), wrt, "mean"))
+    actual = dy_d(x, y, wrt=wrt, eval_points="mean")
+
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        np.testing.assert_allclose(actual[key], expected[key], atol=DY_D_PARITY, equal_nan=True)
+
+
+@pytest.mark.parity
+def test_dy_d_nonlinear_wrt1_mean_matches_r() -> None:
+    x = np.column_stack(
+        (np.array([-2, -1, 0, 1, 2], dtype=float), np.array([1, 3, 5, 7, 9], dtype=float))
+    )
+    y = x[:, 0] ** 2 + np.sin(x[:, 1])
+
+    expected = _dict_array(dy_d_scalar(x.tolist(), y.tolist(), 1, "mean"))
+    actual = dy_d(x, y, wrt=1, eval_points="mean")
+
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        np.testing.assert_allclose(actual[key], expected[key], atol=DY_D_PARITY, equal_nan=True)
 
 
 def _r_nns_diff(name: str, point: float) -> dict[str, float]:
