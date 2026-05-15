@@ -1,10 +1,19 @@
 [project]
-name = "pynns"
+name = "nns-pm"
 version = "0.1.0"
 description = "Python port of NNS"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-only"
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+urls = { "Homepage" = "https://github.com/rasheed/pynns", "Repository" = "https://github.com/rasheed/pynns", "Issues" = "https://github.com/rasheed/pynns/issues", "Source" = "https://github.com/rasheed/pynns", "Project" = "https://github.com/rasheed/pynns" }
 dependencies = [
     "numpy",
     "polars",

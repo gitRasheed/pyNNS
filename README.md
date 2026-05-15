@@ -4,7 +4,7 @@ Python port of the NNS (Nonlinear Nonparametric Statistics) R package.
 
 ## Status
 
-Pre-alpha, parity-tested port of NNS 12.0.
+Alpha / 0.1.0 alpha. Parity-tested port of installed R NNS 12.0, with deferred paths documented below.
 
 The package API is not stable yet. Current work is focused on matching the
 reference R implementation before adding higher-level Python conveniences.
@@ -14,7 +14,7 @@ pure-Python/NumPy/SciPy port.
 ## Install
 
 ```bash
-uv sync --extra dev
+uv sync --group dev
 ```
 
 Parity tests that miss the local cache require R plus the NNS R package:
@@ -24,6 +24,21 @@ install.packages("NNS")
 ```
 
 Set `PYNNS_OFFLINE=1` to force parity tests to use only the committed R cache.
+
+Deferred paths:
+- nns_var / nns_nowcast
+- vectorized `dy_d` wrt
+- direct raw-factor `nns_m_reg`
+- mixed factor stack method `(1,2)`
+- boost threshold on stochastic path (`n_features > 10`)
+
+The package is GPL-3.0-only and imports as `pynns`.
+
+For user installs, the planned distribution package is `nns-pm`:
+
+```bash
+pip install nns-pm
+```
 
 ## Run Tests
 
