@@ -63,6 +63,7 @@
     "nns_stack_class_balance_150x3_seconds": 0.246,
     "nns_stack_factor_predictor_60_method1_seconds": 0.2143333,
     "nns_stack_mixed_factor_predictor_60_method2_seconds": 0.1684,
+    "nns_stack_mixed_factor_predictor_100x3_method12_seconds": 0.3413333,
     "pm_matrix_100x500_seconds": 0.0168,
     "pm_matrix_10x500_seconds": 0.0004,
     "pm_matrix_50x500_seconds": 0.0038,

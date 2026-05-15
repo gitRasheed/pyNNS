@@ -226,8 +226,8 @@ training and test predictors together using the same full-rank dummy convention
 as installed R's aligned train/test builder. Pure factor-predictor `method=2`
 and `method=(1,2)` match installed R's fallback to method 1. Mixed
 factor/numeric `method=2` uses the expanded numeric design directly. Mixed
-factor/numeric `method=(1,2)` remains deferred because installed-R probes show
-divergent stacked method-1 internals after method-2 projection.
+factor/numeric `method=(1,2)` is supported for parity-covered cases that use
+explicit `factor_levels` expansion.
 
 ## Boost
 

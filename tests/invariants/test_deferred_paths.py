@@ -16,7 +16,6 @@ EXPECTED_DEFERRED_FRAGMENTS = {
         "multivariate `dy.d_` vectorized `wrt`"
     ),
     "direct nns_m_reg factor_2_dummy=True": "direct `factor_2_dummy=True` raw predictor path",
-    "mixed factor predictors with method (1, 2)": "factor predictor stacked method `(1, 2)`",
     "nns_var default VAR path": "default VAR path",
     "nns_nowcast depends on nns_var": "nowcast wrapper",
 }

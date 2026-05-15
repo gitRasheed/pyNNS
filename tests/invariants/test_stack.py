@@ -116,16 +116,65 @@ def test_nns_stack_mixed_factor_predictor_method12_remains_deferred() -> None:
     variable = np.column_stack((x, numeric.astype(object)))
     point = variable[:3]
 
-    with pytest.raises(NotImplementedError, match=r"mixed factor predictors with method \(1, 2\)"):
-        nns_stack(
-            variable,
-            y,
-            point,
-            factor_levels=(["a", "b", "c"], None),
-            cv_size=0.25,
-            folds=1,
-            method=(1, 2),
-        )
+    result = nns_stack(
+        variable,
+        y,
+        point,
+        factor_levels=(["a", "b", "c"], None),
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+    )
+
+    assert result["stack"].shape == (point.shape[0],)
+    assert np.all(np.isfinite(result["stack"]))
+
+
+def test_nns_stack_mixed_factor_predictor_class_method12_supported() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"], dtype=object)
+    numeric = np.linspace(-1.0, 1.0, x.size)
+    y = np.where(x == "a", 1.0, np.where(x == "b", 2.0, 3.0))
+    variable = np.column_stack((x, numeric.astype(object)))
+    point = variable[:3]
+
+    result = nns_stack(
+        variable,
+        y,
+        point,
+        factor_levels=(["a", "b", "c"], None),
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        type="class",
+    )
+
+    assert result["stack"].shape == (point.shape[0],)
+    assert np.all(np.isin(result["stack"], np.unique(y)))
+
+
+@pytest.mark.stochastic
+def test_nns_stack_mixed_factor_predictor_class_balance_method12_supported() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"], dtype=object)
+    numeric = np.linspace(-1.0, 1.0, x.size)
+    y = np.where(x == "a", 1.0, np.where(x == "b", 2.0, 3.0))
+    variable = np.column_stack((x, numeric.astype(object)))
+    point = variable[:3]
+
+    result = nns_stack(
+        variable,
+        y,
+        point,
+        factor_levels=(["a", "b", "c"], None),
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        type="class",
+        balance=True,
+        random_seed=13,
+    )
+
+    assert result["stack"].shape == (point.shape[0],)
+    assert np.all(np.isin(result["stack"], np.unique(y)))
 
 
 def test_nns_stack_class_pred_int_shapes_and_rounding() -> None:
@@ -143,6 +192,30 @@ def test_nns_stack_class_pred_int_shapes_and_rounding() -> None:
     assert all(values.shape == (5,) for values in combined["pred.int"].values())
     for values in combined["pred.int"].values():
         np.testing.assert_allclose(values, np.round(values))
+
+
+def test_nns_stack_mixed_factor_predictor_pred_int_shapes() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"], dtype=object)
+    numeric = np.linspace(-1.0, 1.0, x.size)
+    y = numeric + np.where(x == "a", 0.0, np.where(x == "b", 0.5, 1.0))
+    variable = np.column_stack((x, numeric.astype(object)))
+    point = variable[:3]
+
+    result = nns_stack(
+        variable,
+        y,
+        point,
+        factor_levels=(["a", "b", "c"], None),
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        pred_int=0.95,
+    )
+
+    assert result["pred.int"] is not None
+    assert result["reg.pred.int"] is not None
+    assert result["dim.red.pred.int"] is not None
+    assert all(values.shape == point.shape[:1] for values in result["pred.int"].values())
 
 
 @pytest.mark.stochastic

@@ -50,6 +50,7 @@ uv run pytest tests/benchmarks/ --benchmark-only
 | `nns_stack`, N=3, T_obs=100, T_test=20 | 197.228 ms | 369.667 ms | 0.53x |
 | `nns_stack`, factor predictor method=1, T_obs=60, T_test=5 | 28.700 ms | 214.333 ms | 0.13x |
 | `nns_stack`, mixed factor predictor method=2, T_obs=60, T_test=5 | 34.689 ms | 168.400 ms | 0.21x |
+| `nns_stack`, mixed factor predictor, method=1,2, T_obs=100, T_test=20 | 270.019 ms | 341.333 ms | 0.79x |
 | `nns_stack`, N=3, T_obs=100, T_test=20, pred_int=0.95 | 144.093 ms | 286.000 ms | 0.50x |
 | `nns_stack`, N=3, T_obs=100, T_test=20, ts_test=20 | 159.132 ms | 300.333 ms | 0.53x |
 | `nns_stack` class, N=3, T_obs=100, T_test=20 | 122.462 ms | 270.667 ms | 0.45x |

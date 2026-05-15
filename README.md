@@ -30,7 +30,6 @@ Deferred paths:
 - vectorized `dy_d` wrt
 - `dy_d` `eval_points="obs"` parity gap (implemented but not yet R-parity compatible)
 - direct raw-factor `nns_m_reg`
-- mixed factor stack method `(1,2)`
 - boost threshold on stochastic path (`n_features > 10`)
 
 The package is GPL-3.0-only and imports as `pynns`.

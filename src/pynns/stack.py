@@ -60,16 +60,17 @@ def nns_stack(
     x_test_input: NDArray[Any] | NDArray[np.float64] | None = (
         None if ivs_test is None else np.asarray(ivs_test)
     )
+    all_factor_predictors = False
     if factor_levels is not None and 2 in methods:
         all_factor_predictors = _all_predictors_are_factor(x_input, factor_levels)
         if all_factor_predictors:
             methods = (1,)
-        elif methods == (1, 2):
-            raise NotImplementedError(
-                "nns_stack mixed factor predictors with method (1, 2) are deferred because "
-                "installed R stacked method-1 internals diverge from the current PyNNS "
-                "expansion path."
-            )
+    mixed_factor = False
+    raw_columns = 0
+    if factor_levels is not None and not all_factor_predictors:
+        mixed_factor = any(level is not None for level in factor_levels)
+        if mixed_factor:
+            raw_columns = x_input.shape[1] if x_input.ndim > 1 else 1
     if factor_levels is not None:
         x_input, x_test_input = _expand_factor_predictors(
             ivs_train,
@@ -127,6 +128,8 @@ def nns_stack(
         y_train,
         x_test,
         methods=methods,
+        mixed_factor=mixed_factor,
+        raw_columns=raw_columns,
         objective=objective_value,
         objective_fn=objective_fn,
         cv_size=cv_fraction,
@@ -144,6 +147,8 @@ def nns_stack(
         y_train,
         x_test,
         methods=methods,
+        mixed_factor=mixed_factor,
+        raw_columns=raw_columns,
         objective=objective_value,
         objective_fn=objective_fn,
         cv_size=cv_fraction,
@@ -232,6 +237,8 @@ def _evaluate_method2(
     x_test: NDArray[np.float64],
     *,
     methods: tuple[int, ...],
+    mixed_factor: bool,
+    raw_columns: int,
     objective: Objective,
     objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float],
     cv_size: float,
@@ -301,7 +308,13 @@ def _evaluate_method2(
                 point_only=False,
             )
             train_star = cast(dict[str, NDArray[np.float64]], fit["x.star"])["x"]
-            test_star = _xstar_for_points(fit, cv_x_train, cv_x_test)
+            test_star = _xstar_for_points(
+                fit,
+                cv_x_train,
+                cv_x_test,
+                mixed_factor=mixed_factor,
+                raw_columns=raw_columns,
+            )
 
     final_threshold = _threshold_mode(thresholds)
     final_class_threshold = (
@@ -332,7 +345,13 @@ def _evaluate_method2(
 
     if stack and methods == (1, 2):
         train_star = cast(dict[str, NDArray[np.float64]], final_fit["x.star"])["x"]
-        test_star = _xstar_for_points(final_fit, x_train, x_test)
+        test_star = _xstar_for_points(
+            final_fit,
+            x_train,
+            x_test,
+            mixed_factor=mixed_factor,
+            raw_columns=raw_columns,
+        )
     equation = cast(dict[str, NDArray[np.float64]], final_fit["equation"])
     coef = equation["Coefficient"][:-1]
     relevant_vars = np.flatnonzero(coef > 0.0).astype(np.int64)
@@ -357,6 +376,8 @@ def _evaluate_method1(
     x_test: NDArray[np.float64],
     *,
     methods: tuple[int, ...],
+    mixed_factor: bool,
+    raw_columns: int,
     objective: Objective,
     objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float],
     cv_size: float,
@@ -394,6 +415,8 @@ def _evaluate_method1(
                 cv_y_train,
                 cv_x_test,
                 cv_y_test,
+                mixed_factor=mixed_factor,
+                raw_columns=raw_columns,
                 objective=objective,
                 objective_fn=objective_fn,
                 order=order,
@@ -525,6 +548,8 @@ def _fold_xstar(
     cv_x_test: NDArray[np.float64],
     cv_y_test: NDArray[np.float64],
     *,
+    mixed_factor: bool,
+    raw_columns: int,
     objective: Objective,
     objective_fn: Callable[[NDArray[np.float64], NDArray[np.float64]], float],
     order: Order,
@@ -564,6 +589,8 @@ def _fold_xstar(
         fit,
         cv_x_train,
         cv_x_test,
+        mixed_factor=mixed_factor,
+        raw_columns=raw_columns,
     )
 
 
@@ -675,12 +702,18 @@ def _xstar_for_points(
     fit: dict[str, Any],
     train_x: NDArray[np.float64],
     test_x: NDArray[np.float64],
+    *,
+    mixed_factor: bool,
+    raw_columns: int,
 ) -> NDArray[np.float64]:
     equation = cast(dict[str, NDArray[np.float64]], fit["equation"])
     coef = np.asarray(equation["Coefficient"][:-1], dtype=np.float64)
     active = int(np.sum(np.abs(coef) > 0.0))
     if active == 0:
         active = 1
+    if mixed_factor and raw_columns and coef.size != raw_columns:
+        fallback = cast(dict[str, NDArray[np.float64]], fit["x.star"])["x"]
+        return np.full(test_x.shape[0], float(np.mean(fallback)), dtype=np.float64)
     if coef.size != test_x.shape[1]:
         fallback = cast(dict[str, NDArray[np.float64]], fit["x.star"])["x"]
         return np.full(test_x.shape[0], float(np.mean(fallback)), dtype=np.float64)

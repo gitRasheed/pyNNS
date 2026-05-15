@@ -576,6 +576,63 @@ def test_nns_stack_mixed_factor_predictor_60_method2(
 
 
 @pytest.mark.benchmark
+def test_nns_stack_mixed_factor_predictor_100x3_method12(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+) -> None:
+    levels = ["a", "b", "c"]
+    factor = np.asarray([levels[index % len(levels)] for index in range(100)], dtype=object)
+    numeric = np.linspace(-1.0, 1.0, 100)
+    variable = np.column_stack((factor, numeric.astype(object)))
+    y = numeric + np.where(factor == "a", 0.0, np.where(factor == "b", 0.5, 1.0))
+    point_est = np.column_stack(
+        (
+            np.asarray(
+                [
+                    "a",
+                    "c",
+                    "b",
+                    "a",
+                    "b",
+                    "c",
+                    "a",
+                    "c",
+                    "b",
+                    "a",
+                    "c",
+                    "b",
+                    "a",
+                    "b",
+                    "c",
+                    "a",
+                    "c",
+                    "b",
+                    "a",
+                    "c",
+                ],
+                dtype=object,
+            ),
+            np.linspace(-0.8, 0.8, 20).astype(object),
+        )
+    )
+
+    result = benchmark(
+        nns_stack,
+        variable,
+        y,
+        point_est,
+        factor_levels=(levels, None),
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        dim_red_method="cor",
+    )
+
+    assert result["stack"].shape == (20,)
+    assert isinstance(r_baseline["nns_stack_mixed_factor_predictor_100x3_method12_seconds"], float)
+
+
+@pytest.mark.benchmark
 def test_nns_stack_100x3_pred_int(benchmark: Any, r_baseline: dict[str, object]) -> None:
     x = np.linspace(-2.0, 2.0, 100)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))

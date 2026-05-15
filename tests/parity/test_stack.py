@@ -220,6 +220,46 @@ def test_nns_stack_mixed_factor_predictor_method2_matches_r() -> None:
 
 
 @pytest.mark.parity
+def test_nns_stack_mixed_factor_predictor_method12_matches_r() -> None:
+    x = np.asarray(["b", "a", "b", "c", "a", "c", "b", "a"], dtype=object)
+    z = np.arange(1, x.size + 1, dtype=np.float64) / 10.0
+    variable = np.column_stack((x, z.astype(object)))
+    y = np.asarray([2.0, 1.0, 3.0, 4.0, 1.5, 3.5, 2.5, 1.25])
+    point_factor = np.asarray(["a", "c", "b"], dtype=object)
+    point_z = np.asarray([0.15, 0.55, 0.75], dtype=object)
+    point = np.column_stack((point_factor, point_z))
+    levels = ["a", "b", "c"]
+
+    expected = nns_stack_mixed_factor_predictor(
+        x.tolist(),
+        z.tolist(),
+        y.tolist(),
+        point_factor.tolist(),
+        [0.15, 0.55, 0.75],
+        levels=levels,
+        cv_size=0.25,
+        folds=1,
+        method=[1, 2],
+        order=None,
+        stack=True,
+        dim_red_method="cor",
+    )
+    actual = nns_stack(
+        variable,
+        y,
+        point,
+        factor_levels=(levels, None),
+        cv_size=0.25,
+        folds=1,
+        method=(1, 2),
+        stack=True,
+        dim_red_method="cor",
+    )
+
+    _assert_stack_matches(actual, expected, exact_probability_threshold=False)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize(
     ("method", "ts_test"),
     [([1], 5), ([1], 10), ([2], 5), ([2], 10), ([1, 2], 10)],
