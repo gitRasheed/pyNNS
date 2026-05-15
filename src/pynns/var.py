@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from numbers import Integral
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -31,6 +31,158 @@ def nns_var(
         "nns_var default VAR path requires R named-data-frame stack semantics for lagged "
         "variables, which are not yet ported."
     )
+
+
+def _var_interpolate_and_extrapolate(
+    variables: NDArray[np.float64],
+    h: int,
+    tau: int | Sequence[int] | Sequence[Sequence[int]] = 1,
+    names: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Interpolate missing values and generate univariate ARMA forecasts per column."""
+
+    vars_matrix = np.asarray(variables, dtype=np.float64)
+    if vars_matrix.ndim != 2:
+        raise ValueError("variables must be a 2-D matrix.")
+    if h < 0:
+        raise ValueError("h must be non-negative.")
+
+    n_rows, n_vars = vars_matrix.shape
+    if names is None:
+        names = [f"x{i + 1}" for i in range(n_vars)]
+    if len(names) != n_vars:
+        raise ValueError("names length must match number of variables.")
+
+    from pynns.arma import nns_arma_optim
+    from pynns.regression import nns_reg
+    from pynns.seasonality import nns_seas
+    from pynns.stack import nns_stack
+
+    interpolated = np.empty_like(vars_matrix)
+    univariate_columns: list[np.ndarray] = []
+    indices = np.arange(1, n_rows + 1, dtype=np.float64)
+
+    for j in range(n_vars):
+        selected_variable = np.column_stack((indices, vars_matrix[:, j]))
+        missing = np.flatnonzero(np.isnan(selected_variable[:, 1]))
+        variable_interpolation = np.asarray(selected_variable[:, 1], copy=True)
+        complete = selected_variable[~np.isnan(selected_variable[:, 1]), :]
+
+        if complete.size == 0:
+            raise ValueError("Variable contains only missing values.")
+        interpolation_point = int(complete[-1, 0])
+        h_int = n_rows - interpolation_point
+
+        if missing.size == 0:
+            variable_interpolation = variable_interpolation.copy()
+        elif h_int > 0:
+            fill = nns_stack(
+                np.column_stack((complete[:, 0], complete[:, 0])),
+                complete[:, 1],
+                ivs_test=np.column_stack((missing + 1, missing + 1)),
+                order=None,
+                folds=5,
+                method=1,
+                ncores=1,
+                status=False,
+            )["stack"]
+            variable_interpolation[missing] = np.asarray(fill, dtype=np.float64)
+        else:
+            fitted_missing = nns_reg(
+                complete[:, 0],
+                complete[:, 1],
+                order="max",
+                ncores=1,
+                point_est=np.asarray(missing, dtype=np.float64) + 1,
+                plot=False,
+                point_only=True,
+            )["Point.est"]
+            if fitted_missing.size:
+                variable_interpolation[missing] = np.asarray(fitted_missing, dtype=np.float64)
+
+        if h > 0:
+            tau_i = _var_tau_for_variable(tau, j)
+            try:
+                periods = nns_seas(
+                    variable_interpolation,
+                    modulo=int(np.min(tau_i)),
+                    mod_only=False,
+                )["periods"]
+                if not isinstance(periods, np.ndarray) or periods.size == 0:
+                    periods = None
+            except Exception:
+                periods = None
+
+            result = nns_arma_optim(
+                variable_interpolation,
+                h=h,
+                seasonal_factor=None if periods is None else periods,
+                negative_values=float(np.min(variable_interpolation)) < 0.0,
+                ncores=1,
+            )
+            forecast = np.asarray(result["results"], dtype=np.float64)
+            univariate_columns.append(forecast)
+
+        interpolated[:, j] = variable_interpolation
+
+    positive_values = np.nanmin(vars_matrix, axis=0)
+    for j in range(n_vars):
+        if positive_values[j] > 0.0:
+            interpolated[:, j] = np.maximum(0.0, interpolated[:, j])
+
+    if h == 0:
+        return {
+            "interpolated_and_extrapolated": interpolated,
+            "names": list(names),
+        }
+
+    univariate = np.column_stack(univariate_columns)
+    return {
+        "interpolated_and_extrapolated": interpolated,
+        "univariate": univariate,
+        "names": list(names),
+    }
+
+
+def _var_tau_for_variable(
+    tau: int | Sequence[int] | Sequence[Sequence[int]],
+    index: int,
+) -> NDArray[np.int64]:
+    if isinstance(tau, Integral):
+        return np.array([int(tau)], dtype=np.int64)
+
+    if isinstance(tau, str):
+        raise TypeError("tau must be numeric.")
+
+    tau_values = list(cast(Sequence[Any], tau))
+    if len(tau_values) == 0:
+        raise ValueError("tau must include at least one lag.")
+
+    if all(isinstance(item, Integral) for item in tau_values):
+        values = np.asarray(tau_values, dtype=np.int64)
+        if values.size == 0:
+            raise ValueError("tau must include at least one lag.")
+        if np.any(values < 0):
+            raise ValueError("tau values must be non-negative integers.")
+        return values
+
+    has_vector = any(
+        isinstance(item, Sequence) and not isinstance(item, (str, bytes))
+        for item in tau_values
+    )
+    if not has_vector:
+        raise TypeError("tau must be an integer, a numeric sequence, or a list of lag vectors.")
+
+    selected = tau_values[min(index, len(tau_values) - 1)]
+    if isinstance(selected, Integral):
+        out = np.array([int(selected)], dtype=np.int64)
+    else:
+        out = np.asarray(selected, dtype=np.int64).reshape(-1)
+    if out.size == 0:
+        raise ValueError("tau list entries must be non-empty.")
+    if np.any(out < 0):
+        raise ValueError("tau values must be non-negative integers.")
+    return out
 
 
 def _lag_mtx(
