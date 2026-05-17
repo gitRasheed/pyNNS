@@ -25,12 +25,25 @@ REALISTIC_SD_R_PLACEHOLDERS = {
     ("sd_efficient_set", 252, 250, 2): 0.0146,
     ("nns_sd_cluster", 252, 250, 2): 0.0579,
     ("sd_efficient_set", 1257, 100, 2): 0.0199,
-    ("sd_efficient_set", 252, 479, 2): 0.037,
-    ("nns_sd_cluster", 252, 479, 2): 0.182,
+    ("sd_efficient_set", 252, 478, 2): 0.039,
+    ("nns_sd_cluster", 252, 478, 2): 0.185,
     ("sd_efficient_set", 1257, 250, 2): 0.068,
     ("nns_sd_cluster", 1257, 250, 2): 0.186,
-    ("sd_efficient_set", 1257, 479, 2): 0.167,
-    ("nns_sd_cluster", 1257, 479, 2): 0.545,
+    ("sd_efficient_set", 1257, 478, 2): 0.178,
+    ("nns_sd_cluster", 1257, 478, 2): 0.618,
+    ("rolling_sd_efficient_set_252d_monthly", 252, 100, 2): 0.257,
+    ("rolling_sd_efficient_set_252d_monthly", 252, 478, 2): 2.024,
+    ("rolling_sd_cluster_252d_monthly", 252, 100, 2): 0.7557,
+    ("rolling_sd_cluster_252d_monthly", 252, 478, 2): 9.132,
+    ("rolling_sd_cluster_756d_quarterly", 756, 478, 2): 3.915,
+    ("rolling_sd_efficient_set_degree1_vs_degree2_252d_quarterly", 252, 478, 0): 1.748,
+    ("mag7_market_downside_stress", 1257, 9, 1): 0.0417,
+    ("pm_matrix_degree1_mean", 252, 478, 1): 0.2683,
+    ("pm_matrix_degree1_mean", 1257, 478, 1): 1.385,
+    ("pm_matrix_degree2_zero", 252, 478, 2): 0.271,
+    ("market_relative_daily_dispersion", 1257, 478, 2): 0.0297,
+    ("market_relative_rolling_dispersion_63d", 1257, 478, 2): 0.0287,
+    ("market_relative_rolling_dispersion_252d", 1257, 478, 2): 0.0287,
 }
 LABEL_OVERRIDES = {
     **{
@@ -71,6 +84,9 @@ class RealisticSDRow:
 class PythonOnlyRow:
     label: str
     python_seconds: float
+    extra_info: dict[str, Any]
+    r_seconds: float | None
+    r_source: str
 
 
 def main() -> None:
@@ -119,8 +135,20 @@ def main() -> None:
             continue
         python_only_label = _realistic_python_only_label(name)
         if python_only_label is not None:
+            workflow_case = _realistic_workflow_case_from_benchmark_name(name)
+            r_seconds = realistic_r.get(workflow_case) if workflow_case is not None else None
+            r_source = "measured"
+            if r_seconds is None and workflow_case is not None:
+                r_seconds = REALISTIC_SD_R_PLACEHOLDERS.get(workflow_case)
+                r_source = "placeholder"
             python_only_rows.append(
-                PythonOnlyRow(label=python_only_label, python_seconds=python_seconds)
+                PythonOnlyRow(
+                    label=python_only_label,
+                    python_seconds=python_seconds,
+                    extra_info=_as_extra_info(benchmark.get("extra_info", {})),
+                    r_seconds=r_seconds,
+                    r_source=r_source if r_seconds is not None else "none",
+                )
             )
             continue
         r_key = _r_baseline_key(name, key_by_test)
@@ -160,6 +188,12 @@ def _read_realistic_sd_r_csv(
             degree = int(row["degree"])
             rows[(function_name, rows_count, columns, degree)] = float(row["mean_seconds"])
     return rows
+
+
+def _as_extra_info(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
 
 
 def _r_baseline_keys_by_test() -> dict[str, str]:
@@ -294,6 +328,9 @@ def _render_realistic_sd(
     realistic_rows: list[RealisticSDRow],
     python_only_rows: list[PythonOnlyRow],
 ) -> list[str]:
+    total_return_columns = _fixture_return_column_count()
+    constituent_columns = _fixture_constituent_column_count()
+    sanity = _fixture_benchmark_column_sanity()
     sorted_rows = sorted(
         realistic_rows,
         key=lambda row: (row.rows, row.columns, row.degree, row.function_name),
@@ -304,8 +341,18 @@ def _render_realistic_sd(
         "",
         "These benchmarks use the static daily-return fixture at",
         "`tests/fixtures/finance/sp500_daily_returns_2019_2023.csv`. The fixture contains",
-        "1257 daily return rows and 479 clean return columns after dropping tickers with",
-        "missing or non-finite returns.",
+        f"1257 daily return rows and {total_return_columns} clean return columns after dropping",
+        "tickers with missing or non-finite returns. Constituent-universe benchmarks exclude",
+        f"`SPY` and `GSPC`, leaving {constituent_columns} columns. Market-relative workflows",
+        "prefer `GSPC` and fall back to `SPY`; tradable-proxy examples use `SPY`.",
+        "",
+        "Benchmark-column sanity metadata:",
+        "",
+        f"- SPY/GSPC correlation: {sanity.get('spy_gspc_correlation', float('nan')):.6f}",
+        "- Mean absolute daily return difference: "
+        f"{sanity.get('mean_abs_daily_return_difference', float('nan')):.6f}",
+        "- Max absolute daily return difference: "
+        f"{sanity.get('max_abs_daily_return_difference', float('nan')):.6f}",
         "",
         "Python timings come from `pytest-benchmark`. R timings come from",
         "`scripts/benchmark_realistic_sd_r.R` when `--realistic-sd-r-csv` is supplied to",
@@ -317,7 +364,9 @@ def _render_realistic_sd(
         "```bash",
         "PYNNS_OFFLINE=1 uv run pytest -q -n0 -m benchmark --benchmark-enable \\",
         "  --benchmark-json=docs/benchmark_reports/realistic_sd_python_latest.json \\",
-        "  tests/benchmarks/test_stochastic_dominance_realistic.py",
+        "  tests/benchmarks/test_stochastic_dominance_realistic.py \\",
+        "  tests/benchmarks/test_finance_sd_rolling.py \\",
+        "  tests/benchmarks/test_finance_partial_moment_workflows.py",
         "```",
         "",
         "Run matching R baselines with:",
@@ -342,7 +391,7 @@ def _render_realistic_sd(
                     _realistic_label(row),
                     _format_seconds(row.python_seconds),
                     _format_seconds(row.r_seconds) if row.r_seconds is not None else "n/a",
-                    "measured" if row.r_source == "measured" else "manual placeholder",
+                    _format_r_source(row.r_source),
                     _format_slowdown(row.python_seconds, row.r_seconds),
                 ]
             )
@@ -352,14 +401,26 @@ def _render_realistic_sd(
         lines.extend(
             [
                 "",
-                "Additional Python-only realistic building-block benchmarks from the same file:",
+                "Additional realistic finance workflow benchmarks:",
                 "",
-                "| Benchmark | Python mean |",
-                "| --- | ---: |",
+                "| Benchmark | Python mean | R mean | R source | Python/R slowdown | "
+                "Summary metadata |",
+                "| --- | ---: | ---: | --- | ---: | --- |",
             ]
         )
-        for row in sorted(python_only_rows, key=lambda item: item.label):
-            lines.append(f"| {row.label} | {_format_seconds(row.python_seconds)} |")
+        for workflow_row in sorted(python_only_rows, key=lambda item: item.label):
+            r_text = (
+                _format_seconds(workflow_row.r_seconds)
+                if workflow_row.r_seconds is not None
+                else "n/a"
+            )
+            lines.append(
+                f"| {workflow_row.label} | {_format_seconds(workflow_row.python_seconds)} | "
+                f"{r_text} | "
+                f"{_format_r_source(workflow_row.r_source)} | "
+                f"{_format_slowdown(workflow_row.python_seconds, workflow_row.r_seconds)} | "
+                f"{_format_extra_info(workflow_row.extra_info)} |"
+            )
     lines.extend(
         [
             "",
@@ -397,6 +458,14 @@ def _format_slowdown(python_seconds: float, r_seconds: float | None) -> str:
     if r_seconds is None:
         return "n/a"
     return f"{python_seconds / r_seconds:.2f}x"
+
+
+def _format_r_source(source: str) -> str:
+    if source == "measured":
+        return "measured"
+    if source == "placeholder":
+        return "manual placeholder"
+    return "n/a"
 
 
 def _realistic_sd_case_from_benchmark_name(
@@ -439,11 +508,39 @@ def _parse_degree_column_param(param: str) -> tuple[int, int]:
 
 def _parse_rows_columns_param(param: str) -> tuple[int, int]:
     rows_text, columns_text = param.split("x", maxsplit=1)
-    columns = 479 if columns_text == "max" else int(columns_text)
+    columns = _fixture_constituent_column_count() if columns_text == "max" else int(columns_text)
     return int(rows_text), columns
 
 
+def _fixture_constituent_column_count() -> int:
+    fixture = ROOT / "tests" / "fixtures" / "finance" / "sp500_daily_returns_2019_2023.csv"
+    header = fixture.read_text(encoding="utf-8").splitlines()[0].split(",")
+    return len([symbol for symbol in header[1:] if symbol not in {"SPY", "GSPC"}])
+
+
+def _fixture_return_column_count() -> int:
+    fixture = ROOT / "tests" / "fixtures" / "finance" / "sp500_daily_returns_2019_2023.csv"
+    header = fixture.read_text(encoding="utf-8").splitlines()[0].split(",")
+    return len(header) - 1
+
+
+def _fixture_benchmark_column_sanity() -> dict[str, float]:
+    metadata_path = (
+        ROOT
+        / "tests"
+        / "fixtures"
+        / "finance"
+        / "sp500_daily_returns_2019_2023_metadata.json"
+    )
+    payload = _read_json(metadata_path)
+    sanity = payload.get("benchmark_column_sanity", {})
+    if not isinstance(sanity, dict):
+        return {}
+    return {str(key): float(value) for key, value in sanity.items()}
+
+
 def _realistic_python_only_label(name: str) -> str | None:
+    base_name, param = _split_benchmark_name(name)
     labels = {
         "test_magnificent_seven_downside_stress_components": (
             "Magnificent Seven downside stress components with SPY"
@@ -451,8 +548,110 @@ def _realistic_python_only_label(name: str) -> str | None:
         "test_lower_upper_constituent_dispersion_ratio": (
             "Lower/upper constituent dispersion ratio, N=100, T_obs=252"
         ),
+        "test_rolling_sd_efficient_set_252d_monthly_degree2": (
+            "Rolling SD efficient set, 252-day monthly, degree=2"
+        ),
+        "test_rolling_sd_cluster_252d_monthly_degree2": (
+            "Rolling SD cluster, 252-day monthly, degree=2"
+        ),
+        "test_rolling_sd_cluster_756d_quarterly_degree2": (
+            "Rolling SD cluster, 756-day quarterly, degree=2"
+        ),
+        "test_rolling_sd_efficient_set_252d_quarterly_degree1_vs_degree2": (
+            "Rolling SD efficient set, 252-day quarterly, degree 1 vs 2"
+        ),
+        "test_mag7_market_downside_stress_components": (
+            "Magnificent Seven market-downside stress components"
+        ),
+        "test_partial_moment_covariance_matrix_workflow": (
+            "Partial-moment covariance workflow"
+        ),
+        "test_market_relative_daily_dispersion_full_fixture": (
+            "Market-relative daily dispersion, full fixture"
+        ),
+        "test_market_relative_rolling_dispersion_signal": (
+            "Market-relative rolling dispersion signal"
+        ),
     }
-    return labels.get(name)
+    label = labels.get(base_name)
+    if label is None:
+        return None
+    if param is not None:
+        label = f"{label}, {param}"
+    return label
+
+
+def _realistic_workflow_case_from_benchmark_name(
+    name: str,
+) -> tuple[str, int, int, int] | None:
+    base_name, param = _split_benchmark_name(name)
+    max_columns = _fixture_constituent_column_count()
+    if base_name == "test_rolling_sd_efficient_set_252d_monthly_degree2":
+        if param is None:
+            return None
+        columns = max_columns if param == "nmax" else int(param.removeprefix("n"))
+        return ("rolling_sd_efficient_set_252d_monthly", 252, columns, 2)
+    if base_name == "test_rolling_sd_cluster_252d_monthly_degree2":
+        if param is None:
+            return None
+        columns = max_columns if param == "nmax" else int(param.removeprefix("n"))
+        return ("rolling_sd_cluster_252d_monthly", 252, columns, 2)
+    if base_name == "test_rolling_sd_cluster_756d_quarterly_degree2":
+        return ("rolling_sd_cluster_756d_quarterly", 756, max_columns, 2)
+    if base_name == "test_rolling_sd_efficient_set_252d_quarterly_degree1_vs_degree2":
+        return ("rolling_sd_efficient_set_degree1_vs_degree2_252d_quarterly", 252, max_columns, 0)
+    if base_name == "test_mag7_market_downside_stress_components":
+        return ("mag7_market_downside_stress", 1257, 9, 1)
+    if base_name == "test_partial_moment_covariance_matrix_workflow":
+        if param is None:
+            return None
+        rows_text, degree_text, target_text = param.split("-", maxsplit=2)
+        rows = int(rows_text.removesuffix("d"))
+        degree = int(degree_text.removeprefix("degree"))
+        return (f"pm_matrix_{degree_text}_{target_text}", rows, max_columns, degree)
+    if base_name == "test_market_relative_daily_dispersion_full_fixture":
+        return ("market_relative_daily_dispersion", 1257, max_columns, 2)
+    if base_name == "test_market_relative_rolling_dispersion_signal":
+        if param is None:
+            return None
+        window = int(param.removesuffix("d"))
+        return (f"market_relative_rolling_dispersion_{window}d", 1257, max_columns, 2)
+    return None
+
+
+def _format_extra_info(extra_info: dict[str, Any]) -> str:
+    labels = {
+        "window_count": "windows",
+        "average_efficient_set_size": "avg set",
+        "average_cluster_count": "avg clusters",
+        "average_turnover": "avg turnover",
+        "average_degree1_set_size": "avg d1 set",
+        "average_degree2_set_size": "avg d2 set",
+        "downside_observation_count": "downside obs",
+        "stress_regression_r2": "stress R2",
+        "rows": "rows",
+        "columns": "cols",
+        "covariance_shape": "matrix N",
+        "signal_length": "signal len",
+        "finite_count": "finite",
+        "next_day_market_correlation": "next-day corr",
+        "spy_gspc_correlation": "SPY/GSPC corr",
+        "mean_abs_daily_return_difference": "mean abs diff",
+        "max_abs_daily_return_difference": "max abs diff",
+    }
+    parts = []
+    for key, label in labels.items():
+        if key not in extra_info:
+            continue
+        value = extra_info[key]
+        if isinstance(value, int):
+            formatted = str(value)
+        elif isinstance(value, float):
+            formatted = f"{value:.4g}"
+        else:
+            formatted = str(value)
+        parts.append(f"{label}: {formatted}")
+    return "; ".join(parts) if parts else "n/a"
 
 
 def _format_ms(seconds: float) -> str:

@@ -232,12 +232,15 @@ def _load_daily_returns(*, row_count: int, column_count: int | str) -> NDArray[n
             f"expected at least {resolved_column_count}.",
         )
 
+    header = _fixture_header()
+    symbols = _constituent_symbols()
+    usecols = [header.index(symbol) for symbol in symbols[:resolved_column_count]]
     data = np.loadtxt(
         _FIXTURE,
         delimiter=",",
         skiprows=1,
         max_rows=row_count,
-        usecols=range(1, resolved_column_count + 1),
+        usecols=usecols,
         dtype=np.float64,
     )
     if data.shape != (row_count, resolved_column_count):
@@ -268,4 +271,8 @@ def _fixture_header() -> tuple[str, ...]:
 
 
 def _fixture_column_count() -> int:
-    return len(_fixture_header()) - 1
+    return len(_constituent_symbols())
+
+
+def _constituent_symbols() -> tuple[str, ...]:
+    return tuple(symbol for symbol in _fixture_header()[1:] if symbol not in {"SPY", "GSPC"})

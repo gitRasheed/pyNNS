@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy as np
 
+_TICKER_ALIASES = {"^GSPC": "GSPC"}
+
 _SP100_SYMBOLS = [
     "AAPL",
     "ABBV",
@@ -118,7 +120,7 @@ def main() -> None:
     metadata_output = output.with_name(f"{output.stem}_metadata.json")
 
     yf = _import_yfinance()
-    tickers = _universe_symbols(args.universe)
+    tickers = _universe_symbols(args.universe, args.ticker_source_csv)
     for symbol in args.include_symbol:
         if symbol not in tickers:
             tickers.append(symbol)
@@ -135,8 +137,10 @@ def main() -> None:
         threads=True,
     )
     adjusted_close = _adjusted_close_frame(prices)
+    adjusted_close = adjusted_close.rename(columns=_TICKER_ALIASES)
+    tickers_for_metadata = [_TICKER_ALIASES.get(ticker, ticker) for ticker in tickers]
     all_missing_tickers = sorted(
-        set(tickers) - set(str(column) for column in adjusted_close.columns),
+        set(tickers_for_metadata) - set(str(column) for column in adjusted_close.columns),
     )
     returns = adjusted_close.pct_change(fill_method=None).iloc[1:]
     returns = returns.replace([np.inf, -np.inf], np.nan)
@@ -171,6 +175,7 @@ def main() -> None:
         "tickers_requested": tickers,
         "tickers_included": [str(column) for column in returns.columns],
         "tickers_dropped": bad_tickers,
+        "ticker_aliases": _TICKER_ALIASES,
         "dropped_tickers": dropped,
         "row_count_before_drop": row_count_before_drop,
         "row_count": int(returns.shape[0]),
@@ -193,6 +198,7 @@ def main() -> None:
             "simple daily returns from adjusted close: price.pct_change().iloc[1:]"
         ),
     }
+    _add_benchmark_column_metadata(metadata, returns)
     metadata_output.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
 
     print(f"wrote {output} ({returns.shape[0]} rows x {returns.shape[1]} columns)")
@@ -211,7 +217,20 @@ def _parse_args() -> argparse.Namespace:
             "tests/fixtures/finance/sp500_daily_returns_2019_2023.csv"
         ),
     )
-    parser.add_argument("--universe", choices=["sp50", "sp100", "sp500"], default="sp100")
+    parser.add_argument(
+        "--universe",
+        choices=["sp50", "sp100", "sp500", "fixture"],
+        default="sp100",
+    )
+    parser.add_argument(
+        "--ticker-source-csv",
+        type=Path,
+        default=None,
+        help=(
+            "Existing fixture CSV whose header supplies the ticker universe when "
+            "`--universe fixture` is used."
+        ),
+    )
     parser.add_argument("--start", required=True)
     parser.add_argument("--end", required=True)
     parser.add_argument("--max-symbols", type=int, default=None)
@@ -236,12 +255,24 @@ def _import_yfinance() -> Any:
     return yf
 
 
-def _universe_symbols(universe: str) -> list[str]:
+def _universe_symbols(universe: str, ticker_source_csv: Path | None) -> list[str]:
+    if universe == "fixture":
+        if ticker_source_csv is None:
+            raise SystemExit("--universe fixture requires --ticker-source-csv.")
+        return _symbols_from_fixture_csv(ticker_source_csv)
     if universe == "sp50":
         return _SP100_SYMBOLS[:50]
     if universe == "sp100":
         return list(_SP100_SYMBOLS)
     return _sp500_symbols_from_wikipedia()
+
+
+def _symbols_from_fixture_csv(path: Path) -> list[str]:
+    with path.open(encoding="utf-8") as handle:
+        header = handle.readline().rstrip("\n").split(",")
+    if len(header) < 2 or header[0] != "Date":
+        raise SystemExit(f"{path} does not look like a finance fixture CSV.")
+    return [symbol for symbol in header[1:] if symbol not in {"GSPC", "^GSPC"}]
 
 
 def _sp500_symbols_from_wikipedia() -> list[str]:
@@ -272,6 +303,27 @@ def _adjusted_close_frame(prices: Any) -> Any:
     if adjusted_close.empty:
         raise SystemExit("No usable adjusted close prices were downloaded.")
     return adjusted_close
+
+
+def _add_benchmark_column_metadata(metadata: dict[str, Any], returns: Any) -> None:
+    included = {str(column) for column in returns.columns}
+    benchmark_columns = {
+        "market_index": "GSPC" if "GSPC" in included else None,
+        "tradable_proxy": "SPY" if "SPY" in included else None,
+        "excluded_from_constituents": [
+            column for column in ("SPY", "GSPC") if column in included
+        ],
+        "yfinance_aliases": _TICKER_ALIASES,
+    }
+    metadata["benchmark_columns"] = benchmark_columns
+
+    if {"SPY", "GSPC"}.issubset(included):
+        diff = returns["SPY"] - returns["GSPC"]
+        metadata["benchmark_column_sanity"] = {
+            "spy_gspc_correlation": float(returns["SPY"].corr(returns["GSPC"])),
+            "mean_abs_daily_return_difference": float(diff.abs().mean()),
+            "max_abs_daily_return_difference": float(diff.abs().max()),
+        }
 
 
 if __name__ == "__main__":
