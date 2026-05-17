@@ -1,8 +1,8 @@
 # PyNNS Examples
 
 These examples are Python-native companions to the upstream R NNS documentation,
-not one-for-one copies of the R reports. Each script is deliberately small,
-runnable, deterministic, and covered by `tests/invariants/test_examples.py`.
+not one-for-one copies of the R reports. Each script is runnable,
+deterministic, topic-focused, and covered by `tests/invariants/test_examples.py`.
 
 The upstream R repository contains several kinds of material:
 
@@ -40,16 +40,4 @@ for example in docs/examples/*.py; do uv run python "$example"; done
 ```
 
 The main R parity guarantees still live in `tests/parity/`. These examples are
-smoke examples, not a replacement for the parity suite.
-
-## Why There Are No Per-Example Markdown Tutorials
-
-The upstream R repo already has full narrative vignettes, a book, and large
-application reports. Thin Python markdown files that merely restate a script add
-noise without adding useful documentation. Until PyNNS has deeper Python-native
-tutorials, this folder keeps the narrative in one index and makes the runnable
-code the source of truth.
-
-If deeper tutorials are added later, they should be substantial documents that
-translate the R vignettes into Python workflows, including interpretation,
-expected outputs, and PyNNS-specific caveats.
+notebook-sized examples, not a replacement for the parity suite.
