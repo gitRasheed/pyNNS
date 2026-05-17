@@ -71,21 +71,24 @@ PyNNS does not plot the dendrogram; it only returns the object data.
 The stochastic-dominance implementation is deliberately pure NumPy. It mirrors
 R's C++ SD core mathematically by sorting each column once, storing prefix sums,
 and evaluating dominance on each pair's merged threshold grid rather than on one
-global all-column grid. Large `nns_sd_cluster` calls build an exact dominance
-matrix, but skip expensive curve work for pairs that min/mean/identical guards
-already prove cannot dominate. Large standalone `sd_efficient_set` calls use a
-kept-only prefix scan: columns are visited in R's LPM-at-global-maximum order and
-only already-kept candidates are tested against the current column. This avoids
-building a full matrix where the public result only needs maximal elements.
+global all-column grid. The full prefix-pair dominance matrix remains available
+internally for verification and fallback, but large public `sd_efficient_set`
+and `nns_sd_cluster` calls use a lazy kept-only prefix scan. Columns are visited
+in R's LPM-at-global-maximum order with original-index tie breaks, and only
+already-kept candidates are tested against the current column. Each pair check
+applies min/mean/identical guards before evaluating curves, then exits as soon
+as dominance is disproved. This avoids building a full matrix where the public
+result only needs the current active set's maximal elements.
 
 These choices preserve exact R-style dominance semantics: no tolerances,
 approximate equality, output reordering, or diagonal/identical-column behavior
 changes are introduced. Polars is intentionally not used in this SD kernel
 because the hot path is dense pairwise threshold evaluation rather than
-data-frame grouping or filtering. R remains faster on large finance fixtures
-because its C++ path walks merged sorted thresholds in tight parallel loops with
-minimal temporaries; PyNNS instead uses NumPy `searchsorted` and vectorized
-blocks to stay dependency-light and pure Python for alpha.
+data-frame grouping or filtering. R remains faster on some large finance
+fixtures because its C++ path walks merged sorted thresholds in tight parallel
+loops with minimal temporaries; PyNNS instead uses NumPy `searchsorted`,
+contiguous column storage, and early-exit scans to stay dependency-light and
+pure Python for alpha.
 
 `nns_cdf` maps to R's `NNS.CDF` deterministic non-plotting paths. It is a
 partial-moment distribution wrapper rather than a textbook ECDF: `degree = 0`

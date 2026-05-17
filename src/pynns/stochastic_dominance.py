@@ -122,15 +122,10 @@ def nns_sd_cluster(
             raise ValueError("names length must match the number of data columns.")
 
     degree_int = int(degree)
-    dominance_matrix = None
+    prefix_precomputed = None
     precomputed = None
     if column_count >= _SD_CLUSTER_DOMINANCE_MATRIX_MIN_COLUMNS:
         prefix_precomputed = _prefix_sd_precompute(values, degree_int, discrete=discrete)
-        dominance_matrix = _dominance_matrix_from_prefix_pairs(
-            prefix_precomputed,
-            degree_int,
-            discrete=discrete,
-        )
     else:
         precomputed = _precompute_sd_table(values, degree_int, discrete=discrete)
     active = list(range(column_count))
@@ -138,16 +133,16 @@ def nns_sd_cluster(
     iteration = 1
 
     while len(active) > min_cluster:
-        if dominance_matrix is None:
-            assert precomputed is not None
-            sd_set_indices = _sd_efficient_active_indices(precomputed, active, degree_int)
-        else:
-            sd_set_indices = _sd_efficient_active_indices_from_matrix(
-                values,
+        if prefix_precomputed is not None:
+            sd_set_indices = _sd_efficient_active_indices_from_prefix_kept(
+                prefix_precomputed,
                 active,
                 degree_int,
-                dominance_matrix,
+                discrete=discrete,
             )
+        else:
+            assert precomputed is not None
+            sd_set_indices = _sd_efficient_active_indices(precomputed, active, degree_int)
         sd_set = [all_names[index] for index in sd_set_indices]
         if not sd_set:
             break
@@ -312,9 +307,9 @@ def _prefix_sd_precompute(
     *,
     discrete: bool,
 ) -> _SDPrefixPrecomputed:
-    sorted_values = np.sort(values, axis=0)
+    sorted_values = np.asfortranarray(np.sort(values, axis=0))
     prefix1 = _prefix_sum(sorted_values)
-    prefix2 = _prefix_sum(sorted_values * sorted_values) if degree == 3 else None
+    prefix2 = _prefix_sum(np.asfortranarray(sorted_values * sorted_values)) if degree == 3 else None
     return _SDPrefixPrecomputed(
         values=values,
         sorted_values=sorted_values,
@@ -345,7 +340,7 @@ def _own_threshold_curves(
     discrete: bool,
 ) -> NDArray[np.float64]:
     columns = sorted_values.shape[1]
-    curves = np.empty_like(sorted_values)
+    curves = np.empty(sorted_values.shape, dtype=np.float64, order="F")
     for index in range(columns):
         curves[:, index] = _pair_curve_values_at_thresholds(
             sorted_values[:, index],
@@ -521,55 +516,69 @@ def _any_prefix_source_dominates(
     *,
     discrete: bool,
 ) -> bool:
-    if not source_indices:
-        return False
-
-    candidate_sources = np.asarray(source_indices, dtype=np.intp)
-    directional_candidates = _prefix_directional_candidates_to_target(
-        precomputed,
-        candidate_sources,
-        target_index,
-        degree,
-    )
-    if not np.any(directional_candidates):
-        return False
-
-    candidate_sources = candidate_sources[directional_candidates]
-    observations = precomputed.sorted_values.shape[0]
-    target_thresholds = precomputed.sorted_values[:, target_index]
-    target_own_curve = precomputed.own_curves[:, target_index][:, np.newaxis]
-    source_curves_at_target = np.empty(
-        (observations, candidate_sources.size),
-        dtype=np.float64,
-    )
-    for position, source_index in enumerate(candidate_sources):
-        source_curves_at_target[:, position] = _pair_curve_values_at_thresholds(
-            precomputed.sorted_values[:, source_index],
-            precomputed.prefix1[:, source_index],
-            None if precomputed.prefix2 is None else precomputed.prefix2[:, source_index],
-            target_thresholds,
-            observations,
+    return any(
+        _dominates_from_prefix_pair(
+            precomputed,
+            source_index,
+            target_index,
             degree,
             discrete=discrete,
         )
+        for source_index in source_indices
+    )
 
-    source_gt_target = np.any(source_curves_at_target > target_own_curve, axis=0)
-    target_gt_source = np.any(target_own_curve > source_curves_at_target, axis=0)
 
-    source_thresholds = precomputed.sorted_values[:, candidate_sources]
-    target_curves_at_source = _pair_curve_values_at_thresholds(
-        precomputed.sorted_values[:, target_index],
-        precomputed.prefix1[:, target_index],
-        None if precomputed.prefix2 is None else precomputed.prefix2[:, target_index],
-        source_thresholds,
+def _dominates_from_prefix_pair(
+    precomputed: _SDPrefixPrecomputed,
+    source_index: int,
+    target_index: int,
+    degree: int,
+    *,
+    discrete: bool,
+) -> bool:
+    if precomputed.identical[source_index, target_index]:
+        return False
+    if precomputed.minimums[source_index] < precomputed.minimums[target_index]:
+        return False
+    if degree > 1 and precomputed.means[source_index] < precomputed.means[target_index]:
+        return False
+
+    observations = precomputed.sorted_values.shape[0]
+    source_sorted = precomputed.sorted_values[:, source_index]
+    source_prefix1 = precomputed.prefix1[:, source_index]
+    source_prefix2 = None if precomputed.prefix2 is None else precomputed.prefix2[:, source_index]
+    source_own_curve = precomputed.own_curves[:, source_index]
+    target_sorted = precomputed.sorted_values[:, target_index]
+    target_prefix1 = precomputed.prefix1[:, target_index]
+    target_prefix2 = None if precomputed.prefix2 is None else precomputed.prefix2[:, target_index]
+    target_own_curve = precomputed.own_curves[:, target_index]
+
+    source_curve_at_target = _pair_curve_values_at_thresholds(
+        source_sorted,
+        source_prefix1,
+        source_prefix2,
+        target_sorted,
         observations,
         degree,
         discrete=discrete,
     )
-    source_own_curves = precomputed.own_curves[:, candidate_sources]
-    source_gt_target |= np.any(source_own_curves > target_curves_at_source, axis=0)
-    target_gt_source |= np.any(target_curves_at_source > source_own_curves, axis=0)
-    return bool(np.any(np.logical_not(source_gt_target) & target_gt_source))
+    if np.any(source_curve_at_target > target_own_curve):
+        return False
+
+    target_gt_source = bool(np.any(target_own_curve > source_curve_at_target))
+    target_curve_at_source = _pair_curve_values_at_thresholds(
+        target_sorted,
+        target_prefix1,
+        target_prefix2,
+        source_sorted,
+        observations,
+        degree,
+        discrete=discrete,
+    )
+    if np.any(source_own_curve > target_curve_at_source):
+        return False
+
+    return target_gt_source or bool(np.any(target_curve_at_source > source_own_curve))
 
 
 def _prefix_pair_candidate_matrix(
@@ -843,7 +852,7 @@ def _fill_lpm_degree2_curves(
 
 
 def _prefix_sum(values: NDArray[np.float64]) -> NDArray[np.float64]:
-    prefix = np.empty((values.shape[0] + 1, values.shape[1]), dtype=np.float64)
+    prefix = np.empty((values.shape[0] + 1, values.shape[1]), dtype=np.float64, order="F")
     prefix[0, :] = 0.0
     np.cumsum(values, axis=0, out=prefix[1:, :])
     return prefix

@@ -85,9 +85,9 @@ invariant, and property coverage.
 - Plotting side effects from R APIs are generally ignored; PyNNS returns data.
 - Stochastic-dominance performance work stays pure NumPy for alpha. The current
   implementation mirrors R's sorted-column/prefix-sum algorithm and adds
-  Python-specific guard pruning and kept-only efficient-set scans. Optional
-  compiled SD backends remain deferred until benchmark evidence justifies the
-  added packaging and maintenance cost.
+  Python-specific guard pruning plus kept-only active-set scans for both large
+  efficient-set and cluster calls. Optional compiled SD backends remain deferred
+  until benchmark evidence justifies the added packaging and maintenance cost.
 
 ## Provider Boundary
 

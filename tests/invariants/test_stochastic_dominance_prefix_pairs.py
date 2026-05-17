@@ -81,6 +81,105 @@ def test_prefix_pair_dominance_matrix_matches_random_global_grid(degree: int) ->
     np.testing.assert_array_equal(actual, expected)
 
 
+@pytest.mark.parametrize(
+    ("degree", "discrete"),
+    [
+        (1, True),
+        (1, False),
+        (2, True),
+        (3, True),
+    ],
+)
+@pytest.mark.parametrize(
+    "returns",
+    [
+        np.asarray(
+            [
+                [0.0, 0.0, 0.0, 1.0, -1.0, 2.0],
+                [0.0, 0.0, 1.0, 0.0, 2.0, -1.0],
+                [1.0, 1.0, 0.0, 2.0, -1.0, 2.0],
+                [1.0, 1.0, 1.0, 0.0, 2.0, -1.0],
+                [2.0, 2.0, 0.0, 1.0, -1.0, 2.0],
+                [2.0, 2.0, 1.0, 2.0, 2.0, -1.0],
+            ],
+            dtype=np.float64,
+        ),
+        np.asarray(
+            [
+                [0.00, 0.10, -0.20, 0.15, 0.00, 0.25],
+                [0.05, 0.15, 0.40, -0.30, 0.05, -0.10],
+                [0.10, 0.20, -0.10, 0.35, 0.10, 0.05],
+                [0.15, 0.25, 0.30, -0.15, 0.15, 0.30],
+                [0.20, 0.30, 0.00, 0.25, 0.20, -0.05],
+                [0.25, 0.35, 0.20, -0.05, 0.25, 0.20],
+            ],
+            dtype=np.float64,
+        ),
+    ],
+)
+def test_prefix_pair_one_direction_evaluator_matches_matrix(
+    degree: int,
+    discrete: bool,
+    returns: np.ndarray,
+) -> None:
+    prefix_precomputed = sd._prefix_sd_precompute(returns, degree, discrete=discrete)
+    dominance_matrix = sd._dominance_matrix_from_prefix_pairs(
+        prefix_precomputed,
+        degree,
+        discrete=discrete,
+    )
+
+    for source_index in range(returns.shape[1]):
+        for target_index in range(returns.shape[1]):
+            actual = sd._dominates_from_prefix_pair(
+                prefix_precomputed,
+                source_index,
+                target_index,
+                degree,
+                discrete=discrete,
+            )
+            assert actual == bool(dominance_matrix[source_index, target_index])
+
+
+@pytest.mark.parametrize(
+    ("degree", "discrete"),
+    [
+        (1, True),
+        (1, False),
+        (2, True),
+        (3, True),
+    ],
+)
+def test_prefix_pair_one_direction_evaluator_matches_random_matrix(
+    degree: int,
+    discrete: bool,
+) -> None:
+    rng = np.random.default_rng(9100 + degree + int(discrete))
+    returns = rng.normal(size=(13, 11))
+    returns[:, 1] = returns[:, 0]
+    returns[:, 2] = returns[:, 0] + 0.4
+    returns[:, 3] = np.round(returns[:, 3], 1)
+    returns[:, 4] = np.linspace(-1.0, 1.0, returns.shape[0])
+    returns[:, 5] = returns[:, 4][::-1]
+    prefix_precomputed = sd._prefix_sd_precompute(returns, degree, discrete=discrete)
+    dominance_matrix = sd._dominance_matrix_from_prefix_pairs(
+        prefix_precomputed,
+        degree,
+        discrete=discrete,
+    )
+
+    for source_index in range(returns.shape[1]):
+        for target_index in range(returns.shape[1]):
+            actual = sd._dominates_from_prefix_pair(
+                prefix_precomputed,
+                source_index,
+                target_index,
+                degree,
+                discrete=discrete,
+            )
+            assert actual == bool(dominance_matrix[source_index, target_index])
+
+
 def test_sd_efficient_set_prefix_path_matches_lazy_path(monkeypatch: pytest.MonkeyPatch) -> None:
     returns = _large_fixture()
 
