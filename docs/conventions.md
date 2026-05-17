@@ -320,8 +320,16 @@ multivariate stage `_var_multivariate_stack_stage` is implemented with
 `lag.mtx` reconstruction, `NNS.stack(method=(1,2), ts.test, dim.red.method)`
 logic, and R-style relevance extraction. The function returns `multivariate`
 and `relevant_variables` in the same shape/naming pattern expected by
-`NNS.VAR`. `nns_nowcast` remains guarded and still requires an explicit external
-macroeconomic data boundary and nowcast-specific date alignment.
+`NNS.VAR`.
+
+`nns_nowcast_panel` is the deterministic nowcast core for user-supplied monthly
+numeric panels. It accepts array-like panels or ordered mappings of column names
+to numeric series, delegates numeric forecasting to `nns_var`, and returns VAR
+fields plus `dates` and `metadata` dictionaries. Date labels are metadata rather
+than array indices. Without dates, forecast rows are labeled `t+1`, `t+2`, ...
+With dates, inputs are normalized to `YYYY-MM`, must be sorted and unique, and
+forecast labels advance monthly. Provider-backed `nns_nowcast` remains guarded
+and still requires an explicit external macroeconomic data boundary.
 
 ## Meboot
 
@@ -408,20 +416,18 @@ rounds results to `digits`, matching R's default output convention.
 `nns_reg`. Numeric `dy_dx` evaluation points use R's finite-difference grid
 around smooth `nns_reg` point estimates and return a table-like dictionary with
 `eval.point`, `first.derivative`, and `second.derivative`. Boundary-point
-quirks follow installed R where covered by parity tests. `dy_d` supports scalar
-`wrt` has enforced R parity for `eval_points="mean"` and `"median"`. Scalar
-`eval_points="last"` returns the expected public structure but remains under
-numeric parity review because boundary-mode derivative estimates are not yet
-aligned with installed R. Scalar distribution modes `eval_points="obs"` and
-`"apd"` return the expected public structure, use an explicit cumulative
-bandwidth perturbation, and compute the same public multivariate
-`NNS.copula(cbind(wrt, wrt, y))` relevance scalar that R uses for the
-distribution grid. They remain known parity gaps, especially for second
-derivatives, so their parity tests are xfailed rather than treated as enforced
-green coverage. `eval_points="mean"` also supports vectorized `wrt` with
-`mixed=False`, returning one row per eval point and one column per requested
-regressor. Vectorized non-mean `wrt` modes and
-vectorized `wrt` with `mixed=True` are deferred.
+quirks follow installed R where covered by parity tests.
+
+PyNNS derivative parity is defined at the public input/output level, not by
+copying R's mutation-heavy perturbation internals. `dy_d` scalar `wrt` has
+enforced R parity for `eval_points="mean"` and `"median"`. Vectorized `wrt`
+with `eval_points="mean"` and `mixed=False` is also covered and returns one row
+per eval point and one column per requested regressor. Scalar
+`eval_points="last"`, `"obs"`, and `"apd"` return the expected public structure
+but remain xfail-known-divergent because their numeric derivative estimates are
+not yet aligned with installed R, especially second derivatives for `obs` and
+`apd`. Vectorized non-mean `wrt` modes and vectorized `wrt` with `mixed=True`
+remain guarded.
 
 ## ANOVA
 

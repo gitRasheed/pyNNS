@@ -35,7 +35,8 @@ explicitly guarded while dependencies remain unresolved.
 | `NNS.seas` | `nns_seas` | Seasonality test |
 | `NNS.SS` | `nns_ss` | Stochastic superiority |
 | `NNS.stack` | `nns_stack` | Stack wrapper |
-| `NNS.VAR` | `nns_var` | Numeric VAR wrapper with `dim_red_method` values `"cor"`, `"NNS.dep"`, `"NNS.caus"`, and `"all"` implemented; `nns_nowcast` remains guarded |
+| `NNS.VAR` | `nns_var` | Numeric VAR wrapper with `dim_red_method` values `"cor"`, `"NNS.dep"`, `"NNS.caus"`, and `"all"` implemented |
+| `NNS.nowcast` core | `nns_nowcast_panel` | Deterministic user-supplied monthly panel nowcast core; no live provider fetching |
 | `dy.dx` | `dy_dx` | `eval_point="overall"` and numeric `eval_point` vectors are implemented; multivariate form (`dy.d_`) |
 | `dy.d_` | `dy_d` | Scalar `wrt` is implemented; vectorized `wrt` for `eval_points="mean"` and `mixed=False` is implemented; other vectorized modes remain deferred |
 | `factor_2_dummy`, `factor_2_dummy_FR` | `factor_2_dummy`, `factor_2_dummy_fr` | Categorical expansion helpers |
@@ -48,7 +49,7 @@ documented `NotImplementedError` instead of an accidental missing attribute.
 
 | R export | PyNNS API | Blocker |
 |---|---|---|
-| `NNS.nowcast` | `nns_nowcast` | Requires external macro-data retrieval and nowcast-specific date alignment |
+| `NNS.nowcast` | `nns_nowcast` | Requires external macro-data retrieval and provider/date-index boundary |
 
 ## Internal Or Out Of Scope
 
