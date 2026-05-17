@@ -371,10 +371,7 @@ def _dummy_matrix_for_column(
             return numeric, [prefix]
     block = factor_2_dummy_fr(values, levels=levels)
     columns = [np.asarray(column, dtype=np.float64).reshape(-1) for column in block.values()]
-    names = [
-        prefix if name == "x" else f"{prefix}_{name}"
-        for name in block
-    ]
+    names = [prefix if name == "x" else f"{prefix}_{name}" for name in block]
     return np.column_stack(columns), names
 
 

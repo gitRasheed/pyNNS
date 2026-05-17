@@ -71,9 +71,7 @@ def nns_boost(
 
     x_train = _as_matrix(x_input, "ivs_train")
     x_test = (
-        x_train.copy()
-        if x_test_input is None
-        else _as_point_matrix(x_test_input, x_train.shape[1])
+        x_train.copy() if x_test_input is None else _as_point_matrix(x_test_input, x_train.shape[1])
     )
     ts_test_value = None if ts_test is None else int(ts_test)
     if ts_test_value is not None and ts_test_value <= 0:

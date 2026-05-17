@@ -90,9 +90,7 @@ def nns_stack(
     if x_train.shape[0] != y_train.size:
         raise ValueError("ivs_train and dv_train must have the same row count.")
     x_test = (
-        x_train.copy()
-        if x_test_input is None
-        else _as_point_matrix(x_test_input, x_train.shape[1])
+        x_train.copy() if x_test_input is None else _as_point_matrix(x_test_input, x_train.shape[1])
     )
     if balance:
         rng = np.random.default_rng(random_seed)

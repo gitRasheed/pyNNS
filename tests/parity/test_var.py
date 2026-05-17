@@ -22,10 +22,7 @@ def _to_matrix(result: object, names: list[str], key: str) -> np.ndarray:
 
 
 def _json_safe_data(values: np.ndarray) -> list[list[float | None]]:
-    return [
-        [None if np.isnan(item) else float(item) for item in row]
-        for row in values.tolist()
-    ]
+    return [[None if np.isnan(item) else float(item) for item in row] for row in values.tolist()]
 
 
 def _relative_diagnostics(actual: np.ndarray, expected: np.ndarray) -> dict[str, float | int]:
@@ -502,4 +499,3 @@ def test_public_nns_var_h0_returns_normalized_interpolation_dict() -> None:
         cast(np.ndarray, expected_result["interpolated_and_extrapolated"]),
     )
     assert actual_result["names"] == expected_result["names"]
-

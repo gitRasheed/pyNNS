@@ -36,9 +36,7 @@ def nns_var(
 
     method = dim_red_method.lower()
     if method not in {"cor", "nns.dep", "nns.caus", "all"}:
-        raise ValueError(
-            'dim_red_method must be one of "cor", "NNS.dep", "NNS.caus", or "all".'
-        )
+        raise ValueError('dim_red_method must be one of "cor", "NNS.dep", "NNS.caus", or "all".')
     if not isinstance(h, Integral):
         raise TypeError("h must be an integer.")
     h_int = int(h)
@@ -275,6 +273,7 @@ def _var_multivariate_stack_stage(
             ivs_test = lagged_iv[-h:, :]
 
         ts_test = max(2 * h, int(0.2 * lagged_dv.size))
+
         def var_obj_fn(predicted: np.ndarray, actual: np.ndarray) -> float:
             predicted_values = np.asarray(predicted, dtype=np.float64)
             actual_values = np.asarray(actual, dtype=np.float64)
@@ -456,8 +455,7 @@ def _var_tau_for_variable(
         return values
 
     has_vector = any(
-        isinstance(item, Sequence) and not isinstance(item, (str, bytes))
-        for item in tau_values
+        isinstance(item, Sequence) and not isinstance(item, (str, bytes)) for item in tau_values
     )
     if not has_vector:
         raise TypeError("tau must be an integer, a numeric sequence, or a list of lag vectors.")
@@ -497,8 +495,7 @@ def _lag_mtx(
 
         is_scalar_tau = all(isinstance(item, Integral) for item in raw_tau)
         is_nested_tau = any(
-            isinstance(item, Sequence) and not isinstance(item, (str, bytes))
-            for item in raw_tau
+            isinstance(item, Sequence) and not isinstance(item, (str, bytes)) for item in raw_tau
         )
 
         if is_nested_tau and not is_scalar_tau:

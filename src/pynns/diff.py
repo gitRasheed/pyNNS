@@ -228,7 +228,7 @@ def dy_d(
                     "call dy_d per regressor for mixed=False first."
                 )
             raise NotImplementedError(
-                "dy_d vectorized wrt is supported only for eval_points=\"mean\" "
+                'dy_d vectorized wrt is supported only for eval_points="mean" '
                 "with mixed=False; call dy_d once per regressor for other eval points."
             )
         outputs = [
@@ -343,9 +343,7 @@ def _dy_dx_numeric(
         rows.append(np.column_stack((lower, eval_recycled, upper)))
 
     deriv_points = np.vstack(rows)
-    point_est = np.concatenate(
-        (deriv_points[:, 0], deriv_points[:, 1], deriv_points[:, 2])
-    )
+    point_est = np.concatenate((deriv_points[:, 0], deriv_points[:, 1], deriv_points[:, 2]))
     reg_output = nns_reg(
         x,
         y,
@@ -452,9 +450,7 @@ def _dy_d_matrix_band(
     upper = estimates[2 * n :]
     first = (upper - fx + fx - lower) / (2.0 * h_step)
     second = (upper - 2.0 * fx + lower) / (h_step**2)
-    mixed_values = (
-        _dy_d_mixed(x, y, eval_points, h_value, matrix_points=True) if mixed else None
-    )
+    mixed_values = _dy_d_mixed(x, y, eval_points, h_value, matrix_points=True) if mixed else None
     return first, second, mixed_values
 
 
@@ -525,9 +521,7 @@ def _dy_d_vector_band(
         upper[index] = _gravity(estimates[(ids == index) & (position == "u")])
     first = (upper - fx + fx - lower) / (2.0 * h_step)
     second = (upper - 2.0 * fx + lower) / (h_step**2)
-    mixed_values = (
-        _dy_d_mixed(x, y, eval_vector, h_value, matrix_points=False) if mixed else None
-    )
+    mixed_values = _dy_d_mixed(x, y, eval_vector, h_value, matrix_points=False) if mixed else None
     return first, second, mixed_values
 
 

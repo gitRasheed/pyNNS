@@ -60,9 +60,7 @@ def nns_arma_optim(
     h_eval = int(n - train_n)
     actual = values[-h_eval:]
     if train_n <= 0.5 * n:
-        raise ValueError(
-            "Please provide a larger [training.set] value (integer) or a smaller [h]."
-        )
+        raise ValueError("Please provide a larger [training.set] value (integer) or a smaller [h].")
     if train_n == n:
         raise ValueError(
             "Please provide a [training.set] value (integer) less than the length of the variable."

@@ -118,9 +118,7 @@ def test_nns_sd_cluster_missing_values_raise() -> None:
 @pytest.mark.parity
 def test_nns_sd_cluster_dendrogram_matches_r_hclust_shape() -> None:
     data = _known_matrix()
-    expected = _normalize_dendrogram(
-        nns_sd_cluster_dendrogram(data.tolist(), 1, "discrete", 1)
-    )
+    expected = _normalize_dendrogram(nns_sd_cluster_dendrogram(data.tolist(), 1, "discrete", 1))
 
     actual = nns_sd_cluster(data, degree=1, min_cluster=1, dendrogram=True)
 
@@ -136,9 +134,7 @@ def test_nns_sd_cluster_dendrogram_matches_r_hclust_shape() -> None:
 @pytest.mark.parity
 def test_nns_sd_cluster_dendrogram_too_few_variables_matches_r() -> None:
     data = _known_matrix()
-    expected = _normalize_dendrogram(
-        nns_sd_cluster_dendrogram(data.tolist(), 1, "discrete", 4)
-    )
+    expected = _normalize_dendrogram(nns_sd_cluster_dendrogram(data.tolist(), 1, "discrete", 4))
 
     actual = nns_sd_cluster(data, degree=1, min_cluster=4, dendrogram=True)
 

@@ -243,10 +243,13 @@ def test_nns_boost_stochastic_epoch_path_matches_r_structure() -> None:
     )
 
     assert set(actual) == set(cast(dict[str, object], expected))
-    assert np.asarray(actual["results"], dtype=np.float64).shape == np.asarray(
-        cast(dict[str, object], expected)["results"],
-        dtype=np.float64,
-    ).shape
+    assert (
+        np.asarray(actual["results"], dtype=np.float64).shape
+        == np.asarray(
+            cast(dict[str, object], expected)["results"],
+            dtype=np.float64,
+        ).shape
+    )
     assert np.asarray(actual["feature.weights"], dtype=np.float64).ndim == 1
     assert np.asarray(actual["feature.frequency"], dtype=np.float64).ndim == 1
     assert np.asarray(actual["n.best"], dtype=np.float64).size > 0
@@ -283,10 +286,13 @@ def test_nns_boost_stochastic_epoch_ts_test_matches_r_structure() -> None:
     )
 
     assert set(actual) == set(cast(dict[str, object], expected))
-    assert np.asarray(actual["results"], dtype=np.float64).shape == np.asarray(
-        cast(dict[str, object], expected)["results"],
-        dtype=np.float64,
-    ).shape
+    assert (
+        np.asarray(actual["results"], dtype=np.float64).shape
+        == np.asarray(
+            cast(dict[str, object], expected)["results"],
+            dtype=np.float64,
+        ).shape
+    )
     assert np.asarray(actual["feature.weights"], dtype=np.float64).ndim == 1
     assert np.asarray(actual["feature.frequency"], dtype=np.float64).ndim == 1
     assert np.asarray(actual["n.best"], dtype=np.float64).size > 0

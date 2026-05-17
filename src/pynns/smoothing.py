@@ -150,8 +150,7 @@ def _basis_matrix(
 def _sigma_matrix(knots: NDArray[np.float64], n_coef: int) -> NDArray[np.float64]:
     eye = np.eye(n_coef, dtype=np.float64)
     second = [
-        BSpline(knots, eye[index], 3, extrapolate=True).derivative(2)
-        for index in range(n_coef)
+        BSpline(knots, eye[index], 3, extrapolate=True).derivative(2) for index in range(n_coef)
     ]
     sigma = np.zeros((n_coef, n_coef), dtype=np.float64)
     nodes, weights = np.polynomial.legendre.leggauss(3)
