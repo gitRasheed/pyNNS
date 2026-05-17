@@ -245,6 +245,17 @@ def r_baseline() -> BenchmarkBaseline:
             method="nonlin",
         )
         _write_benchmark_baseline(cache)
+    for eval_points in ("mean", "median", "last", "obs", "apd"):
+        key = f"dy_d_scalar_{eval_points}_100x2_seconds"
+        if key not in cache:
+            cache[key] = _time_r_dy_d_scalar(eval_points)
+            _write_benchmark_baseline(cache)
+    for method in ("cor", "NNS.dep", "NNS.caus", "all"):
+        key_method = method.lower().replace(".", "_")
+        key = f"nns_var_80x3_h3_tau2_{key_method}_seconds"
+        if key not in cache:
+            cache[key] = _time_r_nns_var(method)
+            _write_benchmark_baseline(cache)
     if "nns_ss_1000_seconds" not in cache:
         cache["nns_ss_1000_seconds"] = _time_r_nns_ss()
         _write_benchmark_baseline(cache)
@@ -1391,6 +1402,52 @@ def _time_r_nns_arma_pred_int(*, auto: bool, method: str) -> float:
         f"method = '{method}', pred.int = 0.95, plot = FALSE, seasonal.plot = FALSE)\n"
         "set.seed(123); invisible(run())\n"
         "times <- replicate(5, { set.seed(123); system.time(invisible(run()))[['elapsed']] })\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_dy_d_scalar(eval_points: str) -> float:
+    script = (
+        "library(NNS)\n"
+        "x1 <- seq(-1.5, 1.5, length.out = 100)\n"
+        "x2 <- cos(seq(0, 2, length.out = 100))\n"
+        "x <- data.frame(x1 = x1, x2 = x2)\n"
+        "y <- x1^2 + 0.5 * x2 + sin(x1 * x2)\n"
+        f"run <- function() NNS::dy.d_(x, y, wrt = 1, eval.point = '{eval_points}')\n"
+        "invisible(run())\n"
+        "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_var(method: str) -> float:
+    script = (
+        "library(NNS)\n"
+        "t <- seq_len(80)\n"
+        "x <- cbind("
+        "sin(t / 5) + 0.01 * t, "
+        "cos(t / 7) + 0.02 * t, "
+        "sin(t / 11) + cos(t / 13))\n"
+        f"run <- function() NNS::NNS.VAR(x, h = 3, tau = 2, dim.red.method = '{method}', "
+        "status = FALSE)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(

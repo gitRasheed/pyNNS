@@ -3,7 +3,9 @@
 Run with:
 
 ```bash
-uv run pytest -n0 -m benchmark --benchmark-enable tests/benchmarks/
+uv run pytest -n0 -m benchmark --benchmark-enable \
+  --benchmark-json=reports/benchmark_latest.json tests/benchmarks/
+uv run python scripts/update_benchmarks_doc.py reports/benchmark_latest.json
 ```
 
 ## Results
@@ -38,6 +40,11 @@ uv run pytest -n0 -m benchmark --benchmark-enable tests/benchmarks/
 | `nns_distance_bulk` class, N=3, T_obs=500, T_test=50 | 3.200 ms | 2.260 ms | -29.4% |
 | `nns_diff`, f=sin, point=1 | 1.356 ms | 4.050 ms | +198.7% |
 | `dy_dx`, T=100, eval_point=c(-1,0,1) | 26.480 ms | 53.333 ms | +101.4% |
+| `dy_d`, scalar wrt=1, eval_points=mean, N=2, T_obs=100 | 95.307 ms | 266.200 ms | +179.3% |
+| `dy_d`, scalar wrt=1, eval_points=median, N=2, T_obs=100 | 94.077 ms | 245.600 ms | +161.1% |
+| `dy_d`, scalar wrt=1, eval_points=last, N=2, T_obs=100 | 94.694 ms | 279.200 ms | +194.8% |
+| `dy_d`, scalar wrt=1, eval_points=obs, N=2, T_obs=100 | 96.901 ms | 290.000 ms | +199.3% |
+| `dy_d`, scalar wrt=1, eval_points=apd, N=2, T_obs=100 | 496.503 ms | 790.200 ms | +59.2% |
 | `nns_anova`, binary, T_obs=100 | 6.271 ms | 4.400 ms | -29.8% |
 | `nns_reg`, dim-red cor, N=3, T_obs=200 | 31.526 ms | 42.600 ms | +35.1% |
 | `nns_reg`, T_obs=200, T_test=20, confidence_interval=0.95 | 54.557 ms | 93.400 ms | +71.2% |
@@ -75,6 +82,10 @@ uv run pytest -n0 -m benchmark --benchmark-enable tests/benchmarks/
 | `nns_arma`, T_obs=200, h=5, seasonal_factor=c(3,4), method=lin, pred_int=0.95 | 153.921 ms | 207.800 ms | +35.0% |
 | `nns_arma`, T_obs=200, h=5, seasonal_factor=True, method=nonlin, pred_int=0.95 | 156.288 ms | 380.000 ms | +143.1% |
 | `nns_arma_optim`, T_obs=80, h=5, seasonal_factor=c(3:10), lin_only=True | 26.946 ms | 163.333 ms | +506.1% |
+| `nns_var`, dim_red_method=cor, N=3, T_obs=80, h=3, tau=2 | 652.514 ms | 3603.667 ms | +452.3% |
+| `nns_var`, dim_red_method=NNS.dep, N=3, T_obs=80, h=3, tau=2 | 1189.121 ms | 3995.333 ms | +236.0% |
+| `nns_var`, dim_red_method=NNS.caus, N=3, T_obs=80, h=3, tau=2 | 2606.211 ms | 7236.000 ms | +177.6% |
+| `nns_var`, dim_red_method=all, N=3, T_obs=80, h=3, tau=2 | 2979.431 ms | 7409.667 ms | +148.7% |
 | `nns_meboot`, T_obs=500, reps=100, rho=0 | 74.937 ms | 78.000 ms | +4.1% |
 | `nns_meboot`, T_obs=1000, reps=100, rho=0 | 115.564 ms | 108.000 ms | -6.5% |
 | `nns_mc`, T_obs=500, reps=30, by=0.2 | 319.045 ms | 736.000 ms | +130.7% |

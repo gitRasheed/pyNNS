@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from pynns import (
+    dy_d,
     dy_dx,
     lpm,
     nns_anova,
@@ -30,6 +31,7 @@ from pynns import (
     nns_seas,
     nns_ss,
     nns_stack,
+    nns_var,
     pm_matrix,
     sd_efficient_set,
 )
@@ -274,6 +276,24 @@ def test_dy_dx_numeric_eval_points(benchmark: Any, r_baseline: dict[str, object]
     assert isinstance(result, dict)
     assert result["eval.point"].shape == (3,)
     assert isinstance(r_baseline["dy_dx_numeric_100_seconds"], float)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("eval_points", ["mean", "median", "last", "obs", "apd"])
+def test_dy_d_scalar_wrt1_100x2(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+    eval_points: str,
+) -> None:
+    x1 = np.linspace(-1.5, 1.5, 100)
+    x2 = np.cos(np.linspace(0.0, 2.0, 100))
+    x = np.column_stack((x1, x2))
+    y = x[:, 0] ** 2 + 0.5 * x[:, 1] + np.sin(x[:, 0] * x[:, 1])
+
+    result = benchmark(dy_d, x, y, wrt=1, eval_points=eval_points)
+
+    assert set(result) == {"First", "Second"}
+    assert isinstance(r_baseline[f"dy_d_scalar_{eval_points}_100x2_seconds"], float)
 
 
 @pytest.mark.benchmark
@@ -1111,6 +1131,29 @@ def test_nns_arma_optim_80_small(
 
     assert result["results"].shape == (5,)
     assert isinstance(r_baseline["nns_arma_optim_80_small_seconds"], float)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("dim_red_method", ["cor", "NNS.dep", "NNS.caus", "all"])
+def test_nns_var_80x3_h3_tau2(
+    benchmark: Any,
+    r_baseline: dict[str, object],
+    dim_red_method: str,
+) -> None:
+    t = np.arange(1, 81, dtype=np.float64)
+    variables = np.column_stack(
+        (
+            np.sin(t / 5.0) + 0.01 * t,
+            np.cos(t / 7.0) + 0.02 * t,
+            np.sin(t / 11.0) + np.cos(t / 13.0),
+        )
+    )
+
+    result = benchmark(nns_var, variables, h=3, tau=2, dim_red_method=dim_red_method)
+
+    assert result["ensemble"].shape == (3, 3)
+    key_method = dim_red_method.lower().replace(".", "_")
+    assert isinstance(r_baseline[f"nns_var_80x3_h3_tau2_{key_method}_seconds"], float)
 
 
 @pytest.mark.benchmark
