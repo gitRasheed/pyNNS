@@ -3,10 +3,12 @@
 This page summarizes the public PyNNS API surface, known gaps, guarded paths,
 and design boundaries.
 
-PyNNS is an alpha, parity-focused Python port of installed R NNS 12.0. The goal
-is public input/output compatibility where R behavior is stable, documented, and
-useful. The goal is not to copy every R internal helper, data-frame quirk, or
-runtime side effect.
+PyNNS is an alpha, parity-focused Python port of installed R NNS 12.0,
+implemented natively in Python on top of NumPy, SciPy, and Polars. It does not
+wrap R, call the R package at runtime, or depend on compiled R/C++ shims. The
+goal is public input/output compatibility where R behavior is stable,
+documented, and useful. The goal is not to copy every R internal helper name,
+data-frame quirk, or runtime side effect as a public Python API.
 
 Status labels:
 
@@ -128,7 +130,13 @@ examples include:
 
 ## Internal Or Out Of Scope
 
-`NNS.ANOVA.bin`, `Uni.caus`, `NNS.caus.matrix`, `NNS.dep.matrix`, compiled
-`*_cpp` shims, sampling helpers, and generated-vector helpers are R internal
-surfaces. PyNNS exposes the public wrappers that depend on them instead of
-mirroring every internal helper as a top-level API.
+Some R NNS helper names are implementation details or lower-level surfaces in
+the R package rather than APIs PyNNS should expose one-for-one. Examples include
+`NNS.ANOVA.bin`, `Uni.caus`, compiled `*_cpp` shims, sampling helpers, and
+generated-vector helpers.
+
+PyNNS implements the corresponding behavior natively in Python where it is
+needed by public APIs. It does not mirror every R helper name as a top-level
+Python export. Matrix-style public behavior is exposed where supported through
+Python names such as `causal_matrix`; not exposing an exact R helper name does
+not mean the implementation delegates to R or compiled code.
