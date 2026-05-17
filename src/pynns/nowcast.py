@@ -9,6 +9,44 @@ from numpy.typing import NDArray
 
 from pynns.var import nns_var
 
+_DEFAULT_NOWCAST_SERIES = (
+    "PAYEMS",
+    "JTSJOL",
+    "CPIAUCSL",
+    "DGORDER",
+    "RSAFS",
+    "UNRATE",
+    "HOUST",
+    "INDPRO",
+    "DSPIC96",
+    "BOPTEXP",
+    "BOPTIMP",
+    "TTLCONS",
+    "IR",
+    "CPILFESL",
+    "PCEPILFE",
+    "PCEPI",
+    "PERMIT",
+    "TCU",
+    "BUSINV",
+    "ULCNFB",
+    "IQ",
+    "GACDISA066MSFRBNY",
+    "GACDFSA066MSFRBPHI",
+    "PCEC96",
+    "GDPC1",
+    "ICSA",
+    "DGS10",
+    "T10Y2Y",
+    "WALCL",
+    "PALLFNFINDEXM",
+    "FEDFUNDS",
+    "PPIACO",
+    "CIVPART",
+    "M2NS",
+    "ADPMNUSNERNSA",
+)
+
 
 def nns_nowcast_panel(
     panel: object,
@@ -166,20 +204,65 @@ def nns_nowcast(
     keep_data: bool = False,
     status: bool = True,
     ncores: int | None = None,
+    provider_backend: object | None = None,
+    fetch: bool = False,
 ) -> dict[str, Any]:
-    """Guarded placeholder for R's NNS.nowcast wrapper."""
-    del (
-        h,
-        additional_regressors,
-        additional_sources,
-        naive_weights,
-        specific_regressors,
-        start_date,
-        keep_data,
-        status,
-        ncores,
+    """Provider-backed nowcast wrapper with no default live provider."""
+    del status, ncores
+    if not fetch:
+        raise NotImplementedError(
+            "nns_nowcast default live macro data retrieval is not implemented; "
+            "pass fetch=True with an explicit provider_backend or use nns_nowcast_panel."
+        )
+    if provider_backend is None:
+        raise ValueError("provider_backend is required when fetch=True.")
+    if additional_regressors is not None or additional_sources is not None:
+        raise ValueError("additional_regressors/additional_sources are not supported yet.")
+    if specific_regressors is not None:
+        raise ValueError("specific_regressors is not supported yet.")
+
+    fetch_method = getattr(provider_backend, "fetch", None)
+    if not callable(fetch_method):
+        raise TypeError("provider_backend must define a fetch(series, start_date) method.")
+
+    payload = fetch_method(_DEFAULT_NOWCAST_SERIES, start_date)
+    series, dates, provider_metadata = _provider_payload_parts(payload)
+    output = nns_nowcast_panel(
+        series,
+        h=h,
+        tau=12,
+        dim_red_method="cor",
+        naive_weights=naive_weights,
+        dates=dates,
     )
-    raise NotImplementedError(
-        "nns_nowcast external macro data retrieval and nowcast-specific date alignment "
-        "are not yet ported."
-    )
+    metadata = dict(output["metadata"]) if isinstance(output["metadata"], Mapping) else {}
+    metadata["source"] = "provider"
+    if provider_metadata:
+        metadata["provider"] = provider_metadata
+    output["metadata"] = metadata
+    if keep_data:
+        output["raw_panel"] = {str(key): list(value) for key, value in series.items()}
+        if dates is not None:
+            output["raw_dates"] = list(dates)
+    return output
+
+
+def _provider_payload_parts(
+    payload: object,
+) -> tuple[Mapping[str, Sequence[object]], Sequence[object] | None, Mapping[str, object] | None]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("provider fetch result must be a mapping.")
+    if "series" not in payload:
+        raise ValueError("provider fetch result must contain a 'series' mapping.")
+    series = payload["series"]
+    if not isinstance(series, Mapping):
+        raise TypeError("provider 'series' must be a mapping of names to numeric sequences.")
+    if not series:
+        raise ValueError("provider 'series' must contain at least one series.")
+    dates = payload.get("dates")
+    if dates is not None and not isinstance(dates, Sequence):
+        raise TypeError("provider 'dates' must be a sequence when provided.")
+    metadata = payload.get("metadata")
+    if metadata is not None and not isinstance(metadata, Mapping):
+        raise TypeError("provider 'metadata' must be a mapping when provided.")
+    return series, dates, metadata

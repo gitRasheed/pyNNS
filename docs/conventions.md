@@ -328,8 +328,10 @@ to numeric series, delegates numeric forecasting to `nns_var`, and returns VAR
 fields plus `dates` and `metadata` dictionaries. Date labels are metadata rather
 than array indices. Without dates, forecast rows are labeled `t+1`, `t+2`, ...
 With dates, inputs are normalized to `YYYY-MM`, must be sorted and unique, and
-forecast labels advance monthly. Provider-backed `nns_nowcast` remains guarded
-and still requires an explicit external macroeconomic data boundary.
+forecast labels advance monthly. `nns_nowcast(fetch=True, provider_backend=...)`
+supports explicit fixture-style providers whose `fetch(series, start_date)`
+method returns `{"series": ..., "dates": ..., "metadata": ...}`. Default live
+fetching remains guarded; PyNNS does not ship an implicit FRED/Yahoo provider.
 
 ## Meboot
 
