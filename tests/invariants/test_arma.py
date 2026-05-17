@@ -160,7 +160,7 @@ def test_nns_var_public_supported_paths_return_output_contract(dim_red_method: s
 
 
 def test_nns_nowcast_remains_deferred() -> None:
-    with pytest.raises(NotImplementedError, match="nns_nowcast external macro data retrieval"):
+    with pytest.raises(NotImplementedError, match="nns_nowcast default live macro data retrieval"):
         nns_nowcast(h=1)
 
 

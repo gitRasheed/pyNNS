@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from collections import OrderedDict
 from collections.abc import Mapping
 from types import SimpleNamespace
@@ -22,6 +23,17 @@ class FixtureNowcastProvider:
         self.requested_series = series
         self.requested_start_date = start_date
         return self.payload
+
+
+def _patch_fredapi_import(monkeypatch: pytest.MonkeyPatch, fake_fred: type[object]) -> None:
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name: str) -> object:
+        if name == "fredapi":
+            return SimpleNamespace(Fred=fake_fred)
+        return real_import_module(name)
+
+    monkeypatch.setattr("pynns.providers.nowcast.importlib.import_module", fake_import_module)
 
 
 def _panel() -> np.ndarray:
@@ -474,10 +486,7 @@ def test_fredapi_nowcast_provider_uses_explicit_key_over_env(
             return OrderedDict((("2020-01-01", 1.0),))
 
     monkeypatch.setenv("FRED_API_KEY", "env-key")
-    monkeypatch.setattr(
-        "pynns.providers.nowcast.importlib.import_module",
-        lambda name: SimpleNamespace(Fred=FakeFred),
-    )
+    _patch_fredapi_import(monkeypatch, FakeFred)
 
     FredApiNowcastProvider(api_key="explicit-key", series=["PAYEMS"]).fetch((), "2020-01")
 
@@ -495,10 +504,7 @@ def test_fredapi_nowcast_provider_uses_env_key(monkeypatch: pytest.MonkeyPatch) 
             return OrderedDict((("2020-01-01", 1.0),))
 
     monkeypatch.setenv("FRED_API_KEY", "env-key")
-    monkeypatch.setattr(
-        "pynns.providers.nowcast.importlib.import_module",
-        lambda name: SimpleNamespace(Fred=FakeFred),
-    )
+    _patch_fredapi_import(monkeypatch, FakeFred)
 
     FredApiNowcastProvider(series=["PAYEMS"]).fetch((), "2020-01")
 
@@ -514,10 +520,7 @@ def test_fredapi_nowcast_provider_monthly_series_payload(monkeypatch: pytest.Mon
             assert observation_start == "2020-01-03"
             return OrderedDict((("2020-01-01", 1.0), ("2020-02-01", 2.0)))
 
-    monkeypatch.setattr(
-        "pynns.providers.nowcast.importlib.import_module",
-        lambda name: SimpleNamespace(Fred=FakeFred),
-    )
+    _patch_fredapi_import(monkeypatch, FakeFred)
 
     payload = FredApiNowcastProvider(api_key="key", series=["PAYEMS"]).fetch((), "2020-01-03")
 
@@ -549,10 +552,7 @@ def test_fredapi_nowcast_provider_daily_values_use_monthly_last(
                 )
             )
 
-    monkeypatch.setattr(
-        "pynns.providers.nowcast.importlib.import_module",
-        lambda name: SimpleNamespace(Fred=FakeFred),
-    )
+    _patch_fredapi_import(monkeypatch, FakeFred)
 
     payload = FredApiNowcastProvider(api_key="key", series=["DGS10"]).fetch((), "2020-01")
 
@@ -575,10 +575,7 @@ def test_fredapi_nowcast_provider_quarterly_values_leave_other_months_missing(
         def get_series(self, name: str, observation_start: str) -> OrderedDict[str, float]:
             return data[name]
 
-    monkeypatch.setattr(
-        "pynns.providers.nowcast.importlib.import_module",
-        lambda name: SimpleNamespace(Fred=FakeFred),
-    )
+    _patch_fredapi_import(monkeypatch, FakeFred)
 
     payload = FredApiNowcastProvider(api_key="key", series=["PAYEMS", "GDPC1"]).fetch((), "2020-01")
 
@@ -601,10 +598,7 @@ def test_fredapi_nowcast_provider_preserves_requested_series_order(
         def get_series(self, name: str, observation_start: str) -> OrderedDict[str, float]:
             return OrderedDict((("2020-01-01", float(len(name))),))
 
-    monkeypatch.setattr(
-        "pynns.providers.nowcast.importlib.import_module",
-        lambda name: SimpleNamespace(Fred=FakeFred),
-    )
+    _patch_fredapi_import(monkeypatch, FakeFred)
 
     payload = FredApiNowcastProvider(api_key="key", series=["UNRATE", "PAYEMS"]).fetch(
         (), "2020-01"
@@ -636,10 +630,7 @@ def test_nns_nowcast_fredapi_provider_path_matches_panel_core(
         def get_series(self, name: str, observation_start: str) -> OrderedDict[str, float]:
             return data[name]
 
-    monkeypatch.setattr(
-        "pynns.providers.nowcast.importlib.import_module",
-        lambda name: SimpleNamespace(Fred=FakeFred),
-    )
+    _patch_fredapi_import(monkeypatch, FakeFred)
     provider = FredApiNowcastProvider(api_key="key", series=["PAYEMS", "UNRATE"])
 
     actual = nns_nowcast(fetch=True, provider_backend=provider, h=2, keep_data=True)
