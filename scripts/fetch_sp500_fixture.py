@@ -119,6 +119,9 @@ def main() -> None:
 
     yf = _import_yfinance()
     tickers = _universe_symbols(args.universe)
+    for symbol in args.include_symbol:
+        if symbol not in tickers:
+            tickers.append(symbol)
     if args.max_symbols is not None:
         tickers = tickers[: args.max_symbols]
 
@@ -139,14 +142,18 @@ def main() -> None:
     returns = returns.replace([np.inf, -np.inf], np.nan)
 
     row_count_before_drop = int(returns.shape[0])
-    bad_tickers = sorted(
-        all_missing_tickers
-        + [
-            str(column)
-            for column in returns.columns
-            if returns[column].isna().any() or not np.isfinite(returns[column].to_numpy()).all()
-        ],
-    )
+    dropped: dict[str, str] = {
+        ticker: "missing adjusted close data" for ticker in all_missing_tickers
+    }
+    for column in returns.columns:
+        column_name = str(column)
+        column_values = returns[column].to_numpy()
+        if returns[column].isna().any():
+            dropped[column_name] = "missing returns after pct_change"
+        elif not np.isfinite(column_values).all():
+            dropped[column_name] = "non-finite returns after pct_change"
+
+    bad_tickers = sorted(dropped)
     returns = returns.drop(columns=[ticker for ticker in bad_tickers if ticker in returns.columns])
     returns = returns.dropna(axis=0, how="any")
     returns = returns.astype(float)
@@ -158,14 +165,30 @@ def main() -> None:
         "source": "Yahoo Finance via yfinance",
         "fetch_date": datetime.now(UTC).isoformat(),
         "universe": args.universe,
+        "requested_universe": args.universe,
         "start": args.start,
         "end": args.end,
         "tickers_requested": tickers,
         "tickers_included": [str(column) for column in returns.columns],
         "tickers_dropped": bad_tickers,
+        "dropped_tickers": dropped,
         "row_count_before_drop": row_count_before_drop,
         "row_count": int(returns.shape[0]),
         "column_count": int(returns.shape[1]),
+        "adjusted_close_convention": (
+            "Yahoo Finance adjusted close column when available; close column fallback only if "
+            "adjusted close is absent from the download payload."
+        ),
+        "cleaning_rules": [
+            "download requested ticker adjusted close series",
+            "compute simple daily returns with pct_change(fill_method=None).iloc[1:]",
+            "replace positive and negative infinity with NaN",
+            "drop tickers with missing or non-finite return observations",
+            "drop rows with any remaining missing return observations",
+        ],
+        "full_sp500_or_cleaned_subset": (
+            "full requested universe" if not bad_tickers else "cleaned subset of requested universe"
+        ),
         "return_calculation_convention": (
             "simple daily returns from adjusted close: price.pct_change().iloc[1:]"
         ),
@@ -192,6 +215,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--start", required=True)
     parser.add_argument("--end", required=True)
     parser.add_argument("--max-symbols", type=int, default=None)
+    parser.add_argument(
+        "--include-symbol",
+        action="append",
+        default=[],
+        help="Extra ticker to append to the selected universe, e.g. --include-symbol SPY.",
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 

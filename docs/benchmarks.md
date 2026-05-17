@@ -93,3 +93,68 @@ uv run python scripts/update_benchmarks_doc.py docs/benchmark_reports/benchmark_
 | `nns_mc`, T_obs=500, reps=30, by=0.1 | 608.958 ms | 1437.000 ms | 2.36x |
 | `nns_ss`, T_obs=1000 | 0.413 ms | 0.200 ms | 0.48x |
 | `nns_ss`, T_obs=200, reps=100, confidence_interval=TRUE | 163.931 ms | 152.667 ms | 0.93x |
+
+## Realistic Finance SD North Stars
+
+These benchmarks use the static daily-return fixture at
+`tests/fixtures/finance/sp500_daily_returns_2019_2023.csv`. The fixture contains
+decimal simple daily returns computed from adjusted close prices for a cleaned
+S&P 500-style universe:
+
+- Date range: 2019-01-01 through 2024-01-01 fetch window.
+- Observations: 1257 daily return rows.
+- Universe: 479 clean columns after dropping tickers with missing or non-finite returns.
+- Benchmark/index proxy: SPY is included.
+- File size: about 9.7 MB.
+
+The benchmark tests are intentionally a middle ground: large enough to expose
+realistic stochastic-dominance scaling, but small enough for quick local
+iteration. Full-universe/manual experiments can use the same fixture and the R
+script below.
+
+Run Python realistic finance benchmarks with:
+
+```bash
+PYNNS_OFFLINE=1 uv run pytest -q -n0 -m benchmark --benchmark-enable \
+  tests/benchmarks/test_stochastic_dominance_realistic.py
+```
+
+Run matching R SD baselines with:
+
+```bash
+Rscript scripts/benchmark_realistic_sd_r.R --repeats=10
+```
+
+`Python/R slowdown` is computed as `Python mean / R mean`. Values above `1.00x`
+mean Python is slower than R.
+
+| Realistic benchmark | Python mean | R baseline | Python/R slowdown |
+| --- | ---: | ---: | ---: |
+| `sd_efficient_set`, degree=1, N=50, T_obs=252 | 28.774 ms | 2.300 ms | 12.51x |
+| `sd_efficient_set`, degree=2, N=50, T_obs=252 | 14.545 ms | 2.200 ms | 6.61x |
+| `nns_sd_cluster`, degree=1, N=50, T_obs=252 | 27.295 ms | 2.600 ms | 10.50x |
+| `nns_sd_cluster`, degree=2, N=50, T_obs=252 | 17.930 ms | 7.300 ms | 2.46x |
+| `sd_efficient_set`, degree=1, N=100, T_obs=252 | 724.159 ms | 5.200 ms | 139.26x |
+| `sd_efficient_set`, degree=2, N=100, T_obs=252 | 93.597 ms | 4.600 ms | 20.35x |
+| `nns_sd_cluster`, degree=1, N=100, T_obs=252 | 271.908 ms | 5.900 ms | 46.09x |
+| `nns_sd_cluster`, degree=2, N=100, T_obs=252 | 248.668 ms | 15.500 ms | 16.04x |
+| `sd_efficient_set`, degree=2, N=250, T_obs=252 | 842.446 ms | 14.600 ms | 57.70x |
+| `nns_sd_cluster`, degree=2, N=250, T_obs=252 | 3665.298 ms | 57.900 ms | 63.30x |
+| `sd_efficient_set`, degree=2, N=100, T_obs=1257 | 1634.817 ms | 19.900 ms | 82.15x |
+
+Additional Python-only realistic building-block benchmarks from the same file:
+
+| Benchmark | Python mean |
+| --- | ---: |
+| Magnificent Seven downside stress components with SPY | 0.339 ms |
+| Lower/upper constituent dispersion ratio, N=100, T_obs=252 | 0.123 ms |
+
+Interpretation:
+
+- The current NumPy SD-cluster matrix path improves PyNNS relative to its prior
+  repeated lazy scans, but R's C++ SD core remains much faster on realistic
+  finance data.
+- The gap grows materially with both universe size and history length.
+- The clearest optimisation targets are standalone `sd_efficient_set` internals,
+  degree-1 SD paths, and reusing/chunking dominance work for larger realistic
+  universes.
