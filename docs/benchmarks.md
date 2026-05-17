@@ -130,31 +130,43 @@ mean Python is slower than R.
 
 | Realistic benchmark | Python mean | R baseline | Python/R slowdown |
 | --- | ---: | ---: | ---: |
-| `sd_efficient_set`, degree=1, N=50, T_obs=252 | 28.774 ms | 2.300 ms | 12.51x |
-| `sd_efficient_set`, degree=2, N=50, T_obs=252 | 14.545 ms | 2.200 ms | 6.61x |
-| `nns_sd_cluster`, degree=1, N=50, T_obs=252 | 27.295 ms | 2.600 ms | 10.50x |
-| `nns_sd_cluster`, degree=2, N=50, T_obs=252 | 17.930 ms | 7.300 ms | 2.46x |
-| `sd_efficient_set`, degree=1, N=100, T_obs=252 | 724.159 ms | 5.200 ms | 139.26x |
-| `sd_efficient_set`, degree=2, N=100, T_obs=252 | 93.597 ms | 4.600 ms | 20.35x |
-| `nns_sd_cluster`, degree=1, N=100, T_obs=252 | 271.908 ms | 5.900 ms | 46.09x |
-| `nns_sd_cluster`, degree=2, N=100, T_obs=252 | 248.668 ms | 15.500 ms | 16.04x |
-| `sd_efficient_set`, degree=2, N=250, T_obs=252 | 842.446 ms | 14.600 ms | 57.70x |
-| `nns_sd_cluster`, degree=2, N=250, T_obs=252 | 3665.298 ms | 57.900 ms | 63.30x |
-| `sd_efficient_set`, degree=2, N=100, T_obs=1257 | 1634.817 ms | 19.900 ms | 82.15x |
+| `sd_efficient_set`, degree=1, N=50, T_obs=252 | 25.373 ms | 2.300 ms | 11.03x |
+| `sd_efficient_set`, degree=2, N=50, T_obs=252 | 12.661 ms | 2.200 ms | 5.75x |
+| `nns_sd_cluster`, degree=1, N=50, T_obs=252 | 24.407 ms | 2.600 ms | 9.39x |
+| `nns_sd_cluster`, degree=2, N=50, T_obs=252 | 15.832 ms | 7.300 ms | 2.17x |
+| `sd_efficient_set`, degree=1, N=100, T_obs=252 | 84.474 ms | 5.200 ms | 16.24x |
+| `sd_efficient_set`, degree=2, N=100, T_obs=252 | 89.688 ms | 4.600 ms | 19.50x |
+| `nns_sd_cluster`, degree=1, N=100, T_obs=252 | 83.891 ms | 5.900 ms | 14.22x |
+| `nns_sd_cluster`, degree=2, N=100, T_obs=252 | 88.977 ms | 15.500 ms | 5.74x |
+| `sd_efficient_set`, degree=2, N=250, T_obs=252 | 547.219 ms | 14.600 ms | 37.48x |
+| `nns_sd_cluster`, degree=2, N=250, T_obs=252 | 557.147 ms | 57.900 ms | 9.62x |
+| `sd_efficient_set`, degree=2, N=100, T_obs=1257 | 549.356 ms | 19.900 ms | 27.61x |
 
 Additional Python-only realistic building-block benchmarks from the same file:
 
 | Benchmark | Python mean |
 | --- | ---: |
-| Magnificent Seven downside stress components with SPY | 0.339 ms |
-| Lower/upper constituent dispersion ratio, N=100, T_obs=252 | 0.123 ms |
+| Magnificent Seven downside stress components with SPY | 0.315 ms |
+| Lower/upper constituent dispersion ratio, N=100, T_obs=252 | 0.113 ms |
+
+Full-fixture SD scaling after the prefix-pair NumPy path:
+
+| Realistic benchmark | Python mean | R mean | Python/R slowdown |
+| --- | ---: | ---: | ---: |
+| `sd_efficient_set`, degree=2, N=479, T_obs=252 | 2.131 s | 0.037 s | 57.60x |
+| `nns_sd_cluster`, degree=2, N=479, T_obs=252 | 2.184 s | 0.182 s | 12.00x |
+| `sd_efficient_set`, degree=2, N=250, T_obs=1257 | 3.982 s | 0.068 s | 58.85x |
+| `nns_sd_cluster`, degree=2, N=250, T_obs=1257 | 3.794 s | 0.186 s | 20.40x |
+| `sd_efficient_set`, degree=2, N=479, T_obs=1257 | 13.888 s | 0.167 s | 83.16x |
+| `nns_sd_cluster`, degree=2, N=479, T_obs=1257 | 14.518 s | 0.545 s | 26.64x |
 
 Interpretation:
 
-- The current NumPy SD-cluster matrix path improves PyNNS relative to its prior
-  repeated lazy scans, but R's C++ SD core remains much faster on realistic
-  finance data.
-- The gap grows materially with both universe size and history length.
-- The clearest optimisation targets are standalone `sd_efficient_set` internals,
-  degree-1 SD paths, and reusing/chunking dominance work for larger realistic
-  universes.
+- The prefix-pair NumPy SD matrix avoids the prior global all-column grid and
+  materially improves degree-1 large cases and degree-2 cluster scaling.
+- Full-fixture PyNNS runs are feasible for research iteration, finishing in
+  seconds rather than minutes, but R's C++ SD core remains materially faster.
+- The remaining gap is largest for standalone efficient-set construction, where
+  the Python path still loops over source columns and target blocks.
+- The next optimisation decision is whether to add an optional compiled SD
+  backend for the pair matrix while preserving the exact Python semantics.

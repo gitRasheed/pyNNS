@@ -19,6 +19,8 @@ from scipy.spatial.distance import squareform  # type: ignore[import-untyped]
 from pynns.core import _as_1d_values, lpm
 
 _SD_CLUSTER_DOMINANCE_MATRIX_MIN_COLUMNS = 75
+_SD_PREFIX_PAIR_MATRIX_MIN_COLUMNS = 75
+_SD_PREFIX_PAIR_TARGET_BLOCK_COLUMNS = 64
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,18 @@ class _SDPrecomputed:
     sorted_values: NDArray[np.float64]
     curves: NDArray[np.float64]
     curve_sums: NDArray[np.float64]
+    minimums: NDArray[np.float64]
+    means: NDArray[np.float64]
+    identical: NDArray[np.bool_]
+
+
+@dataclass(frozen=True)
+class _SDPrefixPrecomputed:
+    values: NDArray[np.float64]
+    sorted_values: NDArray[np.float64]
+    prefix1: NDArray[np.float64]
+    prefix2: NDArray[np.float64] | None
+    own_curves: NDArray[np.float64]
     minimums: NDArray[np.float64]
     means: NDArray[np.float64]
     identical: NDArray[np.bool_]
@@ -108,22 +122,28 @@ def nns_sd_cluster(
             raise ValueError("names length must match the number of data columns.")
 
     degree_int = int(degree)
-    precomputed = _precompute_sd_table(values, degree_int, discrete=discrete)
-    dominance_matrix = (
-        _dominance_matrix_from_precomputed(precomputed, degree_int)
-        if column_count >= _SD_CLUSTER_DOMINANCE_MATRIX_MIN_COLUMNS
-        else None
-    )
+    dominance_matrix = None
+    precomputed = None
+    if column_count >= _SD_CLUSTER_DOMINANCE_MATRIX_MIN_COLUMNS:
+        prefix_precomputed = _prefix_sd_precompute(values, degree_int, discrete=discrete)
+        dominance_matrix = _dominance_matrix_from_prefix_pairs(
+            prefix_precomputed,
+            degree_int,
+            discrete=discrete,
+        )
+    else:
+        precomputed = _precompute_sd_table(values, degree_int, discrete=discrete)
     active = list(range(column_count))
     clusters: dict[str, list[str]] = {}
     iteration = 1
 
     while len(active) > min_cluster:
         if dominance_matrix is None:
+            assert precomputed is not None
             sd_set_indices = _sd_efficient_active_indices(precomputed, active, degree_int)
         else:
             sd_set_indices = _sd_efficient_active_indices_from_matrix(
-                precomputed,
+                values,
                 active,
                 degree_int,
                 dominance_matrix,
@@ -235,8 +255,22 @@ def sd_efficient_set(
     if values.shape[1] == 0:
         return []
 
+    active = list(range(values.shape[1]))
+    if values.shape[1] >= _SD_PREFIX_PAIR_MATRIX_MIN_COLUMNS:
+        prefix_precomputed = _prefix_sd_precompute(values, degree, discrete=discrete)
+        dominance_matrix = _dominance_matrix_from_prefix_pairs(
+            prefix_precomputed,
+            degree,
+            discrete=discrete,
+        )
+        return _sd_efficient_active_indices_from_matrix(
+            values,
+            active,
+            degree,
+            dominance_matrix,
+        )
     precomputed = _precompute_sd_table(values, degree, discrete=discrete)
-    return _sd_efficient_active_indices(precomputed, list(range(values.shape[1])), degree)
+    return _sd_efficient_active_indices(precomputed, active, degree)
 
 
 def _sd_efficient_set_names(
@@ -277,6 +311,59 @@ def _precompute_sd_table(
     )
 
 
+def _prefix_sd_precompute(
+    values: NDArray[np.float64],
+    degree: int,
+    *,
+    discrete: bool,
+) -> _SDPrefixPrecomputed:
+    sorted_values = np.sort(values, axis=0)
+    prefix1 = _prefix_sum(sorted_values)
+    prefix2 = _prefix_sum(sorted_values * sorted_values) if degree == 3 else None
+    return _SDPrefixPrecomputed(
+        values=values,
+        sorted_values=sorted_values,
+        prefix1=prefix1,
+        prefix2=prefix2,
+        own_curves=_own_threshold_curves(
+            sorted_values,
+            prefix1,
+            prefix2,
+            degree,
+            discrete=discrete,
+        ),
+        minimums=sorted_values[0, :],
+        means=np.mean(values, axis=0),
+        identical=np.all(
+            sorted_values.T[:, np.newaxis, :] == sorted_values.T[np.newaxis, :, :],
+            axis=2,
+        ),
+    )
+
+
+def _own_threshold_curves(
+    sorted_values: NDArray[np.float64],
+    prefix1: NDArray[np.float64],
+    prefix2: NDArray[np.float64] | None,
+    degree: int,
+    *,
+    discrete: bool,
+) -> NDArray[np.float64]:
+    columns = sorted_values.shape[1]
+    curves = np.empty_like(sorted_values)
+    for index in range(columns):
+        curves[:, index] = _pair_curve_values_at_thresholds(
+            sorted_values[:, index],
+            prefix1[:, index],
+            None if prefix2 is None else prefix2[:, index],
+            sorted_values[:, index],
+            sorted_values.shape[0],
+            degree,
+            discrete=discrete,
+        )
+    return curves
+
+
 def _sd_efficient_active_indices(
     precomputed: _SDPrecomputed,
     active: Sequence[int],
@@ -307,7 +394,7 @@ def _sd_efficient_active_indices(
 
 
 def _sd_efficient_active_indices_from_matrix(
-    precomputed: _SDPrecomputed,
+    values: NDArray[np.float64],
     active: Sequence[int],
     degree: int,
     dominance_matrix: NDArray[np.bool_],
@@ -316,8 +403,8 @@ def _sd_efficient_active_indices_from_matrix(
         return []
 
     active_array = np.asarray(active, dtype=np.intp)
-    tmax = float(np.max(precomputed.values[:, active_array]))
-    order_lpm = _lpm_at_target(precomputed.values[:, active_array], tmax, degree)
+    tmax = float(np.max(values[:, active_array]))
+    order_lpm = _lpm_at_target(values[:, active_array], tmax, degree)
     order = [
         active[int(position)]
         for position in sorted(
@@ -352,6 +439,82 @@ def _dominance_matrix_from_precomputed(
         dominates &= precomputed.means[:, np.newaxis] >= precomputed.means[np.newaxis, :]
     np.fill_diagonal(dominates, False)
     return dominates
+
+
+def _dominance_matrix_from_prefix_pairs(
+    precomputed: _SDPrefixPrecomputed,
+    degree: int,
+    *,
+    discrete: bool,
+) -> NDArray[np.bool_]:
+    sorted_values = precomputed.sorted_values
+    observations, columns = sorted_values.shape
+    any_gt = np.zeros((columns, columns), dtype=np.bool_)
+
+    for target_start in range(0, columns, _SD_PREFIX_PAIR_TARGET_BLOCK_COLUMNS):
+        target_stop = min(target_start + _SD_PREFIX_PAIR_TARGET_BLOCK_COLUMNS, columns)
+        target_indices = np.arange(target_start, target_stop, dtype=np.intp)
+        target_thresholds = sorted_values[:, target_start:target_stop]
+        target_own_curves = precomputed.own_curves[:, target_start:target_stop]
+
+        for source_index in range(columns):
+            source_curves = _pair_curve_values_at_thresholds(
+                sorted_values[:, source_index],
+                precomputed.prefix1[:, source_index],
+                None if precomputed.prefix2 is None else precomputed.prefix2[:, source_index],
+                target_thresholds,
+                observations,
+                degree,
+                discrete=discrete,
+            )
+            source_gt_target = np.any(source_curves > target_own_curves, axis=0)
+            target_gt_source = np.any(target_own_curves > source_curves, axis=0)
+            any_gt[source_index, target_start:target_stop] |= source_gt_target
+            any_gt[target_indices, source_index] |= target_gt_source
+
+    dominates = np.logical_not(any_gt) & any_gt.T
+    dominates &= np.logical_not(precomputed.identical)
+    dominates &= precomputed.minimums[:, np.newaxis] >= precomputed.minimums[np.newaxis, :]
+    if degree > 1:
+        dominates &= precomputed.means[:, np.newaxis] >= precomputed.means[np.newaxis, :]
+    np.fill_diagonal(dominates, False)
+    return dominates
+
+
+def _pair_curve_values_at_thresholds(
+    sorted_column: NDArray[np.float64],
+    prefix1_column: NDArray[np.float64],
+    prefix2_column: NDArray[np.float64] | None,
+    thresholds: NDArray[np.float64],
+    observations: int,
+    degree: int,
+    *,
+    discrete: bool,
+) -> NDArray[np.float64]:
+    counts = np.searchsorted(sorted_column, thresholds, side="right")
+    if degree == 1 and discrete:
+        return np.asarray(counts / observations, dtype=np.float64)
+
+    sums1 = prefix1_column[counts]
+    if degree == 1:
+        lower = (counts * thresholds - sums1) / observations
+        totals = prefix1_column[-1]
+        upper = (totals - sums1 - (observations - counts) * thresholds) / observations
+        ratio: NDArray[np.float64] = np.divide(
+            lower,
+            lower + upper,
+            out=np.zeros_like(lower, dtype=np.float64),
+            where=(lower + upper) != 0,
+        )
+        return ratio
+
+    if degree == 2:
+        return (counts * thresholds - sums1) / observations
+
+    if prefix2_column is None:
+        raise ValueError("degree 3 prefix evaluation requires second-moment prefixes.")
+    sums2 = prefix2_column[counts]
+    return (counts * thresholds * thresholds - 2.0 * thresholds * sums1 + sums2) / observations
 
 
 def _dominates_from_precomputed(
