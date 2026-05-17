@@ -20,6 +20,7 @@ _BENCHMARK_ROWS = 252
 _FULL_HISTORY_ROWS = 1257
 _DISPERSION_COLUMNS = 100
 _MAGNIFICENT_SEVEN = ("AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA")
+_MAX_COLUMN_COUNT = "max"
 
 
 @pytest.mark.benchmark
@@ -85,6 +86,62 @@ def test_sd_efficient_set_sp500_daily_returns_1257x100_degree2(benchmark: Any) -
     result = benchmark(sd_efficient_set, returns, 2)
 
     assert all(0 <= index < returns.shape[1] for index in result)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    ("row_count", "column_count", "rounds"),
+    [
+        (_BENCHMARK_ROWS, _MAX_COLUMN_COUNT, 3),
+        (_FULL_HISTORY_ROWS, 250, 3),
+        (_FULL_HISTORY_ROWS, _MAX_COLUMN_COUNT, 1),
+    ],
+    ids=["252xmax", "1257x250", "1257xmax"],
+)
+def test_sd_efficient_set_sp500_daily_returns_full_fixture_degree2(
+    benchmark: Any,
+    row_count: int,
+    column_count: int | str,
+    rounds: int,
+) -> None:
+    returns = _load_daily_returns(row_count=row_count, column_count=column_count)
+
+    result = benchmark.pedantic(sd_efficient_set, args=(returns, 2), rounds=rounds, iterations=1)
+
+    assert all(0 <= index < returns.shape[1] for index in result)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    ("row_count", "column_count", "rounds"),
+    [
+        (_BENCHMARK_ROWS, _MAX_COLUMN_COUNT, 3),
+        (_FULL_HISTORY_ROWS, 250, 3),
+        (_FULL_HISTORY_ROWS, _MAX_COLUMN_COUNT, 1),
+    ],
+    ids=["252xmax", "1257x250", "1257xmax"],
+)
+def test_nns_sd_cluster_sp500_daily_returns_full_fixture_degree2(
+    benchmark: Any,
+    row_count: int,
+    column_count: int | str,
+    rounds: int,
+) -> None:
+    returns = _load_daily_returns(row_count=row_count, column_count=column_count)
+
+    result = benchmark.pedantic(
+        nns_sd_cluster,
+        args=(returns,),
+        kwargs={"degree": 2, "min_cluster": 1},
+        rounds=rounds,
+        iterations=1,
+    )
+
+    clusters = result["Clusters"]
+    assert isinstance(clusters, dict)
+    members = [name for cluster in clusters.values() for name in cluster]
+    assert len(members) == returns.shape[1]
+    assert len(set(members)) == returns.shape[1]
 
 
 @pytest.mark.benchmark
@@ -164,11 +221,15 @@ def _rolling_lower_upper_dispersion_ratio(
     return np.convolve(ratio, kernel, mode="valid")
 
 
-def _load_daily_returns(*, row_count: int, column_count: int) -> NDArray[np.float64]:
+def _load_daily_returns(*, row_count: int, column_count: int | str) -> NDArray[np.float64]:
     available_columns = _fixture_column_count()
-    if available_columns < column_count:
+    resolved_column_count = (
+        available_columns if column_count == _MAX_COLUMN_COUNT else int(column_count)
+    )
+    if available_columns < resolved_column_count:
         raise AssertionError(
-            f"{_FIXTURE} has {available_columns} return columns, expected at least {column_count}.",
+            f"{_FIXTURE} has {available_columns} return columns, "
+            f"expected at least {resolved_column_count}.",
         )
 
     data = np.loadtxt(
@@ -176,11 +237,11 @@ def _load_daily_returns(*, row_count: int, column_count: int) -> NDArray[np.floa
         delimiter=",",
         skiprows=1,
         max_rows=row_count,
-        usecols=range(1, column_count + 1),
+        usecols=range(1, resolved_column_count + 1),
         dtype=np.float64,
     )
-    if data.shape != (row_count, column_count):
-        expected_shape = (row_count, column_count)
+    if data.shape != (row_count, resolved_column_count):
+        expected_shape = (row_count, resolved_column_count)
         raise AssertionError(f"{_FIXTURE} has shape {data.shape}, expected {expected_shape}.")
     return data
 

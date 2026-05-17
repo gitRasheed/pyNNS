@@ -93,6 +93,103 @@ def test_sd_efficient_set_prefix_path_matches_lazy_path(monkeypatch: pytest.Monk
     assert prefix == lazy
 
 
+@pytest.mark.parametrize("degree", [1, 2, 3])
+def test_kept_only_prefix_efficient_set_matches_matrix_path_on_active_subset(degree: int) -> None:
+    returns = _large_fixture()
+    active = [0, 1, 2, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]
+    discrete = True
+    prefix_precomputed = sd._prefix_sd_precompute(returns, degree, discrete=discrete)
+    dominance_matrix = sd._dominance_matrix_from_prefix_pairs(
+        prefix_precomputed,
+        degree,
+        discrete=discrete,
+    )
+
+    expected = sd._sd_efficient_active_indices_from_matrix(
+        returns,
+        active,
+        degree,
+        dominance_matrix,
+    )
+    actual = sd._sd_efficient_active_indices_from_prefix_kept(
+        prefix_precomputed,
+        active,
+        degree,
+        discrete=discrete,
+    )
+
+    assert actual == expected
+
+
+def test_kept_only_prefix_efficient_set_matches_matrix_path_for_repeated_returns() -> None:
+    returns = np.asarray(
+        [
+            [0.0, 0.0, 0.0, 1.0, -1.0, 2.0],
+            [0.0, 0.0, 1.0, 0.0, 2.0, -1.0],
+            [1.0, 1.0, 0.0, 2.0, -1.0, 2.0],
+            [1.0, 1.0, 1.0, 0.0, 2.0, -1.0],
+            [2.0, 2.0, 0.0, 1.0, -1.0, 2.0],
+            [2.0, 2.0, 1.0, 2.0, 2.0, -1.0],
+        ],
+        dtype=np.float64,
+    )
+    active = list(range(returns.shape[1]))
+    prefix_precomputed = sd._prefix_sd_precompute(returns, 2, discrete=True)
+    dominance_matrix = sd._dominance_matrix_from_prefix_pairs(
+        prefix_precomputed,
+        2,
+        discrete=True,
+    )
+
+    expected = sd._sd_efficient_active_indices_from_matrix(
+        returns,
+        active,
+        2,
+        dominance_matrix,
+    )
+    actual = sd._sd_efficient_active_indices_from_prefix_kept(
+        prefix_precomputed,
+        active,
+        2,
+        discrete=True,
+    )
+
+    assert actual == expected
+
+
+@pytest.mark.parametrize("degree", [1, 2, 3])
+def test_kept_only_prefix_efficient_set_matches_matrix_path_for_random_fixture(
+    degree: int,
+) -> None:
+    rng = np.random.default_rng(1701 + degree)
+    returns = rng.normal(size=(18, 24))
+    returns[:, 1] = returns[:, 0]
+    returns[:, 2] = np.round(returns[:, 2], 1)
+    returns[:, 3] = returns[:, 0] + 0.3
+    active = list(range(returns.shape[1]))
+    prefix_precomputed = sd._prefix_sd_precompute(returns, degree, discrete=True)
+    dominance_matrix = sd._dominance_matrix_from_prefix_pairs(
+        prefix_precomputed,
+        degree,
+        discrete=True,
+    )
+
+    expected = sd._sd_efficient_active_indices_from_matrix(
+        returns,
+        active,
+        degree,
+        dominance_matrix,
+    )
+    actual = sd._sd_efficient_active_indices_from_prefix_kept(
+        prefix_precomputed,
+        active,
+        degree,
+        discrete=True,
+    )
+
+    assert actual == expected
+
+
 @pytest.mark.parametrize("dendrogram", [False, True])
 def test_nns_sd_cluster_prefix_path_matches_lazy_path(
     monkeypatch: pytest.MonkeyPatch,

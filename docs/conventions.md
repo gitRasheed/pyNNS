@@ -68,6 +68,25 @@ names. `type="continuous"` is supported for first-degree efficient sets.
 `merge`, `height`, `order`, `labels`, `method`, `call`, and `dist.method`.
 PyNNS does not plot the dendrogram; it only returns the object data.
 
+The stochastic-dominance implementation is deliberately pure NumPy. It mirrors
+R's C++ SD core mathematically by sorting each column once, storing prefix sums,
+and evaluating dominance on each pair's merged threshold grid rather than on one
+global all-column grid. Large `nns_sd_cluster` calls build an exact dominance
+matrix, but skip expensive curve work for pairs that min/mean/identical guards
+already prove cannot dominate. Large standalone `sd_efficient_set` calls use a
+kept-only prefix scan: columns are visited in R's LPM-at-global-maximum order and
+only already-kept candidates are tested against the current column. This avoids
+building a full matrix where the public result only needs maximal elements.
+
+These choices preserve exact R-style dominance semantics: no tolerances,
+approximate equality, output reordering, or diagonal/identical-column behavior
+changes are introduced. Polars is intentionally not used in this SD kernel
+because the hot path is dense pairwise threshold evaluation rather than
+data-frame grouping or filtering. R remains faster on large finance fixtures
+because its C++ path walks merged sorted thresholds in tight parallel loops with
+minimal temporaries; PyNNS instead uses NumPy `searchsorted` and vectorized
+blocks to stay dependency-light and pure Python for alpha.
+
 `nns_cdf` maps to R's `NNS.CDF` deterministic non-plotting paths. It is a
 partial-moment distribution wrapper rather than a textbook ECDF: `degree = 0`
 uses R's lower-partial-moment frequency convention, and positive degrees use

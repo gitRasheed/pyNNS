@@ -46,7 +46,7 @@ invariant, and property coverage.
 | Nowcast: `NNS.nowcast` core via `nns_nowcast_panel`, explicit `nns_nowcast(fetch=True, provider_backend=...)` | partial | medium | Deterministic user panels and explicit CSV/FRED provider boundary are implemented; default live fetching is guarded. |
 | Providers: `CsvNowcastProvider`, `FredApiNowcastProvider` | implemented | medium | CSV is local/offline. FRED requires optional `fredapi` extra and a supplied API key. |
 | Bootstrap/Monte Carlo: `nns_meboot`, `nns_mc` | implemented | medium | Deterministic diagnostics are parity-tested; exact stochastic replicate parity with R is not expected. |
-| Stochastic dominance/superiority: `fsd`, `ssd`, `tsd`, `.uni` wrappers, `nns_ss`, `nns_sd_cluster`, `sd_efficient_set` | implemented | medium | Public structures and deterministic paths are covered; stochastic intervals use PyNNS RNG. |
+| Stochastic dominance/superiority: `fsd`, `ssd`, `tsd`, `.uni` wrappers, `nns_ss`, `nns_sd_cluster`, `sd_efficient_set` | implemented | medium | Public structures and deterministic paths are covered. SD uses exact pure-NumPy prefix-pair kernels with guarded large-case paths; R's C++ core remains faster on full finance fixtures. Stochastic intervals use PyNNS RNG. |
 | ANOVA: `nns_anova` | implemented | high | Binary, multi-group, pairwise, and degenerate `NaN` conventions are covered. |
 | Normalization: `nns_norm` | implemented | high | Numeric matrix path is implemented. |
 | Categorical helpers: `encode_factor_codes`, `factor_2_dummy`, `factor_2_dummy_fr` | implemented | high | Explicit `levels=` should be used to reproduce R factor ordering. |
@@ -83,6 +83,11 @@ invariant, and property coverage.
 - Stochastic exact stream parity is not expected. Stochastic paths use NumPy RNG
   and are tested structurally/statistically.
 - Plotting side effects from R APIs are generally ignored; PyNNS returns data.
+- Stochastic-dominance performance work stays pure NumPy for alpha. The current
+  implementation mirrors R's sorted-column/prefix-sum algorithm and adds
+  Python-specific guard pruning and kept-only efficient-set scans. Optional
+  compiled SD backends remain deferred until benchmark evidence justifies the
+  added packaging and maintenance cost.
 
 ## Provider Boundary
 
