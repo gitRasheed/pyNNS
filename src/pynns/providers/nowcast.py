@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import csv
+import importlib
+import os
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
-from pynns.nowcast import _normalize_month_label
+from pynns.nowcast import _DEFAULT_NOWCAST_SERIES, _normalize_month_label
 
 
 class CsvNowcastProvider:
@@ -104,6 +106,110 @@ class CsvNowcastProvider:
         if lengths != {len(dates)}:
             raise ValueError("CSV nowcast provider series columns must have equal lengths.")
         return dates, values
+
+
+class FredApiNowcastProvider:
+    """Optional FRED API provider for deterministic nowcast payloads."""
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        api_key_env: str = "FRED_API_KEY",
+        series: Sequence[str] | None = None,
+    ) -> None:
+        self.api_key = api_key
+        self.api_key_env = api_key_env
+        self.series = None if series is None else [str(name) for name in series]
+
+    def fetch(self, series: Sequence[str], start_date: str) -> dict[str, object]:
+        selected_series = self.series if self.series is not None else [str(name) for name in series]
+        if not selected_series:
+            selected_series = list(_DEFAULT_NOWCAST_SERIES)
+        api_key = self._api_key()
+        fred_module = _load_fredapi()
+        fred_client = fred_module.Fred(api_key=api_key)
+
+        start_month = _normalize_month_label(start_date)
+        monthly_series: OrderedDict[str, OrderedDict[str, float | None]] = OrderedDict()
+        all_months: set[str] = set()
+        for name in selected_series:
+            raw_values = fred_client.get_series(name, observation_start=start_date)
+            monthly_values = _monthly_last_observations(raw_values, start_month)
+            monthly_series[name] = monthly_values
+            all_months.update(monthly_values)
+
+        dates = sorted(all_months)
+        payload_series: OrderedDict[str, list[float | None]] = OrderedDict()
+        for name, values in monthly_series.items():
+            payload_series[name] = [values.get(month) for month in dates]
+
+        return {
+            "dates": dates,
+            "series": payload_series,
+            "metadata": {
+                "provider": "fredapi",
+                "series": selected_series,
+                "api_key_env": self.api_key_env,
+                "start_date": start_date,
+                "dependency": "fredapi",
+            },
+        }
+
+    def _api_key(self) -> str:
+        api_key = self.api_key if self.api_key is not None else os.environ.get(self.api_key_env)
+        if not api_key:
+            raise ValueError(f"FRED API key is required; pass api_key or set {self.api_key_env}.")
+        return api_key
+
+
+def _load_fredapi() -> Any:
+    try:
+        return importlib.import_module("fredapi")
+    except ImportError as exc:
+        raise ImportError(
+            "FredApiNowcastProvider requires the optional 'fredapi' dependency; "
+            "install nns-pm[fred] or install fredapi."
+        ) from exc
+
+
+def _monthly_last_observations(
+    raw_values: object,
+    start_month: str,
+) -> OrderedDict[str, float | None]:
+    monthly_values: OrderedDict[str, float | None] = OrderedDict()
+    for raw_date, raw_value in _iter_observations(raw_values):
+        month = _normalize_month_label(raw_date)
+        if month < start_month:
+            continue
+        monthly_values[month] = _coerce_optional_float(raw_value)
+    return monthly_values
+
+
+def _iter_observations(raw_values: object) -> list[tuple[object, object]]:
+    items_method = getattr(raw_values, "items", None)
+    if callable(items_method):
+        return list(items_method())
+    if isinstance(raw_values, Sequence) and not isinstance(raw_values, str | bytes):
+        observations = list(raw_values)
+        if all(
+            isinstance(item, Sequence) and not isinstance(item, str | bytes)
+            for item in observations
+        ):
+            return [(item[0], item[1]) for item in observations if len(item) >= 2]
+    raise TypeError("fredapi get_series result must provide .items() or date/value pairs.")
+
+
+def _coerce_optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"FRED series contains a nonnumeric value: {value!r}") from exc
+    if result != result:
+        return None
+    return result
 
 
 def _parse_optional_float(value: Any, column: str, row_number: int) -> float | None:

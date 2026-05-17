@@ -332,8 +332,10 @@ forecast labels advance monthly. `nns_nowcast(fetch=True, provider_backend=...)`
 supports explicit providers whose `fetch(series, start_date)` method returns
 `{"series": ..., "dates": ..., "metadata": ...}`. `CsvNowcastProvider` is the
 offline local-file provider for monthly panels; it performs no resampling and no
-network access. Default live fetching remains guarded; PyNNS does not ship an
-implicit FRED/Yahoo provider.
+network access. `FredApiNowcastProvider` is an optional live FRED provider that
+requires the `fredapi` extra and a FRED API key supplied explicitly or through
+`FRED_API_KEY`; library code does not read `.env` files. Default live fetching
+remains guarded; PyNNS does not ship an implicit FRED/Yahoo provider.
 
 ## Meboot
 

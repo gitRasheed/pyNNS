@@ -20,6 +20,9 @@ dependencies = [
     "scipy",
 ]
 
+[project.optional-dependencies]
+fred = ["fredapi"]
+
 [dependency-groups]
 dev = [
     "hypothesis",

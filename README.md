@@ -26,7 +26,8 @@ install.packages("NNS")
 Set `PYNNS_OFFLINE=1` to force parity tests to use only the committed R cache.
 
 Deferred paths:
-- live/default `nns_nowcast` provider fetching
+- default `nns_nowcast` provider fetching; explicit CSV and optional FRED API
+  providers are available through `nns_nowcast(fetch=True, provider_backend=...)`
 - vectorized `dy_d` wrt for non-mean modes and `mixed=True`
 - scalar `dy_d` `eval_points="last"`, `"obs"`, and `"apd"` parity gaps
 - direct raw-factor `nns_m_reg`
