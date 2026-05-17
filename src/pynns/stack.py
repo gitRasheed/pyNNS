@@ -340,6 +340,7 @@ def _evaluate_method2(
         prediction = _class_threshold_round(prediction, final_class_threshold, y_train)
     final_obj = objective_fn(fitted_yhat, fitted["y"])
     final_pred_int = cast(dict[str, NDArray[np.float64]] | None, final_fit["pred.int"])
+    final_pred_int = _prediction_interval_or_point_estimate(final_pred_int, prediction)
 
     if stack and methods == (1, 2):
         train_star = cast(dict[str, NDArray[np.float64]], final_fit["x.star"])["x"]
@@ -531,6 +532,7 @@ def _evaluate_method1(
         prediction = _class_threshold_round(prediction, final_class_threshold, y_train)
     final_obj = objective_fn(fitted_yhat, fitted["y"])
     final_pred_int = cast(dict[str, NDArray[np.float64]] | None, final_fit["pred.int"])
+    final_pred_int = _prediction_interval_or_point_estimate(final_pred_int, prediction)
     return _MethodState(
         prediction=prediction,
         objective=final_obj,
@@ -843,6 +845,19 @@ def _combine_prediction_intervals(
     return {
         key: weights[0] * left_values[index] + weights[1] * right_values[index]
         for index, key in enumerate(left)
+    }
+
+
+def _prediction_interval_or_point_estimate(
+    pred_int: dict[str, NDArray[np.float64]] | None,
+    prediction: NDArray[np.float64],
+) -> dict[str, NDArray[np.float64]] | None:
+    if pred_int is None:
+        return None
+    expected = prediction.shape
+    return {
+        key: values if values.shape == expected else prediction.copy()
+        for key, values in pred_int.items()
     }
 
 

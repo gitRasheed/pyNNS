@@ -59,6 +59,7 @@ include = [
     "/docs/api_status.md",
     "/docs/benchmarks.md",
     "/docs/conventions.md",
+    "/docs/examples",
     "/pyproject.toml",
     "/src",
 ]

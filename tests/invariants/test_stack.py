@@ -66,6 +66,43 @@ def test_stack_zero_distance_path_predictions_do_not_warn() -> None:
     assert [warning for warning in caught if issubclass(warning.category, RuntimeWarning)] == []
 
 
+def test_nns_stack_pred_int_falls_back_to_point_estimate_when_regression_drops_rows() -> None:
+    x = np.array(
+        [
+            [6.0, 6.0, 6.0],
+            [6.0, 1.0, 6.0],
+            [6.0, 13.0, 6.0],
+            [1.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 0.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 0.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [0.0, 0.5, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 0.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+            [6.0, 6.0, 6.0],
+        ],
+        dtype=np.float64,
+    )
+    y = 0.5 * x[:, 0] - 0.25 * x[:, 1]
+
+    result = nns_stack(x, y, x[:3], cv_size=0.25, folds=1, method=(1, 2), pred_int=0.95)
+
+    assert result["pred.int"] is not None
+    assert all(values.shape == (3,) for values in result["pred.int"].values())
+
+
 def test_nns_stack_classification_shapes_and_codes() -> None:
     x = np.linspace(-2.0, 2.0, 30)
     variable = np.column_stack((x, np.sin(x), np.cos(x)))

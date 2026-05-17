@@ -3,6 +3,8 @@ docs/*
 !docs/benchmarks.md
 !docs/conventions.md
 !docs/api_status.md
+!docs/examples/
+!docs/examples/**
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

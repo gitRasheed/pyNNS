@@ -18,6 +18,7 @@ Polars.
 - [API status and known gaps](docs/api_status.md)
 - [Behavior conventions and intentional divergences](docs/conventions.md)
 - [Benchmarks](docs/benchmarks.md)
+- [Examples](docs/examples/README.md)
 
 PyNNS aims to match installed R NNS public behavior where it is stable,
 documented, and useful. It does not try to reproduce every R internal helper,
