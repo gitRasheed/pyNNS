@@ -36,7 +36,7 @@ explicitly guarded while dependencies remain unresolved.
 | `NNS.SS` | `nns_ss` | Stochastic superiority |
 | `NNS.stack` | `nns_stack` | Stack wrapper |
 | `NNS.VAR` | `nns_var` | Numeric VAR wrapper with `dim_red_method` values `"cor"`, `"NNS.dep"`, `"NNS.caus"`, and `"all"` implemented |
-| `NNS.nowcast` core | `nns_nowcast_panel`, `nns_nowcast(fetch=True, provider_backend=...)` | Deterministic user-supplied monthly panel and explicit fixture-style provider path; no default live provider |
+| `NNS.nowcast` core | `nns_nowcast_panel`, `nns_nowcast(fetch=True, provider_backend=...)`, `pynns.providers.CsvNowcastProvider` | Deterministic user-supplied monthly panel and explicit provider path, including local CSV panels; no default live provider |
 | `dy.dx` | `dy_dx` | `eval_point="overall"` and numeric `eval_point` vectors are implemented; multivariate form (`dy.d_`) |
 | `dy.d_` | `dy_d` | Scalar `wrt` is implemented; vectorized `wrt` for `eval_points="mean"` and `mixed=False` is implemented; other vectorized modes remain deferred |
 | `factor_2_dummy`, `factor_2_dummy_FR` | `factor_2_dummy`, `factor_2_dummy_fr` | Categorical expansion helpers |

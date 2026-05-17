@@ -329,9 +329,11 @@ fields plus `dates` and `metadata` dictionaries. Date labels are metadata rather
 than array indices. Without dates, forecast rows are labeled `t+1`, `t+2`, ...
 With dates, inputs are normalized to `YYYY-MM`, must be sorted and unique, and
 forecast labels advance monthly. `nns_nowcast(fetch=True, provider_backend=...)`
-supports explicit fixture-style providers whose `fetch(series, start_date)`
-method returns `{"series": ..., "dates": ..., "metadata": ...}`. Default live
-fetching remains guarded; PyNNS does not ship an implicit FRED/Yahoo provider.
+supports explicit providers whose `fetch(series, start_date)` method returns
+`{"series": ..., "dates": ..., "metadata": ...}`. `CsvNowcastProvider` is the
+offline local-file provider for monthly panels; it performs no resampling and no
+network access. Default live fetching remains guarded; PyNNS does not ship an
+implicit FRED/Yahoo provider.
 
 ## Meboot
 

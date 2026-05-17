@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 import numpy as np
 import pytest
 
 from pynns import nns_nowcast, nns_nowcast_panel, nns_var
+from pynns.providers import CsvNowcastProvider
 
 
 class FixtureNowcastProvider:
@@ -256,3 +258,170 @@ def test_nns_nowcast_provider_payload_validation() -> None:
                 {"series": OrderedDict((("PAYEMS", [1.0, "bad"]),))}
             ),
         )
+
+
+def test_csv_nowcast_provider_returns_payload(tmp_path: Any) -> None:
+    csv_path = tmp_path / "macro.csv"
+    csv_path.write_text(
+        "date,PAYEMS,UNRATE\n2020-01-15,1.0,4.0\n2020-02,2.0,5.0\n2020-03-31,3.0,6.0\n",
+        encoding="utf-8",
+    )
+
+    payload = CsvNowcastProvider(csv_path).fetch(("PAYEMS",), "2020-01-01")
+
+    assert payload["dates"] == ["2020-01", "2020-02", "2020-03"]
+    series_payload = cast(Mapping[str, object], payload["series"])
+    assert list(series_payload) == ["PAYEMS", "UNRATE"]
+    assert payload["series"] == OrderedDict(
+        (
+            ("PAYEMS", [1.0, 2.0, 3.0]),
+            ("UNRATE", [4.0, 5.0, 6.0]),
+        )
+    )
+    assert payload["metadata"] == {
+        "provider": "csv",
+        "path": str(csv_path),
+        "date_column": "date",
+        "series_columns": ["PAYEMS", "UNRATE"],
+    }
+
+
+def test_nns_nowcast_csv_provider_matches_panel_core(tmp_path: Any) -> None:
+    csv_path = tmp_path / "macro.csv"
+    panel = _panel()
+    rows = ["date,PAYEMS,UNRATE"]
+    for index, month in enumerate(
+        [f"2020-{month:02d}" for month in range(1, 13)]
+        + [f"2021-{month:02d}" for month in range(1, 13)]
+        + [f"2022-{month:02d}" for month in range(1, 13)]
+        + [f"2023-{month:02d}" for month in range(1, 4)]
+    ):
+        rows.append(f"{month},{panel[index, 0]},{panel[index, 1]}")
+    csv_path.write_text("\n".join(rows), encoding="utf-8")
+
+    actual = nns_nowcast(fetch=True, provider_backend=CsvNowcastProvider(csv_path), h=2)
+    expected = nns_nowcast_panel(
+        OrderedDict(
+            (
+                ("PAYEMS", panel[:, 0].tolist()),
+                ("UNRATE", panel[:, 1].tolist()),
+            )
+        ),
+        h=2,
+        tau=12,
+        dates=[row.split(",", maxsplit=1)[0] for row in rows[1:]],
+    )
+
+    assert actual["names"] == ["PAYEMS", "UNRATE"]
+    assert actual["dates"]["forecast"] == ["2023-04", "2023-05"]
+    for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
+        np.testing.assert_allclose(actual[key], expected[key])
+    assert np.array_equal(actual["relevant_variables"], expected["relevant_variables"])
+    assert actual["metadata"]["provider"]["provider"] == "csv"
+
+
+def test_csv_nowcast_provider_selects_and_orders_series_columns(tmp_path: Any) -> None:
+    csv_path = tmp_path / "macro.csv"
+    csv_path.write_text(
+        "date,PAYEMS,UNRATE,GDPC1\n2020-01,1.0,4.0,7.0\n2020-02,2.0,5.0,8.0\n",
+        encoding="utf-8",
+    )
+
+    payload = CsvNowcastProvider(csv_path, series_columns=["GDPC1", "PAYEMS"]).fetch((), "2020-01")
+
+    series_payload = cast(Mapping[str, object], payload["series"])
+    assert list(series_payload) == ["GDPC1", "PAYEMS"]
+    assert payload["series"] == OrderedDict((("GDPC1", [7.0, 8.0]), ("PAYEMS", [1.0, 2.0])))
+
+
+def test_csv_nowcast_provider_parses_missing_values(tmp_path: Any) -> None:
+    csv_path = tmp_path / "macro.csv"
+    csv_path.write_text(
+        "date,PAYEMS,UNRATE\n2020-01,1.0,\n2020-02,NA,5.0\n2020-03,nan,null\n",
+        encoding="utf-8",
+    )
+
+    payload = CsvNowcastProvider(csv_path).fetch((), "2020-01")
+
+    assert payload["series"] == OrderedDict(
+        (
+            ("PAYEMS", [1.0, None, None]),
+            ("UNRATE", [None, 5.0, None]),
+        )
+    )
+
+
+def test_csv_nowcast_provider_filters_start_date(tmp_path: Any) -> None:
+    csv_path = tmp_path / "macro.csv"
+    csv_path.write_text(
+        "date,PAYEMS\n2020-01,1.0\n2020-02,2.0\n2020-03,3.0\n",
+        encoding="utf-8",
+    )
+
+    payload = CsvNowcastProvider(csv_path).fetch((), "2020-02-15")
+
+    assert payload["dates"] == ["2020-02", "2020-03"]
+    assert payload["series"] == OrderedDict((("PAYEMS", [2.0, 3.0]),))
+
+
+def test_csv_nowcast_provider_rejects_bad_dates(tmp_path: Any) -> None:
+    duplicate_path = tmp_path / "duplicate.csv"
+    duplicate_path.write_text(
+        "date,PAYEMS\n2020-01,1.0\n2020-01,2.0\n",
+        encoding="utf-8",
+    )
+    unsorted_path = tmp_path / "unsorted.csv"
+    unsorted_path.write_text(
+        "date,PAYEMS\n2020-02,2.0\n2020-01,1.0\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="duplicate"):
+        CsvNowcastProvider(duplicate_path).fetch((), "2020-01")
+    with pytest.raises(ValueError, match="sorted"):
+        CsvNowcastProvider(unsorted_path).fetch((), "2020-01")
+
+
+def test_csv_nowcast_provider_rejects_missing_columns(tmp_path: Any) -> None:
+    csv_path = tmp_path / "macro.csv"
+    csv_path.write_text(
+        "month,PAYEMS\n2020-01,1.0\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="missing date column"):
+        CsvNowcastProvider(csv_path).fetch((), "2020-01")
+    with pytest.raises(ValueError, match="missing selected series column"):
+        CsvNowcastProvider(csv_path, date_column="month", series_columns=["UNRATE"]).fetch(
+            (), "2020-01"
+        )
+
+
+def test_csv_nowcast_provider_rejects_nonnumeric_values(tmp_path: Any) -> None:
+    csv_path = tmp_path / "macro.csv"
+    csv_path.write_text(
+        "date,PAYEMS\n2020-01,bad\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="nonnumeric"):
+        CsvNowcastProvider(csv_path).fetch((), "2020-01")
+
+
+def test_csv_nowcast_provider_rejects_empty_or_no_series_csv(tmp_path: Any) -> None:
+    empty_path = tmp_path / "empty.csv"
+    empty_path.write_text("", encoding="utf-8")
+    header_only_path = tmp_path / "header_only.csv"
+    header_only_path.write_text("date,PAYEMS\n", encoding="utf-8")
+    no_series_path = tmp_path / "no_series.csv"
+    no_series_path.write_text(
+        "date\n2020-01\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="empty"):
+        CsvNowcastProvider(empty_path).fetch((), "2020-01")
+    with pytest.raises(ValueError, match="no data rows"):
+        CsvNowcastProvider(header_only_path).fetch((), "2020-01")
+    with pytest.raises(ValueError, match="at least one usable series"):
+        CsvNowcastProvider(no_series_path).fetch((), "2020-01")
