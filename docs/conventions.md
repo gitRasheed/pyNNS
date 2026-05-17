@@ -309,16 +309,19 @@ variable checks as R. The optimizer's prediction intervals are deterministic
 VaR bands around the in-sample optimizer errors; they are separate from
 `nns_arma(pred_int=...)`, which uses the Monte Carlo path. Custom Python
 `obj_fn` callables may be supplied, but R expression objects are not part of the
-Python API. `nns_var` and `nns_nowcast` remain guarded: `nns_var` requires
-the final public assembly path not yet ported. The first-stage interpolation/extrapolation helper
+Python API. `nns_var` is implemented for numeric matrix-like inputs with
+`dim_red_method="cor"`, `dim_red_method="NNS.dep"`,
+`dim_red_method="NNS.caus"`, and `dim_red_method="all"` and returns R-compatible public output keys. The `h == 0`
+path is normalized to a Python dictionary containing `interpolated_and_extrapolated`
+and `names` rather than R's bare data-frame return. The first-stage interpolation/extrapolation helper
 `_var_interpolate_and_extrapolate` is implemented to match R's
 missing-value handling and per-variable `NNS.ARMA.optim` forecasts. The private
 multivariate stage `_var_multivariate_stack_stage` is implemented with
 `lag.mtx` reconstruction, `NNS.stack(method=(1,2), ts.test, dim.red.method)`
 logic, and R-style relevance extraction. The function returns `multivariate`
 and `relevant_variables` in the same shape/naming pattern expected by
-`NNS.VAR`. `nns_nowcast` still delegates to `NNS.VAR` after external
-macroeconomic data retrieval.
+`NNS.VAR`. `nns_nowcast` remains guarded and still requires an explicit external
+macroeconomic data boundary and nowcast-specific date alignment.
 
 ## Meboot
 
@@ -406,11 +409,19 @@ rounds results to `digits`, matching R's default output convention.
 around smooth `nns_reg` point estimates and return a table-like dictionary with
 `eval.point`, `first.derivative`, and `second.derivative`. Boundary-point
 quirks follow installed R where covered by parity tests. `dy_d` supports scalar
-`wrt` for all currently supported `eval_points`; `eval_points="mean"` also supports
-vectorized `wrt` with `mixed=False`, returning one row per eval point and one
-column per requested regressor. `eval_points="obs"` remains parity-divergent for
-scalar and vectorized `wrt` because R applies cumulative perturbation updates across
-bandwidths. Vectorized `wrt` with `mixed=True` is deferred.
+`wrt` has enforced R parity for `eval_points="mean"` and `"median"`. Scalar
+`eval_points="last"` returns the expected public structure but remains under
+numeric parity review because boundary-mode derivative estimates are not yet
+aligned with installed R. Scalar distribution modes `eval_points="obs"` and
+`"apd"` return the expected public structure, use an explicit cumulative
+bandwidth perturbation, and compute the same public multivariate
+`NNS.copula(cbind(wrt, wrt, y))` relevance scalar that R uses for the
+distribution grid. They remain known parity gaps, especially for second
+derivatives, so their parity tests are xfailed rather than treated as enforced
+green coverage. `eval_points="mean"` also supports vectorized `wrt` with
+`mixed=False`, returning one row per eval point and one column per requested
+regressor. Vectorized non-mean `wrt` modes and
+vectorized `wrt` with `mixed=True` are deferred.
 
 ## ANOVA
 

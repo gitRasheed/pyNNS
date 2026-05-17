@@ -35,20 +35,20 @@ explicitly guarded while dependencies remain unresolved.
 | `NNS.seas` | `nns_seas` | Seasonality test |
 | `NNS.SS` | `nns_ss` | Stochastic superiority |
 | `NNS.stack` | `nns_stack` | Stack wrapper |
+| `NNS.VAR` | `nns_var` | Numeric VAR wrapper with `dim_red_method` values `"cor"`, `"NNS.dep"`, `"NNS.caus"`, and `"all"` implemented; `nns_nowcast` remains guarded |
 | `dy.dx` | `dy_dx` | `eval_point="overall"` and numeric `eval_point` vectors are implemented; multivariate form (`dy.d_`) |
 | `dy.d_` | `dy_d` | Scalar `wrt` is implemented; vectorized `wrt` for `eval_points="mean"` and `mixed=False` is implemented; other vectorized modes remain deferred |
 | `factor_2_dummy`, `factor_2_dummy_FR` | `factor_2_dummy`, `factor_2_dummy_fr` | Categorical expansion helpers |
 | `ecdf.pm`, `mean.pm`, `var.pm`, `skew.pm`, `kurt.pm` | `ecdf_pm`, `mean_pm`, `var_pm`, `skew_pm`, `kurt_pm` | Partial-moment classical helpers |
 
-## Guarded Public Exports
+## Guarded Public Exports And Methods
 
-These names are exported so callers get an explicit, documented
-`NotImplementedError` instead of an accidental missing attribute.
+These names or method combinations are exported so callers get an explicit,
+documented `NotImplementedError` instead of an accidental missing attribute.
 
 | R export | PyNNS API | Blocker |
 |---|---|---|
-| `NNS.VAR` | `nns_var` | Requires installed-R named lagged-data-frame / stack semantics for VAR orchestration |
-| `NNS.nowcast` | `nns_nowcast` | Delegates to `NNS.VAR` after external data retrieval |
+| `NNS.nowcast` | `nns_nowcast` | Requires external macro-data retrieval and nowcast-specific date alignment |
 
 ## Internal Or Out Of Scope
 

@@ -25,12 +25,70 @@ def nns_var(
     ncores: int | None = None,
     nowcast: bool = False,
 ) -> dict[str, Any]:
-    """Guarded placeholder for R's NNS.VAR path."""
-    del variables, h, tau, dim_red_method, naive_weights, obj_fn, objective, status, ncores, nowcast
-    raise NotImplementedError(
-        "nns_var default VAR path requires R named-data-frame stack semantics for lagged "
-        "variables, which are not yet ported."
+    """Nonparametric VAR forecast for numeric matrix-like inputs.
+
+    The public Python path returns plain arrays keyed like R's ``NNS.VAR`` output.
+    For ``h == 0`` the result is normalized to a dictionary containing
+    ``interpolated_and_extrapolated`` and ``names`` instead of returning a bare
+    data frame as R does.
+    """
+    del obj_fn, status, ncores, nowcast
+
+    method = dim_red_method.lower()
+    if method not in {"cor", "nns.dep", "nns.caus", "all"}:
+        raise ValueError(
+            'dim_red_method must be one of "cor", "NNS.dep", "NNS.caus", or "all".'
+        )
+    if not isinstance(h, Integral):
+        raise TypeError("h must be an integer.")
+    h_int = int(h)
+    if h_int < 0:
+        raise ValueError("h must be non-negative.")
+
+    variables_matrix = np.asarray(variables, dtype=np.float64)
+    if variables_matrix.ndim != 2:
+        raise ValueError("variables must be a 2-D numeric matrix.")
+    if variables_matrix.shape[0] == 0 or variables_matrix.shape[1] == 0:
+        raise ValueError("variables must be non-empty.")
+    names = [f"x{i + 1}" for i in range(variables_matrix.shape[1])]
+
+    first_stage = _var_interpolate_and_extrapolate(
+        variables_matrix,
+        h_int,
+        tau=tau,
+        names=names,
     )
+    if h_int == 0:
+        return first_stage
+
+    interpolated = cast(NDArray[np.float64], first_stage["interpolated_and_extrapolated"])
+    univariate = cast(NDArray[np.float64], first_stage["univariate"])
+    multivariate_stage = _var_multivariate_stack_stage(
+        interpolated,
+        univariate,
+        h=h_int,
+        tau=tau,
+        names=names,
+        dim_red_method=dim_red_method,
+        objective=objective,
+    )
+    multivariate = cast(NDArray[np.float64], multivariate_stage["multivariate"])
+    relevant_variables = cast(NDArray[Any], multivariate_stage["relevant_variables"])
+    uni_weights, multi_weights = _var_ensemble_weights(
+        relevant_variables,
+        names,
+        naive_weights=naive_weights,
+    )
+    ensemble = univariate * uni_weights[np.newaxis, :] + multivariate * multi_weights[np.newaxis, :]
+
+    return {
+        "interpolated_and_extrapolated": interpolated,
+        "relevant_variables": relevant_variables,
+        "univariate": univariate,
+        "multivariate": multivariate,
+        "ensemble": ensemble,
+        "names": names,
+    }
 
 
 def _var_interpolate_and_extrapolate(
@@ -206,11 +264,6 @@ def _var_multivariate_stack_stage(
     if objective_value not in {"min", "max"}:
         raise ValueError("objective must be 'min' or 'max'.")
     dim_red_value = dim_red_method.lower()
-    if dim_red_value != "cor":
-        raise NotImplementedError(
-            "Only dim_red_method='cor' is currently implemented in the private multivariate helper."
-        )
-
     dim_red_threshold_method = str(dim_red_method)
     for i in range(n_vars):
         lagged_iv = np.column_stack((lagged_train[:, :i], lagged_train[:, i + 1 :]))
@@ -273,7 +326,14 @@ def _var_multivariate_stack_stage(
         lagged_iv_names = lagged_names[:i] + lagged_names[i + 1 :]
         lagged_iv_matrix = np.column_stack((lagged_dv, lagged_iv))
 
-        rel = _spearman_scores(lagged_iv_matrix, lagged_iv_matrix[:, 0])[1:]
+        if dim_red_value == "cor":
+            rel = _spearman_scores(lagged_iv_matrix, lagged_iv_matrix[:, 0])[1:]
+        elif dim_red_value == "nns.dep":
+            rel = _dependence_scores(lagged_iv_matrix)[1:]
+        elif dim_red_value == "nns.caus":
+            rel = _causation_scores(lagged_iv_matrix)[1:]
+        else:
+            rel = _combined_scores(lagged_iv_matrix)[1:]
 
         rel_vars: list[str] = [
             name
@@ -296,6 +356,81 @@ def _var_multivariate_stack_stage(
         "relevant_variables": rv_matrix,
         "names": names_list,
     }
+
+
+def _dependence_scores(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    from pynns.dependence import nns_dep
+
+    matrix = np.asarray(values, dtype=np.float64)
+    if matrix.ndim != 2:
+        raise ValueError("values must be a 2-D matrix.")
+    if matrix.shape[1] == 0:
+        return np.empty(0, dtype=np.float64)
+    scores = np.empty(matrix.shape[1], dtype=np.float64)
+    target = matrix[:, 0]
+    for col in range(matrix.shape[1]):
+        scores[col] = float(nns_dep(target, matrix[:, col])["Dependence"])
+    return scores
+
+
+def _causation_scores(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    from pynns.causation import causal_matrix
+
+    matrix = np.asarray(values, dtype=np.float64)
+    if matrix.ndim != 2:
+        raise ValueError("values must be a 2-D matrix.")
+    if matrix.shape[1] == 0:
+        return np.empty(0, dtype=np.float64)
+    return np.asarray(causal_matrix(matrix)[0, :], dtype=np.float64)
+
+
+def _combined_scores(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    from pynns.stack import _spearman_scores
+
+    matrix = np.asarray(values, dtype=np.float64)
+    if matrix.ndim != 2:
+        raise ValueError("values must be a 2-D matrix.")
+    if matrix.shape[1] == 0:
+        return np.empty(0, dtype=np.float64)
+    cor = _spearman_scores(matrix, matrix[:, 0])
+    dep = _dependence_scores(matrix)
+    caus = _causation_scores(matrix)
+    return (cor + dep + caus) / 3.0
+
+
+def _var_ensemble_weights(
+    relevant_variables: NDArray[Any],
+    names: Sequence[str],
+    *,
+    naive_weights: bool,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    names_list = list(names)
+    n_vars = len(names_list)
+    uni = np.full(n_vars, 0.5, dtype=np.float64)
+    multi = np.full(n_vars, 0.5, dtype=np.float64)
+    if naive_weights:
+        return uni, multi
+
+    rv = np.asarray(relevant_variables, dtype=object)
+    if rv.ndim != 2 or rv.shape[1] != n_vars:
+        raise ValueError("relevant_variables shape must match variable names.")
+
+    for i, given_var in enumerate(names_list):
+        observed = [
+            str(value).split("_tau", 1)[0]
+            for value in rv[:, i].tolist()
+            if value is not None and not (isinstance(value, float) and np.isnan(value))
+        ]
+        if not observed:
+            continue
+        equal_tau = sum(value == given_var for value in observed)
+        unequal_tau = len(observed) - equal_tau
+        total = equal_tau + unequal_tau
+        if total > 0:
+            uni[i] = equal_tau / total
+            multi[i] = 1.0 - uni[i]
+
+    return uni, multi
 
 
 def _var_tau_for_variable(

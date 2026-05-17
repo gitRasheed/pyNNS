@@ -133,7 +133,8 @@ def test_nns_arma_optim_validation_matches_installed_r() -> None:
         )
 
 
-def test_nns_var_remains_deferred() -> None:
+@pytest.mark.parametrize("dim_red_method", ["cor", "NNS.dep", "NNS.caus", "all"])
+def test_nns_var_public_supported_paths_return_output_contract(dim_red_method: str) -> None:
     variables = np.column_stack(
         (
             np.sin(np.arange(1, 40, dtype=np.float64) / 3.0),
@@ -141,12 +142,24 @@ def test_nns_var_remains_deferred() -> None:
         )
     )
 
-    with pytest.raises(NotImplementedError, match="nns_var default VAR path"):
-        nns_var(variables, h=3)
+    result = nns_var(variables, h=3, tau=2, dim_red_method=dim_red_method)
 
+    assert set(result) == {
+        "interpolated_and_extrapolated",
+        "relevant_variables",
+        "univariate",
+        "multivariate",
+        "ensemble",
+        "names",
+    }
+    assert result["interpolated_and_extrapolated"].shape == variables.shape
+    assert result["univariate"].shape == (3, 2)
+    assert result["multivariate"].shape == (3, 2)
+    assert result["ensemble"].shape == (3, 2)
+    assert result["names"] == ["x1", "x2"]
 
 def test_nns_nowcast_remains_deferred() -> None:
-    with pytest.raises(NotImplementedError, match="nns_nowcast depends on nns_var"):
+    with pytest.raises(NotImplementedError, match="nns_nowcast external macro data retrieval"):
         nns_nowcast(h=1)
 
 

@@ -10,7 +10,6 @@ ROOT = Path(__file__).resolve().parents[2]
 EXPORT_SURFACE = ROOT / "docs" / "export_surface.md"
 
 GUARDED_EXPORTS = {
-    "nns_var": "NNS.VAR",
     "nns_nowcast": "NNS.nowcast",
 }
 

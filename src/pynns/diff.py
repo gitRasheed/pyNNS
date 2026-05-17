@@ -267,7 +267,14 @@ def _dy_d_scalar(
     eval_values, vector_branch = _dy_d_eval_points(x_values, wrt_index, eval_points)
     h_s = _derivative_bandwidths(x_values.shape[0])
     results: list[dict[str, NDArray[np.float64]]] = []
+    cumulative_step = 0.0
+    cumulative_bands = _dy_d_uses_distribution_band(eval_points)
+    from pynns.dependence import _gravity
+
     for h_value in h_s:
+        h_step = _dy_d_h_step(x_values[:, wrt_index], int(h_value), _gravity)
+        cumulative_step += h_step
+        perturbation_step = cumulative_step if cumulative_bands else h_step
         if vector_branch:
             first, second, mixed_values = _dy_d_vector_band(
                 x_values,
@@ -275,6 +282,8 @@ def _dy_d_scalar(
                 wrt_index,
                 eval_values.reshape(-1),
                 int(h_value),
+                h_step,
+                perturbation_step,
                 mixed=bool(mixed),
             )
         else:
@@ -284,6 +293,8 @@ def _dy_d_scalar(
                 wrt_index,
                 _as_eval_matrix(eval_values, x_values.shape[1]),
                 int(h_value),
+                h_step,
+                perturbation_step,
                 mixed=bool(mixed),
             )
         result = {"First": first, "Second": second}
@@ -298,6 +309,10 @@ def _dy_d_scalar(
     if mixed and "Mixed" in results[0]:
         output["Mixed"] = _weighted_band_average([result["Mixed"] for result in results])
     return output
+
+
+def _dy_d_uses_distribution_band(eval_points: str | float | NDArray[np.float64]) -> bool:
+    return isinstance(eval_points, str) and eval_points.lower() in {"obs", "apd"}
 
 
 def _dy_dx_numeric(
@@ -405,18 +420,18 @@ def _dy_d_matrix_band(
     wrt_index: int,
     eval_points: NDArray[np.float64],
     h_value: int,
+    h_step: float,
+    perturbation_step: float,
     *,
     mixed: bool,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64] | None]:
-    from pynns.dependence import _gravity
     from pynns.regression import nns_reg
 
     n = eval_points.shape[0]
-    h_step = _dy_d_h_step(x[:, wrt_index], h_value, _gravity)
     lower_points = eval_points.copy()
     upper_points = eval_points.copy()
-    lower_points[:, wrt_index] -= h_step
-    upper_points[:, wrt_index] += h_step
+    lower_points[:, wrt_index] -= perturbation_step
+    upper_points[:, wrt_index] += perturbation_step
     deriv_points = np.vstack((lower_points, eval_points, upper_points))
     estimates = np.asarray(
         nns_reg(
@@ -449,24 +464,24 @@ def _dy_d_vector_band(
     wrt_index: int,
     eval_values: NDArray[np.float64],
     h_value: int,
+    h_step: float,
+    perturbation_step: float,
     *,
     mixed: bool,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64] | None]:
-    from pynns.copula import nns_copula
     from pynns.dependence import _gravity, nns_dep
     from pynns.norm import nns_norm
     from pynns.regression import nns_reg
     from pynns.var import lpm_var
 
     eval_vector = eval_values.reshape(-1)
-    h_step = _dy_d_h_step(x[:, wrt_index], h_value, _gravity)
-    lower_eval = eval_vector - h_step
-    upper_eval = eval_vector + h_step
+    lower_eval = eval_vector - perturbation_step
+    upper_eval = eval_vector + perturbation_step
     norm_col = nns_norm(x[:, wrt_index].reshape(-1, 1)).reshape(-1)
     zz = max(
         float(nns_dep(x[:, wrt_index], y, asym=True)["Dependence"]),
-        float(nns_copula(x[:, wrt_index], y)),
-        float(nns_copula(norm_col, y)),
+        _nns_copula_matrix(np.column_stack((x[:, wrt_index], x[:, wrt_index], y))),
+        _nns_copula_matrix(np.column_stack((norm_col, norm_col, y))),
     )
     seq_by = max(0.01, (1.0 - zz) / 2.0)
     probs = _r_seq_0_1(seq_by)
@@ -514,6 +529,54 @@ def _dy_d_vector_band(
         _dy_d_mixed(x, y, eval_vector, h_value, matrix_points=False) if mixed else None
     )
     return first, second, mixed_values
+
+
+def _nns_copula_matrix(values: NDArray[np.float64]) -> float:
+    from pynns.dependence import _dpm_nd
+    from pynns.pm_matrix import pm_matrix
+
+    data = np.asarray(values, dtype=np.float64)
+    if data.ndim != 2 or data.shape[1] < 2:
+        raise ValueError("NNS.copula matrix input must have at least two columns.")
+
+    n_cols = data.shape[1]
+    target = np.mean(data, axis=0)
+    upper = np.triu_indices(n_cols, k=1)
+
+    discrete_pm = pm_matrix(0.0, 0.0, target, data, pop_adj=False)
+    discrete_co_pm = float(np.sum(discrete_pm["cupm"][upper]) + np.sum(discrete_pm["clpm"][upper]))
+    if discrete_co_pm == 1.0 or discrete_co_pm == 0.0:
+        return 1.0
+
+    continuous_pm = pm_matrix(1.0, 1.0, target, data, pop_adj=True, norm=True)
+    continuous_co_pm = float(
+        np.sum(continuous_pm["cupm"][upper]) + np.sum(continuous_pm["clpm"][upper])
+    )
+
+    independent_co_pm = 0.25 * (n_cols**2 - n_cols)
+    discrete_dep = min(max(abs(discrete_co_pm - independent_co_pm) / independent_co_pm, 0.0), 1.0)
+    continuous_dep = min(
+        max(abs(continuous_co_pm - independent_co_pm) / independent_co_pm, 0.0), 1.0
+    )
+
+    discrete_d_pm = _dpm_nd(data, target, 0.0, norm=True)
+    continuous_d_pm = _dpm_nd(data, target, 1.0, norm=True)
+    independent_d_pm = 1.0 - (0.5**n_cols)
+    n_dim_discrete_dep = abs(discrete_d_pm - independent_d_pm) / independent_d_pm
+    n_dim_continuous_dep = abs(continuous_d_pm - independent_d_pm) / independent_d_pm
+
+    return float(
+        np.sqrt(
+            np.mean(
+                [
+                    discrete_dep,
+                    continuous_dep,
+                    n_dim_discrete_dep,
+                    n_dim_continuous_dep,
+                ]
+            )
+        )
+    )
 
 
 def _dy_d_mixed(

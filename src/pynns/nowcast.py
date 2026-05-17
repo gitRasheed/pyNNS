@@ -28,6 +28,6 @@ def nns_nowcast(
         ncores,
     )
     raise NotImplementedError(
-        "nns_nowcast depends on nns_var, which depends on nns_arma_optim; "
-        "it is not yet ported."
+        "nns_nowcast external macro data retrieval and nowcast-specific date alignment "
+        "are not yet ported."
     )

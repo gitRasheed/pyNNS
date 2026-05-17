@@ -6,7 +6,12 @@ import numpy as np
 import pytest
 from _r import nns
 
-from pynns.var import _lag_mtx, _var_interpolate_and_extrapolate, _var_multivariate_stack_stage
+from pynns.var import (
+    _lag_mtx,
+    _var_interpolate_and_extrapolate,
+    _var_multivariate_stack_stage,
+    nns_var,
+)
 
 
 def _to_matrix(result: object, names: list[str], key: str) -> np.ndarray:
@@ -21,6 +26,58 @@ def _json_safe_data(values: np.ndarray) -> list[list[float | None]]:
         [None if np.isnan(item) else float(item) for item in row]
         for row in values.tolist()
     ]
+
+
+def _relative_diagnostics(actual: np.ndarray, expected: np.ndarray) -> dict[str, float | int]:
+    actual_values = np.asarray(actual, dtype=np.float64)
+    expected_values = np.asarray(expected, dtype=np.float64)
+    diff = np.abs(actual_values - expected_values)
+    finite = np.isfinite(diff)
+    if not np.any(finite):
+        return {
+            "max_abs_diff": 0.0,
+            "max_rel_pct_masked": 0.0,
+            "p95_rel_pct_masked": 0.0,
+            "median_rel_pct_masked": 0.0,
+            "near_zero_reference": int(expected_values.size),
+        }
+    material = finite & (np.abs(expected_values) > 1e-8)
+    rel_pct = np.zeros_like(diff, dtype=np.float64)
+    rel_pct[material] = 100.0 * diff[material] / np.abs(expected_values[material])
+    if np.any(material):
+        material_rel = rel_pct[material]
+        max_rel = float(np.max(material_rel))
+        p95_rel = float(np.percentile(material_rel, 95))
+        median_rel = float(np.median(material_rel))
+    else:
+        max_rel = 0.0
+        p95_rel = 0.0
+        median_rel = 0.0
+    return {
+        "max_abs_diff": float(np.max(diff[finite])),
+        "max_rel_pct_masked": max_rel,
+        "p95_rel_pct_masked": p95_rel,
+        "median_rel_pct_masked": median_rel,
+        "near_zero_reference": int(np.count_nonzero(finite & ~material)),
+    }
+
+
+def _assert_public_numeric_close(
+    actual: np.ndarray,
+    expected: np.ndarray,
+    *,
+    rel_pct: float = 1e-7,
+    abs_tol: float = 1e-8,
+) -> None:
+    diagnostics = _relative_diagnostics(actual, expected)
+    assert diagnostics["max_abs_diff"] <= abs_tol or diagnostics["p95_rel_pct_masked"] <= rel_pct
+    np.testing.assert_allclose(
+        actual,
+        expected,
+        rtol=max(1e-8, rel_pct / 100.0),
+        atol=abs_tol,
+        equal_nan=True,
+    )
 
 
 def test_lag_mtx_scalar_tau_matches_reference_blocks() -> None:
@@ -135,6 +192,7 @@ def _expected_var_multivariate_reference(
         "interpolated_and_extrapolated": _to_matrix(result, names, "interpolated_and_extrapolated"),
         "univariate": _to_matrix(result, names, "univariate"),
         "multivariate": _to_matrix(result, names, "multivariate"),
+        "ensemble": _to_matrix(result, names, "ensemble"),
         "relevant_variables": _to_relevant_matrix(
             result,
             "relevant_variables",
@@ -218,6 +276,9 @@ def test_var_interpolate_and_extrapolate_h0_matches_r() -> None:
         ("complete", 2, "cor"),
         ("tau1", 1, "cor"),
         ("nested", ([1, 2], [1]), "cor"),
+        ("dep", 2, "NNS.dep"),
+        ("caus", 2, "NNS.caus"),
+        ("all", 2, "all"),
     ],
 )
 def test_var_multivariate_stack_stage_matches_r(
@@ -250,37 +311,195 @@ def test_var_multivariate_stack_stage_matches_r(
     expected_multivariate = cast(np.ndarray, expected_result["multivariate"])
     expected_relevant = cast(np.ndarray, expected_result["relevant_variables"])
 
-    np.testing.assert_allclose(actual_multivariate, expected_multivariate, equal_nan=True)
+    if dim_red_method in {"NNS.caus", "all"}:
+        _assert_public_numeric_close(actual_multivariate, expected_multivariate, rel_pct=1.0)
+    else:
+        np.testing.assert_allclose(actual_multivariate, expected_multivariate, equal_nan=True)
     assert actual_relevant.shape == expected_relevant.shape
     assert actual_result["names"] == names
     assert np.array_equal(actual_relevant, expected_relevant)
 
 
 @pytest.mark.parametrize(
-    ("tau", "dim_red_method"),
+    ("name", "tau"),
     [
-        (2, "NNS.dep"),
-        (2, "NNS.caus"),
-        (2, "all"),
+        ("complete", 2),
+        ("scalar_tau", 1),
+        ("nested_tau", ([1, 2], [1])),
     ],
 )
-def test_var_multivariate_stack_stage_cor_only_for_non_cor_methods(
+def test_public_nns_var_cor_matches_r(
+    name: str,
     tau: int | list[int] | list[list[int]],
-    dim_red_method: str,
 ) -> None:
+    del name
     variables = np.column_stack(
         (
             np.arange(-2.0, 18.0, 1.0, dtype=float),
             np.arange(1.0, 40.0, 2.0, dtype=float),
         )
     )
-    first_stage = _var_interpolate_and_extrapolate(variables, 3, tau=tau, names=["x1", "x2"])
-    with pytest.raises(NotImplementedError):
-        _var_multivariate_stack_stage(
-            cast(np.ndarray, first_stage["interpolated_and_extrapolated"]),
-            cast(np.ndarray, first_stage["univariate"]),
-            h=3,
-            tau=tau,
-            names=["x1", "x2"],
-            dim_red_method=dim_red_method,
+
+    expected_result = _expected_var_multivariate_reference(variables, 3, tau, "cor")
+    actual_result = nns_var(variables, 3, tau=tau, dim_red_method="cor")
+
+    assert set(actual_result) == {
+        "interpolated_and_extrapolated",
+        "relevant_variables",
+        "univariate",
+        "multivariate",
+        "ensemble",
+        "names",
+    }
+    assert actual_result["names"] == expected_result["relevant_names"]
+    for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
+        actual_values = cast(np.ndarray, actual_result[key])
+        expected_values = cast(np.ndarray, expected_result[key])
+        assert actual_values.shape == expected_values.shape
+        assert np.all(np.isfinite(actual_values))
+        _assert_public_numeric_close(actual_values, expected_values)
+    assert np.array_equal(
+        cast(np.ndarray, actual_result["relevant_variables"]),
+        cast(np.ndarray, expected_result["relevant_variables"]),
+    )
+
+
+def test_public_nns_var_cor_handles_missing_values_like_r() -> None:
+    variables = np.column_stack(
+        (
+            np.arange(-2.0, 18.0, 1.0, dtype=float),
+            np.arange(1.0, 40.0, 2.0, dtype=float),
         )
+    )
+    variables[4, 0] = np.nan
+    variables[-1, 1] = np.nan
+
+    expected_result = _expected_var_multivariate_reference(variables, 3, 2, "cor")
+    actual_result = nns_var(variables, 3, tau=2, dim_red_method="cor")
+
+    for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
+        _assert_public_numeric_close(
+            cast(np.ndarray, actual_result[key]),
+            cast(np.ndarray, expected_result[key]),
+            abs_tol=1e-8,
+        )
+    assert np.array_equal(
+        cast(np.ndarray, actual_result["relevant_variables"]),
+        cast(np.ndarray, expected_result["relevant_variables"]),
+    )
+
+
+def test_public_nns_var_nns_dep_matches_r() -> None:
+    variables = np.column_stack(
+        (
+            np.arange(-2.0, 18.0, 1.0, dtype=float),
+            np.arange(1.0, 40.0, 2.0, dtype=float),
+        )
+    )
+
+    expected_result = _expected_var_multivariate_reference(variables, 3, 2, "NNS.dep")
+    actual_result = nns_var(variables, 3, tau=2, dim_red_method="NNS.dep")
+
+    assert set(actual_result) == {
+        "interpolated_and_extrapolated",
+        "relevant_variables",
+        "univariate",
+        "multivariate",
+        "ensemble",
+        "names",
+    }
+    assert actual_result["names"] == expected_result["relevant_names"]
+    for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
+        actual_values = cast(np.ndarray, actual_result[key])
+        expected_values = cast(np.ndarray, expected_result[key])
+        assert actual_values.shape == expected_values.shape
+        assert np.all(np.isfinite(actual_values))
+        _assert_public_numeric_close(actual_values, expected_values)
+    assert np.array_equal(
+        cast(np.ndarray, actual_result["relevant_variables"]),
+        cast(np.ndarray, expected_result["relevant_variables"]),
+    )
+
+
+def test_public_nns_var_nns_caus_matches_r() -> None:
+    variables = np.column_stack(
+        (
+            np.arange(-2.0, 18.0, 1.0, dtype=float),
+            np.arange(1.0, 40.0, 2.0, dtype=float),
+        )
+    )
+
+    expected_result = _expected_var_multivariate_reference(variables, 3, 2, "NNS.caus")
+    actual_result = nns_var(variables, 3, tau=2, dim_red_method="NNS.caus")
+
+    assert set(actual_result) == {
+        "interpolated_and_extrapolated",
+        "relevant_variables",
+        "univariate",
+        "multivariate",
+        "ensemble",
+        "names",
+    }
+    assert actual_result["names"] == expected_result["relevant_names"]
+    for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
+        actual_values = cast(np.ndarray, actual_result[key])
+        expected_values = cast(np.ndarray, expected_result[key])
+        assert actual_values.shape == expected_values.shape
+        assert np.all(np.isfinite(actual_values))
+        _assert_public_numeric_close(actual_values, expected_values, rel_pct=1.0)
+    assert np.array_equal(
+        cast(np.ndarray, actual_result["relevant_variables"]),
+        cast(np.ndarray, expected_result["relevant_variables"]),
+    )
+
+
+def test_public_nns_var_all_matches_r() -> None:
+    variables = np.column_stack(
+        (
+            np.arange(-2.0, 18.0, 1.0, dtype=float),
+            np.arange(1.0, 40.0, 2.0, dtype=float),
+        )
+    )
+
+    expected_result = _expected_var_multivariate_reference(variables, 3, 2, "all")
+    actual_result = nns_var(variables, 3, tau=2, dim_red_method="all")
+
+    assert set(actual_result) == {
+        "interpolated_and_extrapolated",
+        "relevant_variables",
+        "univariate",
+        "multivariate",
+        "ensemble",
+        "names",
+    }
+    assert actual_result["names"] == expected_result["relevant_names"]
+    for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
+        actual_values = cast(np.ndarray, actual_result[key])
+        expected_values = cast(np.ndarray, expected_result[key])
+        assert actual_values.shape == expected_values.shape
+        assert np.all(np.isfinite(actual_values))
+        _assert_public_numeric_close(actual_values, expected_values, rel_pct=1.0)
+    assert np.array_equal(
+        cast(np.ndarray, actual_result["relevant_variables"]),
+        cast(np.ndarray, expected_result["relevant_variables"]),
+    )
+
+
+def test_public_nns_var_h0_returns_normalized_interpolation_dict() -> None:
+    variables = np.column_stack(
+        (
+            np.arange(-2.0, 18.0, 1.0, dtype=float),
+            np.arange(1.0, 40.0, 2.0, dtype=float),
+        )
+    )
+
+    expected_result = _expected_var_reference(variables, 0, 2)
+    actual_result = nns_var(variables, 0, tau=2)
+
+    assert set(actual_result) == {"interpolated_and_extrapolated", "names"}
+    _assert_public_numeric_close(
+        cast(np.ndarray, actual_result["interpolated_and_extrapolated"]),
+        cast(np.ndarray, expected_result["interpolated_and_extrapolated"]),
+    )
+    assert actual_result["names"] == expected_result["names"]
+

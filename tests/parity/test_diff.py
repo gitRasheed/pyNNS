@@ -103,6 +103,82 @@ def test_dy_d_nonlinear_wrt1_mean_matches_r() -> None:
         np.testing.assert_allclose(actual[key], expected[key], atol=DY_D_PARITY, equal_nan=True)
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize("eval_points", ["mean", "median"])
+def test_dy_d_scalar_wrt1_point_eval_modes_match_r(eval_points: str) -> None:
+    x = np.column_stack(
+        (np.array([-2, -1, 0, 1, 2], dtype=float), np.array([1, 3, 5, 7, 9], dtype=float))
+    )
+    y = 2 * x[:, 0] + 3 * x[:, 1]
+
+    expected = _dict_array(dy_d_scalar(x.tolist(), y.tolist(), 1, eval_points))
+    actual = dy_d(x, y, wrt=1, eval_points=eval_points)
+
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        actual_values = np.asarray(actual[key], dtype=np.float64).reshape(-1)
+        expected_values = np.asarray(expected[key], dtype=np.float64).reshape(-1)
+        assert actual_values.shape == expected_values.shape
+        np.testing.assert_allclose(actual_values, expected_values, atol=DY_D_PARITY, equal_nan=True)
+
+
+@pytest.mark.parity
+@pytest.mark.xfail(
+    reason=(
+        "R parity not yet matched for scalar last boundary-mode derivative; "
+        "focused linear case differs materially at the boundary"
+    )
+)
+def test_dy_d_scalar_wrt1_last_matches_r() -> None:
+    x = np.column_stack(
+        (np.array([-2, -1, 0, 1, 2], dtype=float), np.array([1, 3, 5, 7, 9], dtype=float))
+    )
+    y = 2 * x[:, 0] + 3 * x[:, 1]
+
+    expected = _dict_array(dy_d_scalar(x.tolist(), y.tolist(), 1, "last"))
+    actual = dy_d(x, y, wrt=1, eval_points="last")
+
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        actual_values = np.asarray(actual[key], dtype=np.float64).reshape(-1)
+        expected_values = np.asarray(expected[key], dtype=np.float64).reshape(-1)
+        assert actual_values.shape == expected_values.shape
+        np.testing.assert_allclose(actual_values, expected_values, atol=DY_D_PARITY, equal_nan=True)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("eval_points", ["obs", "apd"])
+@pytest.mark.xfail(
+    reason=(
+        "R parity not yet matched for scalar obs/apd distribution modes; "
+        "second derivatives remain materially divergent"
+    )
+)
+def test_dy_d_scalar_wrt1_distribution_eval_modes_match_r(eval_points: str) -> None:
+    x1 = np.linspace(-1.5, 1.5, 18)
+    x2 = np.cos(np.linspace(0.0, 2.0, 18))
+    x = np.column_stack((x1, x2))
+    y = x[:, 0] ** 2 + 0.5 * x[:, 1] + np.sin(x[:, 0] * x[:, 1])
+
+    expected = _dict_array(dy_d_scalar(x.tolist(), y.tolist(), 1, eval_points))
+    actual = dy_d(x, y, wrt=1, eval_points=eval_points)
+
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        actual_values = np.asarray(actual[key], dtype=np.float64).reshape(-1)
+        expected_values = np.asarray(expected[key], dtype=np.float64).reshape(-1)
+        assert actual_values.shape == expected_values.shape
+        diagnostics = _relative_diagnostics(actual[key], expected[key])
+        assert diagnostics["max_abs_diff"] <= 5e-3 or diagnostics["p95_rel_pct_masked"] <= 1.0
+        np.testing.assert_allclose(
+            actual_values,
+            expected_values,
+            atol=5e-3,
+            rtol=1e-2,
+            equal_nan=True,
+        )
+
+
 @pytest.mark.parametrize(
     ("wrt", "expected_first", "expected_second"),
     [
@@ -183,3 +259,24 @@ def _dict_array(value: object) -> dict[str, np.ndarray]:
     if not isinstance(value, dict):
         raise AssertionError(f"Expected dictionary, got {type(value)!r}")
     return {key: np.asarray(item, dtype=np.float64) for key, item in value.items()}
+
+
+def _relative_diagnostics(actual: np.ndarray, expected: np.ndarray) -> dict[str, float | int]:
+    actual_values = np.asarray(actual, dtype=np.float64)
+    expected_values = np.asarray(expected, dtype=np.float64)
+    diff = np.abs(actual_values - expected_values)
+    finite = np.isfinite(diff)
+    material = finite & (np.abs(expected_values) > 1e-8)
+    if np.any(material):
+        rel = 100.0 * diff[material] / np.abs(expected_values[material])
+        max_rel = float(np.max(rel))
+        p95_rel = float(np.percentile(rel, 95))
+    else:
+        max_rel = 0.0
+        p95_rel = 0.0
+    return {
+        "max_abs_diff": float(np.max(diff[finite])) if np.any(finite) else 0.0,
+        "max_rel_pct_masked": max_rel,
+        "p95_rel_pct_masked": p95_rel,
+        "near_zero_reference": int(np.count_nonzero(finite & ~material)),
+    }
