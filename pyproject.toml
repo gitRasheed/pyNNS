@@ -1,17 +1,28 @@
 [project]
 name = "nns-pm"
-version = "0.1.0"
-description = "Python port of NNS"
+version = "0.1.1"
+description = "Python port of nonlinear nonparametric statistics from R NNS"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-only"
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
     "Typing :: Typed",
+]
+keywords = [
+    "statistics",
+    "nonparametric",
+    "partial moments",
+    "regression",
+    "forecasting",
+    "nns",
 ]
 urls = { "Homepage" = "https://github.com/rasheed/pynns", "Repository" = "https://github.com/rasheed/pynns", "Issues" = "https://github.com/rasheed/pynns/issues", "Source" = "https://github.com/rasheed/pynns", "Project" = "https://github.com/rasheed/pynns" }
 dependencies = [
@@ -40,6 +51,17 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pynns"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/LICENSE",
+    "/README.md",
+    "/docs/api_status.md",
+    "/docs/benchmarks.md",
+    "/docs/conventions.md",
+    "/pyproject.toml",
+    "/src",
+]
 
 [tool.pytest.ini_options]
 addopts = "-ra -m 'not benchmark' --benchmark-disable -n 4"

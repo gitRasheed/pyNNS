@@ -4,7 +4,7 @@ from typing import Any
 
 from pynns.pm_matrix import pm_matrix as pm_matrix
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 _EXPORTS = {
     "causal_matrix": ("pynns.causation", "causal_matrix"),
