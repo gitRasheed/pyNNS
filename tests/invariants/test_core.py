@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 from _tolerances import EXACT
@@ -73,3 +75,16 @@ def test_lpm_ratio_and_upm_ratio_sum_to_one_when_defined() -> None:
     x = np.array([-2.0, -1.0, 0.5, 3.0])
 
     assert lpm_ratio(2, 0.0, x) + upm_ratio(2, 0.0, x) == pytest.approx(1.0, rel=EXACT)
+
+
+def test_partial_moment_ratios_degenerate_denominator_returns_nan_without_warning() -> None:
+    x = np.array([2.0, 2.0])
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuntimeWarning)
+        lower = lpm_ratio(2, 2.0, x)
+        upper = upm_ratio(2, 2.0, x)
+
+    assert np.isnan(lower)
+    assert np.isnan(upper)
+    assert [warning for warning in caught if issubclass(warning.category, RuntimeWarning)] == []

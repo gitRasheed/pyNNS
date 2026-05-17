@@ -7,7 +7,7 @@ import pytest
 import pynns
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPORT_SURFACE = ROOT / "docs" / "export_surface.md"
+API_STATUS = ROOT / "docs" / "api_status.md"
 
 GUARDED_EXPORTS = {
     "nns_nowcast": "NNS.nowcast",
@@ -15,7 +15,7 @@ GUARDED_EXPORTS = {
 
 
 def test_guarded_exports_are_public_and_documented() -> None:
-    docs = EXPORT_SURFACE.read_text(encoding="utf-8")
+    docs = API_STATUS.read_text(encoding="utf-8")
 
     for python_name, r_name in GUARDED_EXPORTS.items():
         assert python_name in pynns.__all__

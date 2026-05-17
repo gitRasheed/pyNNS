@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
 from pynns import nns_stack
-from pynns.stack import _cv_split
+from pynns.stack import (
+    _cv_split,
+    _distance_bulk_prediction,
+    _distance_path_predictions,
+    _stack_weights,
+)
 
 
 def test_nns_stack_numeric_shapes_and_keys() -> None:
@@ -33,6 +40,30 @@ def test_nns_stack_numeric_shapes_and_keys() -> None:
     assert result["stack"].shape == (7,)
     assert result["probability.threshold"] == pytest.approx(0.5)
     assert np.all(np.isfinite(result["stack"]))
+
+
+def test_stack_min_objective_underflow_weights_do_not_warn() -> None:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuntimeWarning)
+        result = _stack_weights(1e-200, 1.0, (1, 2), "min")
+
+    np.testing.assert_allclose(result, np.array([0.0, 1.0]))
+    assert [warning for warning in caught if issubclass(warning.category, RuntimeWarning)] == []
+
+
+def test_stack_zero_distance_path_predictions_do_not_warn() -> None:
+    features = np.array([[1e-200], [1.0]], dtype=np.float64)
+    yhat = np.array([1e200, 4.0], dtype=np.float64)
+    x_test = np.array([[0.0]], dtype=np.float64)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuntimeWarning)
+        path = _distance_path_predictions(features, yhat, x_test, kmax=2)
+        bulk = _distance_bulk_prediction(features, yhat, x_test, k=2)
+
+    assert np.isposinf(path[0, 0])
+    assert np.isposinf(bulk[0])
+    assert [warning for warning in caught if issubclass(warning.category, RuntimeWarning)] == []
 
 
 def test_nns_stack_classification_shapes_and_codes() -> None:

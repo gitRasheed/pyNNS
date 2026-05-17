@@ -1006,7 +1006,7 @@ def _coefficients(
         rp_x = np.repeat(rp_x, 3)
         rp_y = np.repeat(rp_y, 3)
 
-    with np.errstate(divide="ignore", invalid="ignore"):
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         coef = rise / run
     lower = rp_x[:-1] if rp_x.size > 1 else np.array([float(np.unique(rp_x)[0])])
     upper = rp_x[1:] if rp_x.size > 1 else np.array([float(np.unique(rp_x)[0])])

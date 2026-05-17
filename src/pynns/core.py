@@ -31,7 +31,8 @@ def lpm_ratio(
 
     lower = lpm(degree, target, x)
     upper = upm(degree, target, x)
-    ratio = np.asarray(lower) / (np.asarray(lower) + np.asarray(upper))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ratio = np.asarray(lower) / (np.asarray(lower) + np.asarray(upper))
     return _result_for_target(np.asarray(ratio).reshape(-1), target)
 
 
@@ -62,7 +63,8 @@ def upm_ratio(
 
     lower = lpm(degree, target, x)
     upper = upm(degree, target, x)
-    ratio = np.asarray(upper) / (np.asarray(lower) + np.asarray(upper))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ratio = np.asarray(upper) / (np.asarray(lower) + np.asarray(upper))
     return _result_for_target(np.asarray(ratio).reshape(-1), target)
 
 

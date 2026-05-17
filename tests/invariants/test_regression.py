@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
 from pynns import nns_reg
+from pynns.regression import _coefficients
 
 
 def test_nns_reg_shapes_and_bounds() -> None:
@@ -18,6 +21,18 @@ def test_nns_reg_shapes_and_bounds() -> None:
     assert result["Fitted.xy"]["y.hat"].shape == x.shape
     assert result["Point.est"].shape == (3,)
     assert result["derivative"]["Coefficient"].size == result["regression.points"]["x"].size - 1
+
+
+def test_nns_reg_overflowing_coefficient_is_normalized_without_warning() -> None:
+    rp_x = np.array([0.0, 1e-320], dtype=np.float64)
+    rp_y = np.array([0.0, 1.0], dtype=np.float64)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuntimeWarning)
+        result = _coefficients(rp_x, rp_y, rp_x, rp_y)
+
+    np.testing.assert_allclose(result["Coefficient"], np.array([0.0]))
+    assert [warning for warning in caught if issubclass(warning.category, RuntimeWarning)] == []
 
 
 def test_nns_reg_order_max_is_perfect_fit() -> None:

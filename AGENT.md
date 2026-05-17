@@ -89,7 +89,7 @@ Reports and scripts are diagnostic snapshots only. Enforced behavior belongs in 
 - Watch R C-API distribution functions (`Rf_dexp`, `Rf_dnorm`, `Rf_dbinom`, etc.); verify at least one numeric case against installed R before trusting source-level parameter meaning.
 - If a function being ported depends on another NNS function not yet implemented in PyNNS, stop and report. Do not silently substitute another algorithm.
 - Before implementing a port, list the R function's dependencies, including other NNS functions, internal C++ kernels, and R helpers. Report any unported NNS dependency before writing code.
-- Any new `NotImplementedError` path must be added to `docs/deferred_paths.md` in the same commit.
+- Any new `NotImplementedError` path must be added to `docs/api_status.md` in the same commit.
 - Do not accept fake paths. Either faithfully port public semantics, reject explicitly, or stop and report.
 
 ## Testing Philosophy

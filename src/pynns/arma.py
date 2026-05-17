@@ -592,7 +592,8 @@ def _default_arma_optim_objective(
             float(np.mean(actual_values)),
         )
     )
-    return float(np.mean((predicted_values - actual_values) ** 2) / denominator)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return float(np.mean((predicted_values - actual_values) ** 2) / denominator)
 
 
 def _replace_nan_objectives(values: NDArray[np.float64], objective: str) -> NDArray[np.float64]:
@@ -754,9 +755,16 @@ def _numeric_seasonal_weights(
     output = np.empty(lags.size, dtype=np.float64)
     for index, lag in enumerate(lags):
         rev_var = variable[:: -int(lag)]
-        output[index] = abs(np.float64(np.std(rev_var, ddof=1)) / np.float64(np.mean(rev_var)))
-    relative = output / abs(np.float64(np.std(variable, ddof=1)) / np.float64(np.mean(variable)))
-    seasonal_weighting = 1.0 / relative
+        with np.errstate(invalid="ignore", divide="ignore"):
+            output[index] = abs(
+                np.float64(np.std(rev_var, ddof=1)) / np.float64(np.mean(rev_var))
+            )
+    with np.errstate(invalid="ignore", divide="ignore"):
+        baseline_cv = abs(
+            np.float64(np.std(variable, ddof=1)) / np.float64(np.mean(variable))
+        )
+        relative = output / baseline_cv
+        seasonal_weighting = 1.0 / relative
     observation_weighting = 1.0 / np.sqrt(lags.astype(np.float64))
     denom = float(np.sum(observation_weighting * seasonal_weighting))
     return (seasonal_weighting * observation_weighting) / denom

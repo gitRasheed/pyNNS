@@ -604,10 +604,13 @@ def _distance_path_predictions(
     order = np.argsort(dist, axis=1, kind="quicksort")[:, :kmax]
     sorted_dist = np.take_along_axis(dist, order, axis=1)
     sorted_y = yhat[order]
-    weights = 1.0 / sorted_dist
-    csum_weights = np.cumsum(weights, axis=1)
-    csum_y = np.cumsum(weights * sorted_y, axis=1)
-    return np.asarray(csum_y / csum_weights, dtype=np.float64)
+    with np.errstate(divide="ignore", over="ignore"):
+        weights = 1.0 / sorted_dist
+    with np.errstate(over="ignore", invalid="ignore"):
+        csum_weights = np.cumsum(weights, axis=1)
+        csum_y = np.cumsum(weights * sorted_y, axis=1)
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        return np.asarray(csum_y / csum_weights, dtype=np.float64)
 
 
 def _distance_bulk_prediction(
@@ -620,8 +623,13 @@ def _distance_bulk_prediction(
     order = np.argsort(dist, axis=1, kind="quicksort")[:, :k]
     row_dist = np.take_along_axis(dist, order, axis=1)
     row_y = yhat[order]
-    weights = 1.0 / row_dist
-    return np.asarray(np.sum(weights * row_y, axis=1) / np.sum(weights, axis=1), dtype=np.float64)
+    with np.errstate(divide="ignore", over="ignore"):
+        weights = 1.0 / row_dist
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        return np.asarray(
+            np.sum(weights * row_y, axis=1) / np.sum(weights, axis=1),
+            dtype=np.float64,
+        )
 
 
 def _stack_distances(
@@ -804,7 +812,8 @@ def _stack_weights(
     values = np.array([reg_obj, dimred_obj], dtype=np.float64)
     values[values == 0.0] = 1e-10
     if objective == "min":
-        weights = np.maximum(1e-10, 1.0 / (values**2))
+        with np.errstate(divide="ignore"):
+            weights = np.maximum(1e-10, 1.0 / (values**2))
     else:
         weights = np.maximum(1e-10, values**2)
     mask = np.array([1 in methods, 2 in methods], dtype=bool)

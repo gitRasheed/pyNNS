@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
 from pynns import nns_arma, nns_arma_optim, nns_nowcast, nns_var
+from pynns.arma import _default_arma_optim_objective, _numeric_seasonal_weights
 
 
 def test_nns_arma_output_length_matches_h() -> None:
@@ -176,3 +179,25 @@ def test_nns_arma_finite_where_r_is_finite_case() -> None:
     result = nns_arma(variable, h=5, seasonal_factor=4, method="lin")
 
     assert np.all(np.isfinite(result))
+
+
+def test_arma_degenerate_objective_returns_nan_without_warning() -> None:
+    values = np.ones(3, dtype=np.float64)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuntimeWarning)
+        result = _default_arma_optim_objective(values, values)
+
+    assert np.isnan(result)
+    assert [warning for warning in caught if issubclass(warning.category, RuntimeWarning)] == []
+
+
+def test_arma_constant_numeric_seasonal_weights_return_nan_without_warning() -> None:
+    values = np.full(20, 5.0, dtype=np.float64)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuntimeWarning)
+        result = _numeric_seasonal_weights(values, np.array([4], dtype=np.int64))
+
+    assert np.isnan(result).all()
+    assert [warning for warning in caught if issubclass(warning.category, RuntimeWarning)] == []

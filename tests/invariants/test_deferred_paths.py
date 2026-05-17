@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src" / "pynns"
-DEFERRED_PATHS = ROOT / "docs" / "deferred_paths.md"
+API_STATUS = ROOT / "docs" / "api_status.md"
 
 
 EXPECTED_DEFERRED_FRAGMENTS = {
@@ -21,7 +21,7 @@ EXPECTED_DEFERRED_FRAGMENTS = {
 
 def test_production_notimplemented_guards_are_documented() -> None:
     messages = _production_notimplemented_messages()
-    docs = DEFERRED_PATHS.read_text(encoding="utf-8")
+    docs = API_STATUS.read_text(encoding="utf-8")
 
     assert messages
     stale_mappings = [
