@@ -183,10 +183,10 @@ def _render(rows: list[BenchmarkRow]) -> str:
         "",
         "## Results",
         "",
-        "`Python faster vs R` is computed as `(R baseline / Python mean - 1) * 100`. "
-        "Positive values mean Python is faster; negative values mean Python is slower.",
+        "`Python speed vs R` is computed as `R baseline / Python mean`. Values above `1.00x` "
+        "mean Python is faster; values below `1.00x` mean Python is slower.",
         "",
-        "| Benchmark | Python mean | R baseline | Python faster vs R |",
+        "| Benchmark | Python mean | R baseline | Python speed vs R |",
         "| --- | ---: | ---: | ---: |",
     ]
     for row in rows:
@@ -197,7 +197,7 @@ def _render(rows: list[BenchmarkRow]) -> str:
                     row.label,
                     _format_ms(row.python_seconds),
                     _format_ms(row.r_seconds),
-                    _format_percent(row.python_seconds, row.r_seconds),
+                    _format_speed_ratio(row.python_seconds, row.r_seconds),
                 ]
             )
             + " |"
@@ -209,9 +209,8 @@ def _format_ms(seconds: float) -> str:
     return f"{seconds * 1000.0:.3f} ms"
 
 
-def _format_percent(python_seconds: float, r_seconds: float) -> str:
-    percent = (r_seconds / python_seconds - 1.0) * 100.0
-    return f"{percent:+.1f}%"
+def _format_speed_ratio(python_seconds: float, r_seconds: float) -> str:
+    return f"{r_seconds / python_seconds:.2f}x"
 
 
 if __name__ == "__main__":
