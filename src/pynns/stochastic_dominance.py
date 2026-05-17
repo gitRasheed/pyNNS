@@ -18,12 +18,15 @@ from scipy.spatial.distance import squareform  # type: ignore[import-untyped]
 
 from pynns.core import _as_1d_values, lpm
 
+_SD_CLUSTER_DOMINANCE_MATRIX_MIN_COLUMNS = 75
+
 
 @dataclass(frozen=True)
 class _SDPrecomputed:
     values: NDArray[np.float64]
     sorted_values: NDArray[np.float64]
     curves: NDArray[np.float64]
+    curve_sums: NDArray[np.float64]
     minimums: NDArray[np.float64]
     means: NDArray[np.float64]
     identical: NDArray[np.bool_]
@@ -104,13 +107,27 @@ def nns_sd_cluster(
         if len(all_names) != column_count:
             raise ValueError("names length must match the number of data columns.")
 
-    precomputed = _precompute_sd_table(values, int(degree), discrete=discrete)
+    degree_int = int(degree)
+    precomputed = _precompute_sd_table(values, degree_int, discrete=discrete)
+    dominance_matrix = (
+        _dominance_matrix_from_precomputed(precomputed, degree_int)
+        if column_count >= _SD_CLUSTER_DOMINANCE_MATRIX_MIN_COLUMNS
+        else None
+    )
     active = list(range(column_count))
     clusters: dict[str, list[str]] = {}
     iteration = 1
 
     while len(active) > min_cluster:
-        sd_set_indices = _sd_efficient_active_indices(precomputed, active, int(degree))
+        if dominance_matrix is None:
+            sd_set_indices = _sd_efficient_active_indices(precomputed, active, degree_int)
+        else:
+            sd_set_indices = _sd_efficient_active_indices_from_matrix(
+                precomputed,
+                active,
+                degree_int,
+                dominance_matrix,
+            )
         sd_set = [all_names[index] for index in sd_set_indices]
         if not sd_set:
             break
@@ -245,10 +262,12 @@ def _precompute_sd_table(
     discrete: bool,
 ) -> _SDPrecomputed:
     sorted_values = np.sort(values, axis=0)
+    curves = _sd_curve_table(sorted_values, degree, discrete=discrete)
     return _SDPrecomputed(
         values=values,
         sorted_values=sorted_values,
-        curves=_sd_curve_table(sorted_values, degree, discrete=discrete),
+        curves=curves,
+        curve_sums=np.sum(curves, axis=0),
         minimums=sorted_values[0, :],
         means=np.mean(values, axis=0),
         identical=np.all(
@@ -287,6 +306,54 @@ def _sd_efficient_active_indices(
     return keep
 
 
+def _sd_efficient_active_indices_from_matrix(
+    precomputed: _SDPrecomputed,
+    active: Sequence[int],
+    degree: int,
+    dominance_matrix: NDArray[np.bool_],
+) -> list[int]:
+    if not active:
+        return []
+
+    active_array = np.asarray(active, dtype=np.intp)
+    tmax = float(np.max(precomputed.values[:, active_array]))
+    order_lpm = _lpm_at_target(precomputed.values[:, active_array], tmax, degree)
+    order = [
+        active[int(position)]
+        for position in sorted(
+            range(len(active)),
+            key=lambda position: (order_lpm[position], active[position]),
+        )
+    ]
+
+    keep: list[int] = []
+    for index in order:
+        dominated = any(dominance_matrix[kept, index] for kept in keep)
+        if not dominated:
+            keep.append(index)
+    return keep
+
+
+def _dominance_matrix_from_precomputed(
+    precomputed: _SDPrecomputed,
+    degree: int,
+) -> NDArray[np.bool_]:
+    curves = precomputed.curves
+    columns = curves.shape[1]
+    any_gt = np.zeros((columns, columns), dtype=np.bool_)
+    for start, stop in _curve_comparison_chunks(curves.shape[0], columns):
+        block = curves[start:stop, :]
+        any_gt |= np.any(block[:, :, np.newaxis] > block[:, np.newaxis, :], axis=0)
+
+    dominates = np.logical_not(any_gt) & any_gt.T
+    dominates &= np.logical_not(precomputed.identical)
+    dominates &= precomputed.minimums[:, np.newaxis] >= precomputed.minimums[np.newaxis, :]
+    if degree > 1:
+        dominates &= precomputed.means[:, np.newaxis] >= precomputed.means[np.newaxis, :]
+    np.fill_diagonal(dominates, False)
+    return dominates
+
+
 def _dominates_from_precomputed(
     x_index: int,
     y_index: int,
@@ -302,7 +369,10 @@ def _dominates_from_precomputed(
 
     x_curve = precomputed.curves[:, x_index]
     y_curve = precomputed.curves[:, y_index]
-    if np.array_equal(x_curve, y_curve):
+    if precomputed.curve_sums[x_index] == precomputed.curve_sums[y_index] and np.array_equal(
+        x_curve,
+        y_curve,
+    ):
         return False
     return bool(not np.any(x_curve > y_curve))
 
@@ -506,6 +576,14 @@ def _lpm_at_target(
 def _grid_chunks(grid_size: int, columns: int) -> Iterator[tuple[int, int]]:
     max_intermediate_bytes = 100 * 1024 * 1024
     row_bytes = columns * np.dtype(np.float64).itemsize
+    chunk_size = max(1, max_intermediate_bytes // max(row_bytes, 1))
+    for start in range(0, grid_size, chunk_size):
+        yield start, min(start + chunk_size, grid_size)
+
+
+def _curve_comparison_chunks(grid_size: int, columns: int) -> Iterator[tuple[int, int]]:
+    max_intermediate_bytes = 100 * 1024 * 1024
+    row_bytes = columns * columns * np.dtype(np.bool_).itemsize
     chunk_size = max(1, max_intermediate_bytes // max(row_bytes, 1))
     for start in range(0, grid_size, chunk_size):
         yield start, min(start + chunk_size, grid_size)

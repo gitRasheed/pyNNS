@@ -136,9 +136,10 @@ The cache schema is versioned. Schema mismatches fail. NNS version mismatches wa
 Default pytest excludes benchmarks. Run benchmarks serially because `pytest-benchmark` is not reliable under xdist:
 
 ```bash
+mkdir -p docs/benchmark_reports
 uv run pytest -n0 -m benchmark --benchmark-enable \
-  --benchmark-json=reports/benchmark_latest.json tests/benchmarks/
-uv run python scripts/update_benchmarks_doc.py reports/benchmark_latest.json
+  --benchmark-json=docs/benchmark_reports/benchmark_latest.json tests/benchmarks/
+uv run python scripts/update_benchmarks_doc.py docs/benchmark_reports/benchmark_latest.json
 ```
 
 Benchmark docs report `Python speed vs R = R baseline / Python mean`. Values above `1.00x` mean Python is faster; values below `1.00x` mean Python is slower.

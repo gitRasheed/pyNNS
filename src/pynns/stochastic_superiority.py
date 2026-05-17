@@ -72,18 +72,10 @@ def _stoch_superiority(
     if xs.size == 0 or ys.size == 0:
         raise ValueError("x and y must both have positive length.")
 
-    less_count = 0
-    tie_count = 0
-    left = 0
-    right = 0
-    n_y = ys.size
-    for xi in xs:
-        while left < n_y and ys[left] < xi:
-            left += 1
-        while right < n_y and ys[right] <= xi:
-            right += 1
-        less_count += left
-        tie_count += right - left
+    left = np.searchsorted(ys, xs, side="left")
+    right = np.searchsorted(ys, xs, side="right")
+    less_count = int(np.sum(left))
+    tie_count = int(np.sum(right - left))
 
     denominator = float(xs.size * ys.size)
     p_gt = float(less_count / denominator)

@@ -5,6 +5,8 @@ docs/*
 !docs/api_status.md
 !docs/examples/
 !docs/examples/**
+docs/benchmark_reports/
+reports/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

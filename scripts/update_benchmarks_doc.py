@@ -176,9 +176,11 @@ def _render(rows: list[BenchmarkRow]) -> str:
         "Run with:",
         "",
         "```bash",
+        "mkdir -p docs/benchmark_reports",
         "uv run pytest -n0 -m benchmark --benchmark-enable \\",
-        "  --benchmark-json=reports/benchmark_latest.json tests/benchmarks/",
-        "uv run python scripts/update_benchmarks_doc.py reports/benchmark_latest.json",
+        "  --benchmark-json=docs/benchmark_reports/benchmark_latest.json tests/benchmarks/",
+        "uv run python scripts/update_benchmarks_doc.py "
+        "docs/benchmark_reports/benchmark_latest.json",
         "```",
         "",
         "## Results",
