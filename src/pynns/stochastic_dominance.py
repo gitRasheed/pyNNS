@@ -21,6 +21,7 @@ from pynns.core import _as_1d_values, lpm
 _SD_CLUSTER_DOMINANCE_MATRIX_MIN_COLUMNS = 75
 _SD_PREFIX_PAIR_MATRIX_MIN_COLUMNS = 75
 _SD_PREFIX_PAIR_TARGET_BLOCK_COLUMNS = 64
+_SD_ORDER_STAT_TARGET_BLOCK_COLUMNS = 64
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,13 @@ class _SDPrefixPrecomputed:
     own_curves: NDArray[np.float64]
     minimums: NDArray[np.float64]
     means: NDArray[np.float64]
+    identical: NDArray[np.bool_]
+
+
+@dataclass(frozen=True)
+class _SDOrderStatPrecomputed:
+    values: NDArray[np.float64]
+    sorted_values: NDArray[np.float64]
     identical: NDArray[np.bool_]
 
 
@@ -122,10 +130,17 @@ def nns_sd_cluster(
             raise ValueError("names length must match the number of data columns.")
 
     degree_int = int(degree)
+    order_stat_dominance_matrix = None
     prefix_precomputed = None
     precomputed = None
     if column_count >= _SD_CLUSTER_DOMINANCE_MATRIX_MIN_COLUMNS:
-        prefix_precomputed = _prefix_sd_precompute(values, degree_int, discrete=discrete)
+        if degree_int == 1 and discrete:
+            order_stat_precomputed = _order_stat_sd_precompute(values)
+            order_stat_dominance_matrix = _dominance_matrix_from_order_stats(
+                order_stat_precomputed
+            )
+        else:
+            prefix_precomputed = _prefix_sd_precompute(values, degree_int, discrete=discrete)
     else:
         precomputed = _precompute_sd_table(values, degree_int, discrete=discrete)
     active = list(range(column_count))
@@ -133,7 +148,14 @@ def nns_sd_cluster(
     iteration = 1
 
     while len(active) > min_cluster:
-        if prefix_precomputed is not None:
+        if order_stat_dominance_matrix is not None:
+            sd_set_indices = _sd_efficient_active_indices_from_matrix(
+                values,
+                active,
+                degree_int,
+                order_stat_dominance_matrix,
+            )
+        elif prefix_precomputed is not None:
             sd_set_indices = _sd_efficient_active_indices_from_prefix_kept(
                 prefix_precomputed,
                 active,
@@ -252,6 +274,15 @@ def sd_efficient_set(
 
     active = list(range(values.shape[1]))
     if values.shape[1] >= _SD_PREFIX_PAIR_MATRIX_MIN_COLUMNS:
+        if degree == 1 and discrete:
+            order_stat_precomputed = _order_stat_sd_precompute(values)
+            dominance_matrix = _dominance_matrix_from_order_stats(order_stat_precomputed)
+            return _sd_efficient_active_indices_from_matrix(
+                values,
+                active,
+                degree,
+                dominance_matrix,
+            )
         prefix_precomputed = _prefix_sd_precompute(values, degree, discrete=discrete)
         return _sd_efficient_active_indices_from_prefix_kept(
             prefix_precomputed,
@@ -324,6 +355,18 @@ def _prefix_sd_precompute(
         ),
         minimums=sorted_values[0, :],
         means=np.mean(values, axis=0),
+        identical=np.all(
+            sorted_values.T[:, np.newaxis, :] == sorted_values.T[np.newaxis, :, :],
+            axis=2,
+        ),
+    )
+
+
+def _order_stat_sd_precompute(values: NDArray[np.float64]) -> _SDOrderStatPrecomputed:
+    sorted_values = np.asfortranarray(np.sort(values, axis=0))
+    return _SDOrderStatPrecomputed(
+        values=values,
+        sorted_values=sorted_values,
         identical=np.all(
             sorted_values.T[:, np.newaxis, :] == sorted_values.T[np.newaxis, :, :],
             axis=2,
@@ -504,6 +547,25 @@ def _dominance_matrix_from_prefix_pairs(
 
     dominates = np.logical_not(any_gt) & any_gt.T
     dominates &= _prefix_directional_candidate_matrix(precomputed, degree)
+    np.fill_diagonal(dominates, False)
+    return dominates
+
+
+def _dominance_matrix_from_order_stats(
+    precomputed: _SDOrderStatPrecomputed,
+) -> NDArray[np.bool_]:
+    sorted_values = precomputed.sorted_values
+    columns = sorted_values.shape[1]
+    dominates = np.zeros((columns, columns), dtype=np.bool_)
+
+    for target_start in range(0, columns, _SD_ORDER_STAT_TARGET_BLOCK_COLUMNS):
+        target_stop = min(target_start + _SD_ORDER_STAT_TARGET_BLOCK_COLUMNS, columns)
+        target_values = sorted_values[:, target_start:target_stop]
+        ge_all = np.all(sorted_values[:, :, np.newaxis] >= target_values[:, np.newaxis, :], axis=0)
+        gt_any = np.any(sorted_values[:, :, np.newaxis] > target_values[:, np.newaxis, :], axis=0)
+        dominates[:, target_start:target_stop] = ge_all & gt_any
+
+    dominates &= np.logical_not(precomputed.identical)
     np.fill_diagonal(dominates, False)
     return dominates
 

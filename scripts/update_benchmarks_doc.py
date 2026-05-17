@@ -31,12 +31,14 @@ REALISTIC_SD_R_PLACEHOLDERS = {
     ("nns_sd_cluster", 1257, 250, 2): 0.186,
     ("sd_efficient_set", 1257, 478, 2): 0.178,
     ("nns_sd_cluster", 1257, 478, 2): 0.618,
-    ("rolling_sd_efficient_set_252d_monthly", 252, 100, 2): 0.257,
-    ("rolling_sd_efficient_set_252d_monthly", 252, 478, 2): 2.024,
-    ("rolling_sd_cluster_252d_monthly", 252, 100, 2): 0.7557,
-    ("rolling_sd_cluster_252d_monthly", 252, 478, 2): 9.132,
-    ("rolling_sd_cluster_756d_quarterly", 756, 478, 2): 3.915,
-    ("rolling_sd_efficient_set_degree1_vs_degree2_252d_quarterly", 252, 478, 0): 1.748,
+    ("rolling_sd_efficient_set_252d_monthly", 252, 100, 2): 0.28,
+    ("rolling_sd_efficient_set_252d_monthly", 252, 478, 2): 2.078,
+    ("rolling_sd_cluster_252d_monthly", 252, 100, 2): 0.7997,
+    ("rolling_sd_cluster_252d_monthly", 252, 478, 2): 9.384,
+    ("rolling_sd_cluster_756d_quarterly", 756, 478, 2): 4.2,
+    ("rolling_sd_efficient_set_252d_quarterly", 252, 478, 1): 1.149,
+    ("rolling_sd_cluster_252d_quarterly", 252, 478, 1): 1.161,
+    ("rolling_sd_efficient_set_degree1_vs_degree2_252d_quarterly", 252, 478, 0): 1.847,
     ("mag7_market_downside_stress", 1257, 9, 1): 0.0417,
     ("pm_matrix_degree1_mean", 252, 478, 1): 0.2683,
     ("pm_matrix_degree1_mean", 1257, 478, 1): 1.385,
@@ -426,9 +428,13 @@ def _render_realistic_sd(
             "",
             "Interpretation:",
             "",
+            "- Large degree-1 discrete SD uses an exact order-statistic dominance",
+            "  matrix: one empirical sample FSD-dominates another iff every sorted",
+            "  order statistic is at least as large, with at least one strict",
+            "  improvement.",
             "- Guarded prefix-pair evaluation skips curve work for min/mean/identical",
             "  impossible pairs, and the standalone efficient-set path only checks",
-            "  already-kept candidates.",
+            "  already-kept candidates for degree 2/3 and degree-1 continuous cases.",
             "- The implementation deliberately follows R's C++ SD algorithmic structure:",
             "  sorted columns, prefix sums, pair-threshold dominance checks, exact guards, and",
             "  no tolerance-based shortcuts.",
@@ -557,6 +563,12 @@ def _realistic_python_only_label(name: str) -> str | None:
         "test_rolling_sd_cluster_756d_quarterly_degree2": (
             "Rolling SD cluster, 756-day quarterly, degree=2"
         ),
+        "test_rolling_sd_efficient_set_252d_quarterly_degree1": (
+            "Rolling SD efficient set, 252-day quarterly, degree=1"
+        ),
+        "test_rolling_sd_cluster_252d_quarterly_degree1": (
+            "Rolling SD cluster, 252-day quarterly, degree=1"
+        ),
         "test_rolling_sd_efficient_set_252d_quarterly_degree1_vs_degree2": (
             "Rolling SD efficient set, 252-day quarterly, degree 1 vs 2"
         ),
@@ -598,6 +610,10 @@ def _realistic_workflow_case_from_benchmark_name(
         return ("rolling_sd_cluster_252d_monthly", 252, columns, 2)
     if base_name == "test_rolling_sd_cluster_756d_quarterly_degree2":
         return ("rolling_sd_cluster_756d_quarterly", 756, max_columns, 2)
+    if base_name == "test_rolling_sd_efficient_set_252d_quarterly_degree1":
+        return ("rolling_sd_efficient_set_252d_quarterly", 252, max_columns, 1)
+    if base_name == "test_rolling_sd_cluster_252d_quarterly_degree1":
+        return ("rolling_sd_cluster_252d_quarterly", 252, max_columns, 1)
     if base_name == "test_rolling_sd_efficient_set_252d_quarterly_degree1_vs_degree2":
         return ("rolling_sd_efficient_set_degree1_vs_degree2_252d_quarterly", 252, max_columns, 0)
     if base_name == "test_mag7_market_downside_stress_components":

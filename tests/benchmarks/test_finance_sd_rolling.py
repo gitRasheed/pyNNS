@@ -86,6 +86,42 @@ def test_rolling_sd_cluster_756d_quarterly_degree2(benchmark: Any) -> None:
 
 
 @pytest.mark.benchmark
+def test_rolling_sd_efficient_set_252d_quarterly_degree1(benchmark: Any) -> None:
+    returns = load_constituent_returns(column_count=MAX_COLUMN_COUNT)
+    dates = load_dates()
+
+    result = benchmark.pedantic(
+        _rolling_sd_efficient_set_summary,
+        args=(returns, dates),
+        kwargs={"lookback": 252, "frequency": "quarterly", "degree": 1},
+        rounds=1,
+        iterations=1,
+    )
+
+    _record_summary(benchmark, result)
+    assert result["window_count"] > 0
+    assert result["average_efficient_set_size"] > 0.0
+
+
+@pytest.mark.benchmark
+def test_rolling_sd_cluster_252d_quarterly_degree1(benchmark: Any) -> None:
+    returns = load_constituent_returns(column_count=MAX_COLUMN_COUNT)
+    dates = load_dates()
+
+    result = benchmark.pedantic(
+        _rolling_sd_cluster_summary,
+        args=(returns, dates),
+        kwargs={"lookback": 252, "frequency": "quarterly", "degree": 1},
+        rounds=1,
+        iterations=1,
+    )
+
+    _record_summary(benchmark, result)
+    assert result["window_count"] > 0
+    assert result["average_cluster_count"] > 0.0
+
+
+@pytest.mark.benchmark
 def test_rolling_sd_efficient_set_252d_quarterly_degree1_vs_degree2(
     benchmark: Any,
 ) -> None:

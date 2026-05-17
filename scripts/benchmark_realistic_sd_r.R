@@ -379,6 +379,12 @@ workflow_cases <- list(
   list("rolling_sd_cluster_756d_quarterly", 756, max_columns, 2, max_repeats, function() {
     rolling_sd_cluster_summary(max_columns, 756, "quarterly", 2)
   }),
+  list("rolling_sd_efficient_set_252d_quarterly", 252, max_columns, 1, max_repeats, function() {
+    rolling_sd_efficient_set_summary(max_columns, 252, "quarterly", 1)
+  }),
+  list("rolling_sd_cluster_252d_quarterly", 252, max_columns, 1, max_repeats, function() {
+    rolling_sd_cluster_summary(max_columns, 252, "quarterly", 1)
+  }),
   list("rolling_sd_efficient_set_degree1_vs_degree2_252d_quarterly", 252, max_columns, 0, max_repeats, function() {
     rolling_sd_degree_comparison_summary(max_columns, 252, "quarterly")
   }),
