@@ -15,7 +15,6 @@ EXPECTED_DEFERRED_FRAGMENTS = {
     'dy_d vectorized wrt is supported only for eval_points="mean"': ("`dy_d` vectorized `wrt`"),
     "dy_d vectorized wrt is not implemented for mixed=True": ("`dy_d` vectorized `wrt`"),
     "direct nns_m_reg factor_2_dummy=True": "direct `factor_2_dummy=True` raw predictor path",
-    "nns_nowcast default live macro data retrieval": "live/default `nns_nowcast` provider",
 }
 
 

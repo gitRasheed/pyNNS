@@ -47,7 +47,6 @@ _EXPORTS = {
     "nns_mc": ("pynns.mc", "nns_mc"),
     "nns_meboot": ("pynns.meboot", "nns_meboot"),
     "nns_norm": ("pynns.norm", "nns_norm"),
-    "nns_nowcast": ("pynns.nowcast", "nns_nowcast"),
     "nns_nowcast_panel": ("pynns.nowcast", "nns_nowcast_panel"),
     "nns_part": ("pynns.part", "nns_part"),
     "nns_reg": ("pynns.regression", "nns_reg"),

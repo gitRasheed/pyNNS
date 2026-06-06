@@ -2,7 +2,7 @@
 
 Nonlinear nonparametric statistics in Python.
 
-PyNNS is an alpha Python port of the R NNS 12.0 package. It provides
+PyNNS is an alpha Python port of the R NNS 12.1 beta package. It provides
 partial-moment statistics, nonlinear dependence, regression, classification,
 forecasting, bootstrap, and related tools in Python on top of NumPy, SciPy, and
 Polars.
@@ -99,10 +99,10 @@ panel = OrderedDict(
 forecast = nns_nowcast_panel(panel, h=2, tau=1)
 ```
 
-Default live `nns_nowcast()` fetching is intentionally not implemented. Use
-`nns_nowcast_panel(...)` for deterministic data, or
-`nns_nowcast(fetch=True, provider_backend=...)` with an explicit provider such
-as `CsvNowcastProvider` or optional `FredApiNowcastProvider`.
+R NNS 12.1 beta removed `NNS.nowcast`. PyNNS keeps
+`nns_nowcast_panel(...)` as a deterministic, VAR-backed monthly panel helper.
+`CsvNowcastProvider` and optional `FredApiNowcastProvider` return payloads that
+can be passed to `nns_nowcast_panel`; there is no public `nns_nowcast` wrapper.
 
 ## Main Features
 
@@ -122,7 +122,6 @@ PyNNS is not full R parity yet. The main mathematical gap is `dy_d`:
 - Scalar `dy_d(eval_points="last")`, `"obs"`, and `"apd"` have known parity
   gaps and are kept as xfail tests.
 - Vectorized non-mean `dy_d` and vectorized `mixed=True` modes are guarded.
-- Default hidden live `nns_nowcast()` provider fetching is guarded by design.
 - Direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` is guarded; use the
   public `nns_reg` factor-expansion path instead.
 

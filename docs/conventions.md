@@ -352,14 +352,15 @@ to numeric series, delegates numeric forecasting to `nns_var`, and returns VAR
 fields plus `dates` and `metadata` dictionaries. Date labels are metadata rather
 than array indices. Without dates, forecast rows are labeled `t+1`, `t+2`, ...
 With dates, inputs are normalized to `YYYY-MM`, must be sorted and unique, and
-forecast labels advance monthly. `nns_nowcast(fetch=True, provider_backend=...)`
-supports explicit providers whose `fetch(series, start_date)` method returns
-`{"series": ..., "dates": ..., "metadata": ...}`. `CsvNowcastProvider` is the
-offline local-file provider for monthly panels; it performs no resampling and no
-network access. `FredApiNowcastProvider` is an optional live FRED provider that
-requires the `fredapi` extra and a FRED API key supplied explicitly or through
-`FRED_API_KEY`; library code does not read `.env` files. Default live fetching
-remains guarded; PyNNS does not ship an implicit FRED/Yahoo provider.
+forecast labels advance monthly. R NNS 12.1 beta removed `NNS.nowcast`, so PyNNS
+does not export a public `nns_nowcast` wrapper. `CsvNowcastProvider` and
+`FredApiNowcastProvider` remain explicit payload builders whose
+`fetch(series, start_date)` method returns
+`{"series": ..., "dates": ..., "metadata": ...}` for callers to pass to
+`nns_nowcast_panel`. `CsvNowcastProvider` is offline and local-file only.
+`FredApiNowcastProvider` requires the `fredapi` extra and a FRED API key
+supplied explicitly or through `FRED_API_KEY`; library code does not read `.env`
+files. PyNNS does not ship an implicit FRED/Yahoo provider.
 
 ## Meboot
 

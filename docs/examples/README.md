@@ -25,7 +25,7 @@ you want short Python call patterns that are kept in sync with PyNNS.
 | Regression | [regression.py](regression.py) | `nns_reg`, fitted values, point estimates, regression output shape | `NNSvignette_Clustering_and_Regression.Rmd` |
 | Classification | [classification.py](classification.py) | `nns_reg(..., type="class")`, numeric class-code predictions | `NNSvignette_Classification.Rmd` |
 | Forecasting | [forecasting.py](forecasting.py) | `nns_arma`, `nns_arma_optim`, `nns_var` | `NNSvignette_Forecasting.Rmd` |
-| Nowcast panel | [nowcast_panel.py](nowcast_panel.py) | deterministic user-supplied panel, date metadata, VAR-backed forecast output | `NNS.nowcast` / `NNS.VAR` material |
+| Nowcast panel | [nowcast_panel.py](nowcast_panel.py) | deterministic user-supplied panel, date metadata, VAR-backed forecast output | `NNS.VAR` nowcast/frequency-alignment material |
 
 Run one example:
 

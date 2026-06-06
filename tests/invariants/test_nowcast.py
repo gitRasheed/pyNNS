@@ -2,27 +2,15 @@ from __future__ import annotations
 
 import importlib
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from types import SimpleNamespace
 from typing import Any, cast
 
 import numpy as np
 import pytest
 
-from pynns import nns_nowcast, nns_nowcast_panel, nns_var
+from pynns import nns_nowcast_panel, nns_var
 from pynns.providers import CsvNowcastProvider, FredApiNowcastProvider
-
-
-class FixtureNowcastProvider:
-    def __init__(self, payload: dict[str, object]) -> None:
-        self.payload = payload
-        self.requested_series: tuple[str, ...] | None = None
-        self.requested_start_date: str | None = None
-
-    def fetch(self, series: tuple[str, ...], start_date: str) -> dict[str, object]:
-        self.requested_series = series
-        self.requested_start_date = start_date
-        return self.payload
 
 
 def _patch_fredapi_import(monkeypatch: pytest.MonkeyPatch, fake_fred: type[object]) -> None:
@@ -185,21 +173,16 @@ def _provider_payload() -> dict[str, Any]:
     }
 
 
-def test_nns_nowcast_default_call_remains_guarded() -> None:
-    with pytest.raises(NotImplementedError, match="default live macro data retrieval"):
-        nns_nowcast(h=1)
-
-
-def test_nns_nowcast_fetch_requires_provider() -> None:
-    with pytest.raises(ValueError, match="provider_backend is required"):
-        nns_nowcast(fetch=True)
-
-
-def test_nns_nowcast_provider_path_matches_panel_core() -> None:
+def test_provider_payload_feeds_nowcast_panel_core() -> None:
     payload = _provider_payload()
-    provider = FixtureNowcastProvider(payload)
 
-    actual = nns_nowcast(fetch=True, provider_backend=provider, h=2, start_date="2020-01-03")
+    actual = nns_nowcast_panel(
+        payload["series"],
+        h=2,
+        tau=12,
+        dates=payload["dates"],
+        naive_weights=False,
+    )
     expected = nns_nowcast_panel(
         payload["series"],
         h=2,
@@ -208,69 +191,11 @@ def test_nns_nowcast_provider_path_matches_panel_core() -> None:
         naive_weights=False,
     )
 
-    assert provider.requested_start_date == "2020-01-03"
-    assert provider.requested_series is not None
-    assert provider.requested_series[:2] == ("PAYEMS", "JTSJOL")
     assert actual["names"] == ["PAYEMS", "UNRATE"]
     assert actual["dates"]["forecast"] == ["2023-04", "2023-05"]
     for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
         np.testing.assert_allclose(actual[key], expected[key])
     assert np.array_equal(actual["relevant_variables"], expected["relevant_variables"])
-    assert actual["metadata"]["source"] == "provider"
-    assert actual["metadata"]["provider"] == {"provider": "fixture"}
-    assert "raw_panel" not in actual
-
-
-def test_nns_nowcast_keep_data_includes_raw_provider_panel() -> None:
-    payload = _provider_payload()
-
-    actual = nns_nowcast(
-        fetch=True,
-        provider_backend=FixtureNowcastProvider(payload),
-        h=0,
-        keep_data=True,
-    )
-
-    assert actual["raw_panel"] == {
-        "PAYEMS": payload["series"]["PAYEMS"],
-        "UNRATE": payload["series"]["UNRATE"],
-    }
-    assert actual["raw_dates"] == payload["dates"]
-
-
-def test_nns_nowcast_provider_rejects_unsupported_r_fetch_arguments() -> None:
-    provider = FixtureNowcastProvider(_provider_payload())
-
-    with pytest.raises(ValueError, match="additional_regressors"):
-        nns_nowcast(fetch=True, provider_backend=provider, additional_regressors=["SPY"])
-    with pytest.raises(ValueError, match="specific_regressors"):
-        nns_nowcast(fetch=True, provider_backend=provider, specific_regressors=[1])
-
-
-def test_nns_nowcast_provider_payload_validation() -> None:
-    with pytest.raises(ValueError, match="'series'"):
-        nns_nowcast(fetch=True, provider_backend=FixtureNowcastProvider({}))
-    with pytest.raises(ValueError, match="equal lengths"):
-        nns_nowcast(
-            fetch=True,
-            provider_backend=FixtureNowcastProvider(
-                {"series": OrderedDict((("PAYEMS", [1.0, 2.0]), ("UNRATE", [3.0])))}
-            ),
-        )
-    with pytest.raises(ValueError, match="dates length"):
-        nns_nowcast(
-            fetch=True,
-            provider_backend=FixtureNowcastProvider(
-                {"dates": ["2020-01"], "series": OrderedDict((("PAYEMS", [1.0, 2.0]),))}
-            ),
-        )
-    with pytest.raises(ValueError):
-        nns_nowcast(
-            fetch=True,
-            provider_backend=FixtureNowcastProvider(
-                {"series": OrderedDict((("PAYEMS", [1.0, "bad"]),))}
-            ),
-        )
 
 
 def test_csv_nowcast_provider_returns_payload(tmp_path: Any) -> None:
@@ -299,7 +224,7 @@ def test_csv_nowcast_provider_returns_payload(tmp_path: Any) -> None:
     }
 
 
-def test_nns_nowcast_csv_provider_matches_panel_core(tmp_path: Any) -> None:
+def test_csv_provider_payload_matches_panel_core(tmp_path: Any) -> None:
     csv_path = tmp_path / "macro.csv"
     panel = _panel()
     rows = ["date,PAYEMS,UNRATE"]
@@ -312,7 +237,13 @@ def test_nns_nowcast_csv_provider_matches_panel_core(tmp_path: Any) -> None:
         rows.append(f"{month},{panel[index, 0]},{panel[index, 1]}")
     csv_path.write_text("\n".join(rows), encoding="utf-8")
 
-    actual = nns_nowcast(fetch=True, provider_backend=CsvNowcastProvider(csv_path), h=2)
+    payload = CsvNowcastProvider(csv_path).fetch((), "2000-01-03")
+    actual = nns_nowcast_panel(
+        payload["series"],
+        h=2,
+        tau=12,
+        dates=cast(Sequence[object], payload["dates"]),
+    )
     expected = nns_nowcast_panel(
         OrderedDict(
             (
@@ -330,7 +261,6 @@ def test_nns_nowcast_csv_provider_matches_panel_core(tmp_path: Any) -> None:
     for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
         np.testing.assert_allclose(actual[key], expected[key])
     assert np.array_equal(actual["relevant_variables"], expected["relevant_variables"])
-    assert actual["metadata"]["provider"]["provider"] == "csv"
 
 
 def test_csv_nowcast_provider_selects_and_orders_series_columns(tmp_path: Any) -> None:
@@ -608,7 +538,7 @@ def test_fredapi_nowcast_provider_preserves_requested_series_order(
     assert list(series_payload) == ["UNRATE", "PAYEMS"]
 
 
-def test_nns_nowcast_fredapi_provider_path_matches_panel_core(
+def test_fredapi_provider_payload_matches_panel_core(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     panel = _panel()
@@ -633,7 +563,13 @@ def test_nns_nowcast_fredapi_provider_path_matches_panel_core(
     _patch_fredapi_import(monkeypatch, FakeFred)
     provider = FredApiNowcastProvider(api_key="key", series=["PAYEMS", "UNRATE"])
 
-    actual = nns_nowcast(fetch=True, provider_backend=provider, h=2, keep_data=True)
+    payload = provider.fetch((), "2000-01-03")
+    actual = nns_nowcast_panel(
+        payload["series"],
+        h=2,
+        tau=12,
+        dates=cast(Sequence[object], payload["dates"]),
+    )
     expected = nns_nowcast_panel(
         OrderedDict(
             (
@@ -646,11 +582,6 @@ def test_nns_nowcast_fredapi_provider_path_matches_panel_core(
         dates=[date[:7] for date in dates],
     )
 
-    assert actual["raw_dates"] == [date[:7] for date in dates]
-    assert actual["raw_panel"] == {
-        "PAYEMS": panel[:, 0].tolist(),
-        "UNRATE": panel[:, 1].tolist(),
-    }
     for key in ("interpolated_and_extrapolated", "univariate", "multivariate", "ensemble"):
         np.testing.assert_allclose(actual[key], expected[key])
     assert np.array_equal(actual["relevant_variables"], expected["relevant_variables"])

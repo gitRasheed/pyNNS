@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 import pytest
 
-from pynns import nns_arma, nns_arma_optim, nns_nowcast, nns_var
+from pynns import nns_arma, nns_arma_optim, nns_var
 from pynns.arma import _default_arma_optim_objective, _numeric_seasonal_weights
 
 
@@ -160,11 +160,6 @@ def test_nns_var_public_supported_paths_return_output_contract(dim_red_method: s
     assert result["multivariate"].shape == (3, 2)
     assert result["ensemble"].shape == (3, 2)
     assert result["names"] == ["x1", "x2"]
-
-
-def test_nns_nowcast_remains_deferred() -> None:
-    with pytest.raises(NotImplementedError, match="nns_nowcast default live macro data retrieval"):
-        nns_nowcast(h=1)
 
 
 @pytest.mark.parametrize("values", [np.array([1.0, np.nan, 3.0]), np.array([1.0, np.inf, 3.0])])
