@@ -4,7 +4,7 @@ This page summarizes the public PyNNS API surface, known gaps, guarded paths,
 and design boundaries.
 
 PyNNS is an alpha, parity-focused Python port of installed R NNS 12.1 beta,
-implemented natively in Python on top of NumPy, SciPy, and Polars. It does not
+implemented natively in Python on top of NumPy and SciPy. It does not
 wrap R, call the R package at runtime, or depend on compiled R/C++ shims. The
 goal is public input/output compatibility where R behavior is stable,
 documented, and useful. The goal is not to copy every R internal helper name,
@@ -55,7 +55,7 @@ invariant, and property coverage.
 | Seasonality: `nns_seas` | implemented | high | Non-plotting installed-R path is implemented and cached defensively. |
 | ARMA and VAR: `nns_arma`, `nns_arma_optim`, `nns_var` | implemented | medium | Numeric forecasting and supported VAR dimension-reduction paths are implemented. Stochastic interval streams are structural/statistical parity only. |
 | Nowcast panel: `nns_nowcast_panel` | implemented | medium | Python-native deterministic monthly panel helper backed by `nns_var`. R NNS 12.1 beta removed `NNS.nowcast`, so this is no longer an R-export parity target. |
-| Providers: `CsvNowcastProvider`, `FredApiNowcastProvider` | implemented | medium | Providers produce explicit payloads for `nns_nowcast_panel`. CSV is local/offline. FRED requires optional `fredapi` extra and a supplied API key. |
+| Providers: `CsvNowcastProvider` | implemented | medium | Produces explicit local/offline payloads for `nns_nowcast_panel`. |
 | Bootstrap/Monte Carlo: `nns_meboot`, `nns_mc` | implemented | medium | Deterministic diagnostics are parity-tested; exact stochastic replicate parity with R is not expected. |
 | Stochastic dominance/superiority: `fsd`, `ssd`, `tsd`, `.uni` wrappers, `nns_ss`, `nns_sd_cluster`, `sd_efficient_set` | implemented | medium | Public structures and deterministic paths are covered. SD uses exact pure-NumPy prefix-pair kernels plus a degree-1 discrete order-statistic matrix path; R's C++ core remains faster on full finance fixtures. Stochastic intervals use PyNNS RNG. |
 | ANOVA: `nns_anova` | implemented | high | Binary, multi-group, pairwise, and degenerate `NaN` conventions are covered. |
@@ -78,11 +78,9 @@ invariant, and property coverage.
 - PyNNS does not export `nns_nowcast`; R NNS 12.1 beta removed `NNS.nowcast`.
 - Nowcast providers are payload builders for `nns_nowcast_panel`, not implicit
   public forecast wrappers.
-- `CsvNowcastProvider` is local/offline. `FredApiNowcastProvider` requires the
-  optional `fredapi` dependency and a FRED API key passed explicitly or present
-  in `FRED_API_KEY`.
+- `CsvNowcastProvider` is local/offline.
 - Library code does not auto-load `.env` files.
-- `fredapi`, Yahoo clients, and pandas are not hard dependencies.
+- External data clients and dataframe libraries are not dependencies.
 - PyNNS uses explicit Python errors for some cases where R silently truncates,
   coerces, warns, or returns unusable values. Important divergences are recorded
   in `docs/conventions.md`.
@@ -110,9 +108,8 @@ payload = provider.fetch((), "2000-01-03")
 result = nns_nowcast_panel(payload["series"], h=2, tau=12, dates=payload["dates"])
 ```
 
-`FredApiNowcastProvider` follows the same boundary but requires
-`pip install "nns-pm[fred]"` and a FRED API key. PyNNS does not ship a default
-Yahoo or FRED workflow hidden behind a public nowcast wrapper.
+PyNNS does not ship a default Yahoo, FRED, or other live-data workflow hidden
+behind a public nowcast wrapper.
 
 ## Intentional Divergences And Caveats
 

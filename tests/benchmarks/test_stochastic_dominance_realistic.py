@@ -10,17 +10,20 @@ from numpy.typing import NDArray
 
 from pynns import co_lpm, nns_sd_cluster, pm_matrix, sd_efficient_set
 
-_FIXTURE = (
-    Path(__file__).parents[1]
-    / "fixtures"
-    / "finance"
-    / "sp500_daily_returns_2019_2023.csv"
-)
+_FIXTURE = Path(__file__).parents[1] / "fixtures" / "finance" / "sp500_daily_returns_2019_2023.csv"
 _BENCHMARK_ROWS = 252
 _FULL_HISTORY_ROWS = 1257
 _DISPERSION_COLUMNS = 100
 _MAGNIFICENT_SEVEN = ("AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA")
 _MAX_COLUMN_COUNT = "max"
+
+if not _FIXTURE.exists():
+    pytest.skip(
+        "finance benchmark fixture is local-only; place "
+        "sp500_daily_returns_2019_2023.csv under tests/fixtures/finance "
+        "to run these benchmarks.",
+        allow_module_level=True,
+    )
 
 
 @pytest.mark.benchmark

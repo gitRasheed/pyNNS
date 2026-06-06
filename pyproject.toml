@@ -27,12 +27,8 @@ keywords = [
 urls = { "Homepage" = "https://github.com/rasheed/pynns", "Repository" = "https://github.com/rasheed/pynns", "Issues" = "https://github.com/rasheed/pynns/issues", "Source" = "https://github.com/rasheed/pynns", "Project" = "https://github.com/rasheed/pynns" }
 dependencies = [
     "numpy",
-    "polars",
     "scipy",
 ]
-
-[project.optional-dependencies]
-fred = ["fredapi"]
 
 [dependency-groups]
 dev = [

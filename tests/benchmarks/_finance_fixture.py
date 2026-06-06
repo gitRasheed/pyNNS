@@ -6,16 +6,20 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pytest
 from numpy.typing import NDArray
 
-FIXTURE = (
-    Path(__file__).parents[1]
-    / "fixtures"
-    / "finance"
-    / "sp500_daily_returns_2019_2023.csv"
-)
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "finance" / "sp500_daily_returns_2019_2023.csv"
 METADATA = FIXTURE.with_name(f"{FIXTURE.stem}_metadata.json")
 MAX_COLUMN_COUNT = "max"
+
+if not FIXTURE.exists() or not METADATA.exists():
+    pytest.skip(
+        "finance benchmark fixture is local-only; place "
+        "sp500_daily_returns_2019_2023.csv and metadata under tests/fixtures/finance "
+        "to run these benchmarks.",
+        allow_module_level=True,
+    )
 
 
 def load_constituent_returns(

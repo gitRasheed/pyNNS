@@ -374,14 +374,12 @@ fields plus `dates` and `metadata` dictionaries. Date labels are metadata rather
 than array indices. Without dates, forecast rows are labeled `t+1`, `t+2`, ...
 With dates, inputs are normalized to `YYYY-MM`, must be sorted and unique, and
 forecast labels advance monthly. R NNS 12.1 beta removed `NNS.nowcast`, so PyNNS
-does not export a public `nns_nowcast` wrapper. `CsvNowcastProvider` and
-`FredApiNowcastProvider` remain explicit payload builders whose
-`fetch(series, start_date)` method returns
+does not export a public `nns_nowcast` wrapper. `CsvNowcastProvider` remains an
+explicit payload builder whose `fetch(series, start_date)` method returns
 `{"series": ..., "dates": ..., "metadata": ...}` for callers to pass to
 `nns_nowcast_panel`. `CsvNowcastProvider` is offline and local-file only.
-`FredApiNowcastProvider` requires the `fredapi` extra and a FRED API key
-supplied explicitly or through `FRED_API_KEY`; library code does not read `.env`
-files. PyNNS does not ship an implicit FRED/Yahoo provider.
+Library code does not read `.env` files. PyNNS does not ship an implicit
+FRED/Yahoo provider.
 
 ## Meboot
 

@@ -4,8 +4,7 @@ Nonlinear nonparametric statistics in Python.
 
 PyNNS is an alpha Python port of the R NNS 12.1 beta package. It provides
 partial-moment statistics, nonlinear dependence, regression, classification,
-forecasting, bootstrap, and related tools in Python on top of NumPy, SciPy, and
-Polars.
+forecasting, bootstrap, and related tools in Python on top of NumPy and SciPy.
 
 - PyPI package: `nns-pm`
 - Import name: `pynns`
@@ -15,10 +14,10 @@ Polars.
 
 ## Documentation
 
-- [API status and known gaps](https://github.com/gitRasheed/pyNNS/blob/main/docs/api_status.md)
-- [Behavior conventions and intentional divergences](https://github.com/gitRasheed/pyNNS/blob/main/docs/conventions.md)
-- [Benchmarks](https://github.com/gitRasheed/pyNNS/blob/main/docs/benchmarks.md)
-- [Examples](https://github.com/gitRasheed/pyNNS/blob/main/docs/examples/README.md)
+- [API status and known gaps](docs/api_status.md)
+- [Behavior conventions and intentional divergences](docs/conventions.md)
+- [Benchmarks](docs/benchmarks.md)
+- [Examples](docs/examples/README.md)
 
 PyNNS aims to match installed R NNS public behavior where it is stable,
 documented, and useful. It does not try to reproduce every R internal helper,
@@ -30,15 +29,7 @@ plotting side effect, data-frame quirk, or hidden runtime data fetch.
 pip install nns-pm
 ```
 
-Optional FRED nowcast provider:
-
-```bash
-pip install "nns-pm[fred]"
-```
-
-The optional FRED provider loads `fredapi` only when used. PyNNS does not
-auto-load `.env` files and does not fetch network data unless an explicit
-provider is passed.
+PyNNS does not auto-load `.env` files and does not fetch network data.
 
 R and the R `NNS` package are only needed by maintainers regenerating live parity
 fixtures. Normal Python users do not need R installed.
@@ -101,8 +92,8 @@ forecast = nns_nowcast_panel(panel, h=2, tau=1)
 
 R NNS 12.1 beta removed `NNS.nowcast`. PyNNS keeps
 `nns_nowcast_panel(...)` as a deterministic, VAR-backed monthly panel helper.
-`CsvNowcastProvider` and optional `FredApiNowcastProvider` return payloads that
-can be passed to `nns_nowcast_panel`; there is no public `nns_nowcast` wrapper.
+`CsvNowcastProvider` can build payloads from local CSV files for
+`nns_nowcast_panel`; there is no public `nns_nowcast` wrapper.
 
 ## Main Features
 
@@ -117,18 +108,16 @@ can be passed to `nns_nowcast_panel`; there is no public `nns_nowcast` wrapper.
 
 ## Current Limitations
 
-PyNNS is not full R parity yet. The main deferred public paths are:
+PyNNS is still alpha. The main remaining public caveats are documented guarded
+paths rather than missing core algorithms:
 
-- Scalar and vectorized `dy_d` point and distribution modes are covered on
-  focused fixtures, including `eval_points="obs"` and `"apd"`. Mixed
-  derivatives are supported where mathematically defined for two-regressor
-  inputs.
-- Direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` is guarded; use the
-  public `nns_reg` factor-expansion path or `prepare_factor_predictors(...)`
-  before calling `nns_m_reg(...)`.
+- Direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` is rejected; use
+  `prepare_factor_predictors(...)` first or call `nns_reg(...,
+  factor_2_dummy=True, factor_levels=...)`.
+- Exact random-stream parity is not expected for stochastic APIs because PyNNS
+  uses NumPy RNG while R NNS uses R's RNG.
 
-See the [API status table](https://github.com/gitRasheed/pyNNS/blob/main/docs/api_status.md)
-for the full status table.
+See the [API status table](docs/api_status.md) for the full status table.
 
 ## Testing
 
