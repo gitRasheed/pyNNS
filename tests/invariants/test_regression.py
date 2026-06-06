@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 import pytest
 
-from pynns import nns_reg
+from pynns import nns_m_reg, nns_reg, prepare_factor_predictors
 from pynns.regression import _coefficients
 
 
@@ -311,3 +311,83 @@ def test_nns_reg_factor_predictor_dimred_expands_before_projection() -> None:
     )
     assert result["x.star"]["x"].shape == y.shape
     assert result["Point.est"].shape == (2,)
+
+
+def test_prepare_factor_predictors_returns_m_reg_ready_design() -> None:
+    levels = ["low", "mid", "high"]
+    factor = np.array(["mid", "low", "mid", "high"], dtype=object)
+    numeric = np.array([0.0, 1.0, 2.0, 3.0], dtype=object)
+    x = np.column_stack((factor, numeric))
+    point_est = np.array([["low", 1.5], ["high", 2.5]], dtype=object)
+    y = np.array([2.0, 1.0, 3.0, 4.0])
+
+    design = prepare_factor_predictors(
+        x,
+        point_est=point_est,
+        factor_levels=(levels, None),
+        names=("rating", "score"),
+    )
+
+    np.testing.assert_allclose(
+        design.x,
+        np.array(
+            [
+                [0.0, 1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0, 2.0],
+                [0.0, 0.0, 1.0, 3.0],
+            ]
+        ),
+    )
+    assert design.point_est is not None
+    np.testing.assert_allclose(
+        design.point_est,
+        np.array(
+            [
+                [1.0, 0.0, 0.0, 1.5],
+                [0.0, 0.0, 1.0, 2.5],
+            ]
+        ),
+    )
+    assert design.feature_names == ("rating_low", "rating_mid", "rating_high", "score")
+
+    direct = nns_m_reg(design.x, y, point_est=design.point_est)
+    public = nns_reg(
+        x,
+        y,
+        factor_2_dummy=True,
+        factor_levels=(levels, None),
+        point_est=point_est,
+    )
+
+    np.testing.assert_allclose(direct["R2"], public["R2"])
+    np.testing.assert_allclose(direct["Point.est"], public["Point.est"])
+    np.testing.assert_allclose(direct["Fitted.xy"]["y.hat"], public["Fitted.xy"]["y.hat"])
+
+
+def test_prepare_factor_predictors_univariate_points_are_m_reg_ready_matrix() -> None:
+    x = np.array(["b", "a", "b", "c"], dtype=object)
+    point_est = np.array(["a", "c"], dtype=object)
+
+    design = prepare_factor_predictors(
+        x,
+        point_est=point_est,
+        factor_levels=["a", "b", "c"],
+        names="letter",
+    )
+
+    assert design.x.shape == (4, 3)
+    assert design.point_est is not None
+    assert design.point_est.shape == (2, 3)
+    assert design.feature_names == ("letter_a", "letter_b", "letter_c")
+
+
+def test_prepare_factor_predictors_validates_name_count() -> None:
+    x = np.array([["a", 1.0], ["b", 2.0]], dtype=object)
+
+    with pytest.raises(ValueError, match="names"):
+        prepare_factor_predictors(
+            x,
+            factor_levels=(["a", "b"], None),
+            names=("factor_only",),
+        )

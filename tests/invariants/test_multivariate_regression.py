@@ -105,5 +105,5 @@ def test_nns_m_reg_direct_factor_dummy_path_stays_rejected() -> None:
     )
     y = np.array([2.0, 1.0, 3.0, 4.0])
 
-    with pytest.raises(NotImplementedError, match=r"installed R.*raw factor path errors"):
+    with pytest.raises(NotImplementedError, match=r"prepare_factor_predictors"):
         nns_m_reg(x, y, factor_2_dummy=True)

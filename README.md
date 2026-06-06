@@ -124,7 +124,8 @@ PyNNS is not full R parity yet. The main deferred public paths are:
   derivatives are supported where mathematically defined for two-regressor
   inputs.
 - Direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` is guarded; use the
-  public `nns_reg` factor-expansion path instead.
+  public `nns_reg` factor-expansion path or `prepare_factor_predictors(...)`
+  before calling `nns_m_reg(...)`.
 
 See the [API status table](https://github.com/gitRasheed/pyNNS/blob/main/docs/api_status.md)
 for the full status table.

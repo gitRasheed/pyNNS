@@ -7,6 +7,7 @@ from pynns.pm_matrix import pm_matrix as pm_matrix
 __version__ = "0.1.1"
 
 _EXPORTS = {
+    "FactorDesign": ("pynns.regression", "FactorDesign"),
     "causal_matrix": ("pynns.causation", "causal_matrix"),
     "co_lpm": ("pynns.co_moments", "co_lpm"),
     "co_lpm_nd": ("pynns.dependence", "co_lpm_nd"),
@@ -56,6 +57,7 @@ _EXPORTS = {
     "nns_stack": ("pynns.stack", "nns_stack"),
     "nns_ss": ("pynns.stochastic_superiority", "nns_ss"),
     "nns_var": ("pynns.var", "nns_var"),
+    "prepare_factor_predictors": ("pynns.regression", "prepare_factor_predictors"),
     "sd_efficient_set": ("pynns.stochastic_dominance", "sd_efficient_set"),
     "skew_pm": ("pynns.classical", "skew_pm"),
     "ssd": ("pynns.stochastic_dominance", "ssd"),

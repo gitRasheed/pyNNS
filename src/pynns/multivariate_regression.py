@@ -131,7 +131,8 @@ def _validate_inputs(
     if factor_2_dummy:
         raise NotImplementedError(
             "direct nns_m_reg factor_2_dummy=True is rejected because installed R's "
-            "internal NNS.M.reg raw factor path errors; use nns_reg factor expansion."
+            "internal NNS.M.reg raw factor path errors; use prepare_factor_predictors(...) "
+            "before nns_m_reg(...) or nns_reg(..., factor_2_dummy=True, factor_levels=...)."
         )
     x_values = np.asarray(x, dtype=np.float64)
     if x_values.ndim == 1:

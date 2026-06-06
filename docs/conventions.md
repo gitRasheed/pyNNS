@@ -159,7 +159,25 @@ R's interior-band trace ratio for lambda.
 Factor predictor expansion is supported through the public `nns_reg` path.
 When combined with dimension reduction, factor predictors are expanded with
 R's full-rank dummy convention before synthetic `x.star` coefficients are
-computed.
+computed. For callers that want direct multivariate regression, use
+`prepare_factor_predictors(...)` first and pass the returned numeric design
+matrix into `nns_m_reg(...)`:
+
+```python
+from pynns import nns_m_reg, prepare_factor_predictors
+
+design = prepare_factor_predictors(
+    x,
+    point_est=point_est,
+    factor_levels=(["low", "mid", "high"], None),
+    names=("rating", "score"),
+)
+fit = nns_m_reg(design.x, y, point_est=design.point_est)
+```
+
+`prepare_factor_predictors(...)` uses the same full-rank dummy expansion as
+`nns_reg(..., factor_2_dummy=True)`, combines training `x` and `point_est`
+before expansion, and returns deterministic feature names.
 
 Numeric dimension reduction is supported for `"cor"`, `"NNS.dep"`,
 `"NNS.caus"`, `"all"`, `"equal"`, and numeric coefficient vectors. The
@@ -210,8 +228,11 @@ but `pred.int` lower/upper bounds and fitted confidence columns remain raw
 numeric values. Classification mode (`type="class"`) is supported for
 numeric/logical/factor-like targets and returns numeric class codes. Direct
 `nns_m_reg(..., factor_2_dummy=True)` remains rejected for raw factor
-predictors because installed R errors on that path. Public `nns_reg` factor
-predictor expansion is supported with `factor_2_dummy=True` and explicit
+predictors because installed R errors on that path. This is an intentional API
+boundary rather than a mathematical gap: `nns_m_reg` is the numeric
+multivariate engine, while `prepare_factor_predictors(...)` performs the
+R-compatible categorical design-matrix preparation. Public `nns_reg` factor
+predictor expansion is also supported with `factor_2_dummy=True` and explicit
 `factor_levels=` metadata; it combines training `x` and `point_est` before
 full-rank dummy expansion, matching installed R's `factor_2_dummy_FR` path.
 
@@ -423,9 +444,9 @@ binary rather than the higher-level classification intent.
 R classification paths work with numeric class codes. R factors become
 1-indexed numeric codes in factor-level order and predictions are returned as
 codes rather than decoded labels. PyNNS provides `factor_2_dummy`,
-`factor_2_dummy_fr`, and `encode_factor_codes`; pass explicit `levels=` to
-reproduce R factor level order because NumPy arrays do not carry factor
-metadata.
+`factor_2_dummy_fr`, `encode_factor_codes`, and `prepare_factor_predictors`;
+pass explicit `levels=` / `factor_levels=` to reproduce R factor level order
+because NumPy arrays do not carry factor metadata.
 
 `nns_reg(..., type="class")`, `nns_m_reg(..., type="class")`, and
 `nns_stack(..., type="class")` are supported for numeric, logical, and
