@@ -117,10 +117,10 @@ can be passed to `nns_nowcast_panel`; there is no public `nns_nowcast` wrapper.
 
 ## Current Limitations
 
-PyNNS is not full R parity yet. The main mathematical gap is `dy_d`:
+PyNNS is not full R parity yet. The main deferred public paths are:
 
-- Scalar `dy_d(eval_points="last")`, `"obs"`, and `"apd"` have known parity
-  gaps and are kept as xfail tests.
+- Scalar `dy_d` point and distribution modes are parity-covered on focused
+  fixtures, including `eval_points="obs"` and `"apd"`.
 - Vectorized non-mean `dy_d` and vectorized `mixed=True` modes are guarded.
 - Direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` is guarded; use the
   public `nns_reg` factor-expansion path instead.

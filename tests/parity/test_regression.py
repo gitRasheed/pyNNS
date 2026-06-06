@@ -160,6 +160,41 @@ def test_nns_reg_dimred_smooth_matches_r() -> None:
 
 
 @pytest.mark.parity
+def test_nns_reg_dimred_smooth_out_of_range_points_match_r() -> None:
+    x1 = np.linspace(-1.5, 1.5, 18)
+    x2 = np.cos(np.linspace(0.0, 2.0, 18))
+    x = np.column_stack((x1, x2))
+    y = x[:, 0] ** 2 + 0.5 * x[:, 1] + np.sin(x[:, 0] * x[:, 1])
+    h_step = 0.35294117647058826
+    lower = x.copy()
+    upper = x.copy()
+    lower[:, 0] -= h_step
+    upper[:, 0] += h_step
+    point = np.vstack((lower, x, upper))
+
+    expected = _r_nns_reg_dimred(
+        x,
+        y,
+        order=None,
+        dim_red_method="equal",
+        threshold=0.0,
+        point_est=point,
+        point_only=True,
+        smooth=True,
+    )
+    actual = nns_reg(
+        x,
+        y,
+        dim_red_method="equal",
+        point_est=point,
+        point_only=True,
+        smooth=True,
+    )
+
+    _assert_reg_matches(actual, expected, check_dimred=True, atol=5e-3)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("relationship", MODE_RELATIONSHIPS)
 @pytest.mark.parametrize("order", MODE_ORDERS)
@@ -867,7 +902,7 @@ def _r_nns_reg_dimred(
         "NNS.reg",
         x.tolist(),
         y.tolist(),
-        smooth,
+        False,
         order,
         dim_red_method,
         tau,
@@ -881,7 +916,7 @@ def _r_nns_reg_dimred(
         confidence_interval,
         threshold,
         None,
-        False,
+        smooth,
         "off",
         "L2",
         1,

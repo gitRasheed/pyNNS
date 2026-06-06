@@ -266,15 +266,15 @@ def _dy_d_scalar(
 
     eval_values, vector_branch = _dy_d_eval_points(x_values, wrt_index, eval_points)
     h_s = _derivative_bandwidths(x_values.shape[0])
-    results: list[dict[str, NDArray[np.float64]]] = []
+    results: list[dict[str, NDArray[np.float64]] | None] = [None] * h_s.size
     cumulative_step = 0.0
-    cumulative_bands = _dy_d_uses_distribution_band(eval_points)
     from pynns.dependence import _gravity
 
     for h_value in h_s:
-        h_step = _dy_d_h_step(x_values[:, wrt_index], int(h_value), _gravity)
+        # R overwrites duplicate rounded bandwidths at their first result slot.
+        result_index = int(np.flatnonzero(h_s == h_value)[0])
+        h_step = _dy_d_h_step(x_values[:, wrt_index], int(h_s[result_index]), _gravity)
         cumulative_step += h_step
-        perturbation_step = cumulative_step if cumulative_bands else h_step
         if vector_branch:
             first, second, mixed_values = _dy_d_vector_band(
                 x_values,
@@ -283,7 +283,7 @@ def _dy_d_scalar(
                 eval_values.reshape(-1),
                 int(h_value),
                 h_step,
-                perturbation_step,
+                cumulative_step,
                 mixed=bool(mixed),
             )
         else:
@@ -294,25 +294,22 @@ def _dy_d_scalar(
                 _as_eval_matrix(eval_values, x_values.shape[1]),
                 int(h_value),
                 h_step,
-                perturbation_step,
+                cumulative_step,
                 mixed=bool(mixed),
             )
         result = {"First": first, "Second": second}
         if mixed_values is not None:
             result["Mixed"] = mixed_values
-        results.append(result)
+        results[result_index] = result
 
+    active_results = [result for result in results if result is not None]
     output = {
-        "First": _weighted_band_average([result["First"] for result in results]),
-        "Second": _weighted_band_average([result["Second"] for result in results]),
+        "First": _weighted_band_average([result["First"] for result in active_results]),
+        "Second": _weighted_band_average([result["Second"] for result in active_results]),
     }
-    if mixed and "Mixed" in results[0]:
-        output["Mixed"] = _weighted_band_average([result["Mixed"] for result in results])
+    if mixed and "Mixed" in active_results[0]:
+        output["Mixed"] = _weighted_band_average([result["Mixed"] for result in active_results])
     return output
-
-
-def _dy_d_uses_distribution_band(eval_points: str | float | NDArray[np.float64]) -> bool:
-    return isinstance(eval_points, str) and eval_points.lower() in {"obs", "apd"}
 
 
 def _dy_dx_numeric(

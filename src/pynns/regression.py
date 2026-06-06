@@ -186,17 +186,20 @@ def _nns_reg_univariate_core(
             rp_y,
             spar=(dependence + 0.5) / 2.0,
         )
-        rp_y = spline_fit.predict(rp_x)
-        rp_y = np.minimum(np.max(y_values), np.maximum(np.min(y_values), rp_y))
+        smooth_rp_y = spline_fit.predict(rp_x)
+        # R derives smooth slopes before clamping returned regression points.
+        coeff_rp_y = smooth_rp_y.copy()
+        rp_y = np.minimum(np.max(y_values), np.maximum(np.min(y_values), smooth_rp_y))
+    else:
+        coeff_rp_y = rp_y.copy()
 
-    rp_y_for_coeff = rp_y.copy()
     if class_mode:
         rp_y = _round_clamp_classes(rp_y, y_values)
 
     if multivariate_call:
         return {"x": rp_x, "y": rp_y}
 
-    coeff = _coefficients(rp_x, rp_y_for_coeff, x_values, y_values)
+    coeff = _coefficients(rp_x, coeff_rp_y, x_values, y_values)
     if smooth_condition and spline_fit is not None:
         order_idx = np.argsort(x_values, kind="mergesort")
         estimate = np.empty_like(x_values, dtype=np.float64)
@@ -1063,12 +1066,20 @@ def _predict_points(
         upper_mask = point_est > np.max(x)
         lower_mask = point_est < np.min(x)
         if np.any(upper_mask):
-            out[upper_mask] = (point_est[upper_mask] - float(np.max(x))) * upper_slope + float(
-                nns_mode(y[np.flatnonzero(x == np.max(x))])
+            out[upper_mask] = (
+                point_est[upper_mask] - float(np.max(x))
+            ) * upper_slope + _boundary_y(
+                x,
+                y,
+                low=False,
             )
         if np.any(lower_mask):
-            out[lower_mask] = (point_est[lower_mask] - float(np.min(x))) * lower_slope + float(
-                nns_mode(y[np.flatnonzero(x == np.min(x))])
+            out[lower_mask] = (
+                point_est[lower_mask] - float(np.min(x))
+            ) * lower_slope + _boundary_y(
+                x,
+                y,
+                low=True,
             )
     return out.astype(np.float64)
 
@@ -1090,14 +1101,28 @@ def _extrapolate_points(
     upper_mask = point_est > np.max(x)
     lower_mask = point_est < np.min(x)
     if np.any(upper_mask):
-        out[upper_mask] = (point_est[upper_mask] - float(np.max(x))) * upper_slope + float(
-            nns_mode(y[np.flatnonzero(x == np.max(x))])
+        out[upper_mask] = (point_est[upper_mask] - float(np.max(x))) * upper_slope + _boundary_y(
+            x,
+            y,
+            low=False,
         )
     if np.any(lower_mask):
-        out[lower_mask] = (point_est[lower_mask] - float(np.min(x))) * lower_slope + float(
-            nns_mode(y[np.flatnonzero(x == np.min(x))])
+        out[lower_mask] = (point_est[lower_mask] - float(np.min(x))) * lower_slope + _boundary_y(
+            x,
+            y,
+            low=True,
         )
     return out
+
+
+def _boundary_y(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    *,
+    low: bool,
+) -> float:
+    index = int(np.argmin(x) if low else np.argmax(x))
+    return float(nns_mode(np.asarray([y[index]], dtype=np.float64)))
 
 
 def _find_interval(

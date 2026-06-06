@@ -449,16 +449,26 @@ around smooth `nns_reg` point estimates and return a table-like dictionary with
 `eval.point`, `first.derivative`, and `second.derivative`. Boundary-point
 quirks follow installed R where covered by parity tests.
 
-PyNNS derivative parity is defined at the public input/output level, not by
-copying R's mutation-heavy perturbation internals. `dy_d` scalar `wrt` has
-enforced R parity for `eval_points="mean"` and `"median"`. Vectorized `wrt`
-with `eval_points="mean"` and `mixed=False` is also covered and returns one row
-per eval point and one column per requested regressor. Scalar
-`eval_points="last"`, `"obs"`, and `"apd"` return the expected public structure
-but remain xfail-known-divergent because their numeric derivative estimates are
-not yet aligned with installed R, especially second derivatives for `obs` and
-`apd`. Vectorized non-mean `wrt` modes and vectorized `wrt` with `mixed=True`
-remain guarded.
+PyNNS derivative parity is defined at the public input/output level, while
+preserving R's cumulative finite-difference perturbation pattern for `dy_d`.
+`dy_d` scalar `wrt` has enforced R parity for `eval_points="mean"`, `"median"`,
+`"last"`, `"obs"`, and `"apd"`. Vectorized `wrt` with
+`eval_points="mean"` and `mixed=False` is also covered and returns one row per
+eval point and one column per requested regressor. Vectorized non-mean `wrt`
+modes and vectorized `wrt` with `mixed=True` remain guarded. Treat `dy_d` as an
+NNS finite-difference sensitivity estimate around `nns_reg` point estimates,
+not as an exact analytic calculus derivative.
+
+For scalar `dy_d`, R mutates lower and upper finite-difference points
+cumulatively across rounded bandwidths. If rounded bandwidths repeat, R writes
+the later cumulative result back to the first matching result slot and drops
+the empty slots during final weighted averaging; PyNNS mirrors that behavior.
+The `obs` and `apd` paths also rely on smooth dimensional-reduction
+`nns_reg(..., point_est=..., dim_red_method="equal", smooth=True)` estimates.
+For out-of-range smooth point estimates, R derives extrapolation slopes from
+the smoothed regression points before clamping returned regression-point `y`
+values, then anchors the extrapolation at the first `which.min` / `which.max`
+boundary row. PyNNS mirrors those boundary quirks for parity.
 
 ## ANOVA
 

@@ -74,3 +74,14 @@ def test_dy_d_vectorized_wrt_mean_is_implemented() -> None:
     assert result.keys() == {"First", "Second"}
     assert result["First"].shape == (1, 2)
     assert result["Second"].shape == (1, 2)
+
+
+def test_dy_d_point_modes_preserve_linear_slope_direction() -> None:
+    rng = np.random.default_rng(0)
+    x = np.column_stack((rng.uniform(-2.0, 2.0, 120), rng.uniform(-1.0, 1.0, 120)))
+    positive = 2.0 * x[:, 0] + 0.5 * x[:, 1]
+    negative = -2.0 * x[:, 0] + 0.5 * x[:, 1]
+
+    for eval_points in ("mean", "median", "last"):
+        assert dy_d(x, positive, wrt=1, eval_points=eval_points)["First"][0] > 0.0
+        assert dy_d(x, negative, wrt=1, eval_points=eval_points)["First"][0] < 0.0

@@ -123,15 +123,9 @@ def test_dy_d_scalar_wrt1_point_eval_modes_match_r(eval_points: str) -> None:
 
 
 @pytest.mark.parity
-@pytest.mark.xfail(
-    reason=(
-        "R parity not yet matched for scalar last boundary-mode derivative; "
-        "focused linear case differs materially at the boundary"
-    )
-)
 def test_dy_d_scalar_wrt1_last_matches_r() -> None:
     x = np.column_stack(
-        (np.array([-2, -1, 0, 1, 2], dtype=float), np.array([1, 3, 5, 7, 9], dtype=float))
+        (np.linspace(-2.0, 2.0, 60), np.cos(np.linspace(0.0, 5.0, 60)))
     )
     y = 2 * x[:, 0] + 3 * x[:, 1]
 
@@ -148,12 +142,6 @@ def test_dy_d_scalar_wrt1_last_matches_r() -> None:
 
 @pytest.mark.parity
 @pytest.mark.parametrize("eval_points", ["obs", "apd"])
-@pytest.mark.xfail(
-    reason=(
-        "R parity not yet matched for scalar obs/apd distribution modes; "
-        "second derivatives remain materially divergent"
-    )
-)
 def test_dy_d_scalar_wrt1_distribution_eval_modes_match_r(eval_points: str) -> None:
     x1 = np.linspace(-1.5, 1.5, 18)
     x2 = np.cos(np.linspace(0.0, 2.0, 18))

@@ -10,6 +10,14 @@ goal is public input/output compatibility where R behavior is stable,
 documented, and useful. The goal is not to copy every R internal helper name,
 data-frame quirk, or runtime side effect as a public Python API.
 
+Current release-relevant state: the core partial-moment APIs, deterministic
+regression/classification/forecasting surfaces, and scalar multivariate
+derivative modes are parity-covered on focused fixtures. The largest remaining
+API gaps are guarded vectorized `dy_d` non-mean/mixed modes, direct raw-factor
+`nns_m_reg(..., factor_2_dummy=True)`, and named data-frame factor ordering
+quirks. Performance gaps remain mostly in large stochastic-dominance workloads
+where R uses compiled kernels.
+
 Status labels:
 
 - `implemented`: covered public behavior with no known release-blocking gap.
@@ -51,14 +59,12 @@ invariant, and property coverage.
 | Normalization: `nns_norm` | implemented | high | Numeric matrix path is implemented. |
 | Categorical helpers: `encode_factor_codes`, `factor_2_dummy`, `factor_2_dummy_fr` | implemented | high | Explicit `levels=` should be used to reproduce R factor ordering. |
 | Scalar differentiation: `nns_diff`, `dy_dx` | implemented | high | `dy_dx(..., eval_point="overall")` and numeric evaluation points are covered. |
-| Multivariate differentiation: `dy_d` | known gap | low | `mean`/`median` scalar paths and vectorized `mean` with `mixed=False` are covered. Non-mean/distribution modes remain the main math gap. |
+| Multivariate differentiation: `dy_d` | partial | medium | Scalar point modes `mean`, `median`, `last`, `obs`, and `apd` plus vectorized `mean` with `mixed=False` are covered on focused parity fixtures. Vectorized non-mean and vectorized `mixed=True` modes remain guarded. |
 
 ## Guarded And Deferred Paths
 
 | Area | Path | Current behavior | Reason / next action |
 |---|---|---|---|
-| Differentiation | `dy_d` scalar `eval_points="last"` | Returns the expected public structure but parity test remains xfail. | Boundary/extrapolation-sensitive first derivative differs materially in focused parity. Keep xfail until aligned or intentionally documented as divergent. |
-| Differentiation | `dy_d` scalar `eval_points="obs"` / `"apd"` | Returns the expected public structure but parity tests remain xfail. | Distribution-mode numeric values, especially second derivatives, remain materially divergent from installed R. This is the main math gap. |
 | Differentiation | `dy_d` vectorized `wrt` for non-mean modes | Guarded with `NotImplementedError`. | Vectorized `wrt` parity is enforced only for `eval_points="mean"` with `mixed=False`. |
 | Differentiation | `dy_d` vectorized `wrt` with `mixed=True` | Guarded with `NotImplementedError`. | Mixed vectorized semantics are not yet aligned. Call per regressor where supported. |
 | Multivariate regression | direct `factor_2_dummy=True` raw predictor path | Guarded with `NotImplementedError` in direct `nns_m_reg(..., factor_2_dummy=True)`. | Installed R direct `NNS.M.reg` raw factor input errors. Public `nns_reg` factor expansion is supported. |
@@ -126,9 +132,9 @@ examples include:
 
 - PyNNS is alpha. The public API is parity-focused but not declared stable.
 - This is not full R parity yet.
-- The main known mathematical gap is `dy_d` non-mean/distribution behavior:
-  scalar `last`, `obs`, and `apd` remain xfail-known divergent, and vectorized
-  non-mean or `mixed=True` paths are guarded.
+- The remaining `dy_d` API gaps are vectorized non-mean modes and vectorized
+  `mixed=True`; scalar point and distribution modes are parity-covered on
+  focused fixtures.
 - Optional provider support should remain explicit and dependency-light.
 - Version changes and release metadata should be handled separately from API
   status documentation.
