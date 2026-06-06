@@ -15,10 +15,10 @@ Polars.
 
 ## Documentation
 
-- [API status and known gaps](https://github.com/rasheed/pynns/blob/main/docs/api_status.md)
-- [Behavior conventions and intentional divergences](https://github.com/rasheed/pynns/blob/main/docs/conventions.md)
-- [Benchmarks](https://github.com/rasheed/pynns/blob/main/docs/benchmarks.md)
-- [Examples](https://github.com/rasheed/pynns/blob/main/docs/examples/README.md)
+- [API status and known gaps](https://github.com/gitRasheed/pyNNS/blob/main/docs/api_status.md)
+- [Behavior conventions and intentional divergences](https://github.com/gitRasheed/pyNNS/blob/main/docs/conventions.md)
+- [Benchmarks](https://github.com/gitRasheed/pyNNS/blob/main/docs/benchmarks.md)
+- [Examples](https://github.com/gitRasheed/pyNNS/blob/main/docs/examples/README.md)
 
 PyNNS aims to match installed R NNS public behavior where it is stable,
 documented, and useful. It does not try to reproduce every R internal helper,
@@ -126,7 +126,7 @@ PyNNS is not full R parity yet. The main deferred public paths are:
 - Direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` is guarded; use the
   public `nns_reg` factor-expansion path instead.
 
-See the [API status table](https://github.com/rasheed/pynns/blob/main/docs/api_status.md)
+See the [API status table](https://github.com/gitRasheed/pyNNS/blob/main/docs/api_status.md)
 for the full status table.
 
 ## Testing

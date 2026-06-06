@@ -11,9 +11,10 @@ documented, and useful. The goal is not to copy every R internal helper name,
 data-frame quirk, or runtime side effect as a public Python API.
 
 Current release-relevant state: the core partial-moment APIs, deterministic
-regression/classification/forecasting surfaces, and scalar multivariate
-derivative modes are parity-covered on focused fixtures. The largest remaining
-API gaps are direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` and named
+regression/classification/forecasting surfaces, and scalar/vectorized
+multivariate derivative modes are parity-covered on focused fixtures. The
+largest remaining API gaps are direct raw-factor `nns_m_reg(...,
+factor_2_dummy=True)` and named
 data-frame factor ordering quirks. Performance gaps remain mostly in large
 stochastic-dominance workloads where R uses compiled kernels.
 
