@@ -220,27 +220,11 @@ def dy_d(
     wrt_values = np.asarray(wrt, dtype=np.int64).reshape(-1)
 
     if wrt_values.size > 1:
-        eval_points_is_mean = isinstance(eval_points, str) and eval_points.lower() == "mean"
-        if not eval_points_is_mean or mixed:
-            if mixed:
-                raise NotImplementedError(
-                    "dy_d vectorized wrt is not implemented for mixed=True; "
-                    "call dy_d per regressor for mixed=False first."
-                )
-            raise NotImplementedError(
-                'dy_d vectorized wrt is supported only for eval_points="mean" '
-                "with mixed=False; call dy_d once per regressor for other eval points."
-            )
         outputs = [
-            _dy_d_scalar(x_values, y_values, int(wrt_index) - 1, eval_points, mixed=False)
+            _dy_d_scalar(x_values, y_values, int(wrt_index) - 1, eval_points, mixed=bool(mixed))
             for wrt_index in wrt_values
         ]
-        first_values = [np.asarray(output["First"], dtype=np.float64) for output in outputs]
-        second_values = [np.asarray(output["Second"], dtype=np.float64) for output in outputs]
-        return {
-            "First": np.column_stack(first_values),
-            "Second": np.column_stack(second_values),
-        }
+        return _combine_dy_d_outputs(outputs)
 
     wrt_index = int(wrt_values[0]) - 1
     return _dy_d_scalar(
@@ -250,6 +234,18 @@ def dy_d(
         eval_points,
         mixed=bool(mixed),
     )
+
+
+def _combine_dy_d_outputs(
+    outputs: list[dict[str, NDArray[np.float64]]],
+) -> dict[str, NDArray[np.float64]]:
+    return {
+        key: np.column_stack(
+            [np.asarray(output[key], dtype=np.float64).reshape(-1) for output in outputs]
+        )
+        for key in ("First", "Second", "Mixed")
+        if all(key in output for output in outputs)
+    }
 
 
 def _dy_d_scalar(
@@ -447,7 +443,11 @@ def _dy_d_matrix_band(
     upper = estimates[2 * n :]
     first = (upper - fx + fx - lower) / (2.0 * h_step)
     second = (upper - 2.0 * fx + lower) / (h_step**2)
-    mixed_values = _dy_d_mixed(x, y, eval_points, h_value, matrix_points=True) if mixed else None
+    mixed_values = (
+        _dy_d_mixed(x, y, eval_points, h_value, wrt_index=wrt_index, matrix_points=True)
+        if mixed
+        else None
+    )
     return first, second, mixed_values
 
 
@@ -518,7 +518,11 @@ def _dy_d_vector_band(
         upper[index] = _gravity(estimates[(ids == index) & (position == "u")])
     first = (upper - fx + fx - lower) / (2.0 * h_step)
     second = (upper - 2.0 * fx + lower) / (h_step**2)
-    mixed_values = _dy_d_mixed(x, y, eval_vector, h_value, matrix_points=False) if mixed else None
+    mixed_values = (
+        _dy_d_mixed(x, y, eval_vector, h_value, wrt_index=wrt_index, matrix_points=False)
+        if mixed
+        else None
+    )
     return first, second, mixed_values
 
 
@@ -576,6 +580,7 @@ def _dy_d_mixed(
     eval_points: NDArray[np.float64],
     h_value: int,
     *,
+    wrt_index: int,
     matrix_points: bool,
 ) -> NDArray[np.float64]:
     from pynns.dependence import _gravity
@@ -601,7 +606,7 @@ def _dy_d_mixed(
         vector = eval_points.reshape(-1)
         if vector.size != 2:
             raise ValueError("Mixed Derivatives are only for 2 IV")
-        h_step = _dy_d_h_step(x[:, 0], h_value, _gravity)
+        h_step = _dy_d_h_step(x[:, wrt_index], h_value, _gravity)
         mixed_points = np.asarray(
             [
                 vector + h_step,

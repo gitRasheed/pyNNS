@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from _r import dy_d_scalar, dy_dx_numeric, dy_dx_overall, nns_diff_custom
+from _r import dy_d_scalar, dy_d_scalar_mixed, dy_dx_numeric, dy_dx_overall, nns_diff_custom
 from _tolerances import EXACT
 
 from pynns import dy_d, dy_dx, nns_diff
@@ -233,6 +233,47 @@ def test_dy_d_vectorized_wrt_nonlinear_mean_matches_r() -> None:
         )
 
 
+@pytest.mark.parity
+@pytest.mark.parametrize("eval_points", ["median", "last", "obs", "apd"])
+def test_dy_d_vectorized_wrt_non_mean_modes_match_r(eval_points: str) -> None:
+    x1 = np.linspace(-1.5, 1.5, 18)
+    x2 = np.cos(np.linspace(0.0, 2.0, 18))
+    x = np.column_stack((x1, x2))
+    y = x[:, 0] ** 2 + 0.5 * x[:, 1] + np.sin(x[:, 0] * x[:, 1])
+
+    expected = _stacked_scalar_dy_d(x, y, [1, 2], eval_points)
+    actual = dy_d(x, y, wrt=np.array([1, 2]), eval_points=eval_points)
+
+    atol = 3e-2 if eval_points == "apd" else 5e-3
+    _assert_dy_d_dict_close(actual, expected, atol=atol, rtol=1e-2)
+
+
+@pytest.mark.parity
+@pytest.mark.parametrize("eval_points", ["mean"])
+def test_dy_d_vectorized_wrt_mixed_modes_match_r(eval_points: str) -> None:
+    x1 = np.linspace(-1.5, 1.5, 18)
+    x2 = np.cos(np.linspace(0.0, 2.0, 18))
+    x = np.column_stack((x1, x2))
+    y = x[:, 0] ** 2 + 0.5 * x[:, 1] + np.sin(x[:, 0] * x[:, 1])
+
+    expected = _stacked_scalar_dy_d_mixed(x, y, [1, 2], eval_points)
+    actual = dy_d(x, y, wrt=np.array([1, 2]), eval_points=eval_points, mixed=True)
+
+    _assert_dy_d_dict_close(actual, expected, atol=5e-3, rtol=1e-2)
+
+
+@pytest.mark.parity
+def test_dy_d_vectorized_wrt_numeric_eval_mixed_matches_r() -> None:
+    x = np.column_stack((np.linspace(-1.0, 1.0, 12), np.cos(np.linspace(0.0, 2.0, 12))))
+    y = x[:, 0] ** 2 + x[:, 1]
+    eval_points = np.array([0.1, 0.4], dtype=np.float64)
+
+    expected = _stacked_scalar_dy_d_mixed(x, y, [1, 2], eval_points)
+    actual = dy_d(x, y, wrt=np.array([1, 2]), eval_points=eval_points, mixed=True)
+
+    _assert_dy_d_dict_close(actual, expected, atol=5e-3, rtol=1e-2)
+
+
 def _r_nns_diff(name: str, point: float) -> dict[str, float]:
     result = nns_diff_custom(name, point)
     assert isinstance(result, dict)
@@ -247,6 +288,56 @@ def _dict_array(value: object) -> dict[str, np.ndarray]:
     if not isinstance(value, dict):
         raise AssertionError(f"Expected dictionary, got {type(value)!r}")
     return {key: np.asarray(item, dtype=np.float64) for key, item in value.items()}
+
+
+def _stacked_scalar_dy_d(
+    x: np.ndarray,
+    y: np.ndarray,
+    wrt_values: list[int],
+    eval_points: str,
+) -> dict[str, np.ndarray]:
+    outputs = [
+        _dict_array(dy_d_scalar(x.tolist(), y.tolist(), wrt, eval_points))
+        for wrt in wrt_values
+    ]
+    return _stack_dy_d_outputs(outputs)
+
+
+def _stacked_scalar_dy_d_mixed(
+    x: np.ndarray,
+    y: np.ndarray,
+    wrt_values: list[int],
+    eval_points: object,
+) -> dict[str, np.ndarray]:
+    point_arg = eval_points.tolist() if isinstance(eval_points, np.ndarray) else eval_points
+    outputs = [
+        _dict_array(dy_d_scalar_mixed(x.tolist(), y.tolist(), wrt, point_arg))
+        for wrt in wrt_values
+    ]
+    return _stack_dy_d_outputs(outputs)
+
+
+def _stack_dy_d_outputs(outputs: list[dict[str, np.ndarray]]) -> dict[str, np.ndarray]:
+    return {
+        key: np.column_stack(
+            [np.asarray(output[key], dtype=np.float64).reshape(-1) for output in outputs]
+        )
+        for key in ("First", "Second", "Mixed")
+        if all(key in output for output in outputs)
+    }
+
+
+def _assert_dy_d_dict_close(
+    actual: dict[str, np.ndarray],
+    expected: dict[str, np.ndarray],
+    *,
+    atol: float,
+    rtol: float,
+) -> None:
+    assert actual.keys() == expected.keys()
+    for key in actual:
+        assert actual[key].shape == expected[key].shape
+        np.testing.assert_allclose(actual[key], expected[key], atol=atol, rtol=rtol, equal_nan=True)
 
 
 def _relative_diagnostics(actual: np.ndarray, expected: np.ndarray) -> dict[str, float | int]:

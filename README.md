@@ -119,9 +119,10 @@ can be passed to `nns_nowcast_panel`; there is no public `nns_nowcast` wrapper.
 
 PyNNS is not full R parity yet. The main deferred public paths are:
 
-- Scalar `dy_d` point and distribution modes are parity-covered on focused
-  fixtures, including `eval_points="obs"` and `"apd"`.
-- Vectorized non-mean `dy_d` and vectorized `mixed=True` modes are guarded.
+- Scalar and vectorized `dy_d` point and distribution modes are covered on
+  focused fixtures, including `eval_points="obs"` and `"apd"`. Mixed
+  derivatives are supported where mathematically defined for two-regressor
+  inputs.
 - Direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` is guarded; use the
   public `nns_reg` factor-expansion path instead.
 

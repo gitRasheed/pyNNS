@@ -452,12 +452,18 @@ quirks follow installed R where covered by parity tests.
 PyNNS derivative parity is defined at the public input/output level, while
 preserving R's cumulative finite-difference perturbation pattern for `dy_d`.
 `dy_d` scalar `wrt` has enforced R parity for `eval_points="mean"`, `"median"`,
-`"last"`, `"obs"`, and `"apd"`. Vectorized `wrt` with
-`eval_points="mean"` and `mixed=False` is also covered and returns one row per
-eval point and one column per requested regressor. Vectorized non-mean `wrt`
-modes and vectorized `wrt` with `mixed=True` remain guarded. Treat `dy_d` as an
-NNS finite-difference sensitivity estimate around `nns_reg` point estimates,
-not as an exact analytic calculus derivative.
+`"last"`, `"obs"`, and `"apd"`. Vectorized `wrt` returns one row per eval point
+and one column per requested regressor for `First`, `Second`, and `Mixed` when
+mixed derivatives are defined. Treat `dy_d` as an NNS finite-difference
+sensitivity estimate around `nns_reg` point estimates, not as an exact analytic
+calculus derivative.
+
+Mixed derivatives require a two-regressor input. Numeric two-value evaluation
+points and single-row point modes match installed R on focused fixtures. For
+multi-row matrix evaluation points, including `eval_points="obs"`, PyNNS uses a
+pointwise mixed finite-difference construction. Installed R's vectorized
+list-matrix path packs multi-row mixed derivative points in an order-dependent
+way, so PyNNS does not copy that packing quirk.
 
 For scalar `dy_d`, R mutates lower and upper finite-difference points
 cumulatively across rounded bandwidths. If rounded bandwidths repeat, R writes

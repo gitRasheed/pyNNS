@@ -37,32 +37,59 @@ def test_dy_dx_numeric_eval_point_returns_derivative_table() -> None:
     assert np.all(np.isfinite(result["first.derivative"]))
 
 
-def test_dy_d_remains_deferred() -> None:
-    x = np.column_stack((np.linspace(-2.0, 2.0, 24), np.linspace(0.0, 1.0, 24)))
-    y = x[:, 0] + x[:, 1]
-
-    with pytest.raises(
-        NotImplementedError, match='vectorized wrt is supported only for eval_points="mean"'
-    ):
-        dy_d(x, y, wrt=np.array([1, 2]))
-
-
-def test_dy_d_vectorized_wrt_obs_remains_deferred() -> None:
+def test_dy_d_vectorized_wrt_obs_is_implemented() -> None:
     x = np.random.RandomState(0).randn(40, 3)
     y = x[:, 0] + 2.0 * x[:, 1] - x[:, 2]
 
-    with pytest.raises(
-        NotImplementedError, match="vectorized wrt is supported only for eval_points"
-    ):
-        dy_d(x, y, wrt=np.array([1, 2]), eval_points="obs")
+    result = dy_d(x, y, wrt=np.array([1, 2]), eval_points="obs")
+
+    assert result.keys() == {"First", "Second"}
+    assert result["First"].shape == (40, 2)
+    assert result["Second"].shape == (40, 2)
 
 
-def test_dy_d_vectorized_wrt_mixed_remains_deferred() -> None:
+def test_dy_d_vectorized_wrt_mixed_three_column_input_falls_back_to_first_second() -> None:
     x = np.random.RandomState(1).randn(40, 3)
     y = x[:, 0] + x[:, 1] + x[:, 2]
 
-    with pytest.raises(NotImplementedError, match="vectorized wrt is not implemented for mixed"):
-        dy_d(x, y, wrt=np.array([1, 2]), eval_points="mean", mixed=True)
+    result = dy_d(x, y, wrt=np.array([1, 2]), eval_points="mean", mixed=True)
+
+    assert result.keys() == {"First", "Second"}
+    assert result["First"].shape == (1, 2)
+    assert result["Second"].shape == (1, 2)
+
+
+def test_dy_d_vectorized_wrt_mixed_two_column_input_returns_mixed() -> None:
+    x = np.random.RandomState(1).randn(40, 2)
+    y = x[:, 0] + x[:, 1]
+
+    result = dy_d(x, y, wrt=np.array([1, 2]), eval_points="mean", mixed=True)
+
+    assert result.keys() == {"First", "Second", "Mixed"}
+    assert result["First"].shape == (1, 2)
+    assert result["Second"].shape == (1, 2)
+    assert result["Mixed"].shape == (1, 2)
+
+
+def test_dy_d_vectorized_wrt_obs_mixed_uses_pointwise_python_shape() -> None:
+    x = np.random.RandomState(3).randn(24, 2)
+    y = x[:, 0] ** 2 + x[:, 1]
+
+    result = dy_d(x, y, wrt=np.array([1, 2]), eval_points="obs", mixed=True)
+
+    assert result.keys() == {"First", "Second", "Mixed"}
+    assert result["First"].shape == (24, 2)
+    assert result["Second"].shape == (24, 2)
+    assert result["Mixed"].shape == (24, 2)
+    assert np.all(np.isfinite(result["Mixed"]))
+
+
+def test_dy_d_vectorized_wrt_apd_mixed_remains_invalid() -> None:
+    x = np.random.RandomState(1).randn(40, 2)
+    y = x[:, 0] + x[:, 1]
+
+    with pytest.raises(ValueError, match="Mixed Derivatives are only for 2 IV"):
+        dy_d(x, y, wrt=np.array([1, 2]), eval_points="apd", mixed=True)
 
 
 def test_dy_d_vectorized_wrt_mean_is_implemented() -> None:

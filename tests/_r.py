@@ -718,6 +718,31 @@ def dy_d_scalar(
         return result
 
 
+def dy_d_scalar_mixed(
+    x: Sequence[Sequence[float]],
+    y: Sequence[float],
+    wrt: int,
+    eval_points: object,
+) -> RValue:
+    args = {"x": x, "y": y, "wrt": wrt, "eval_points": eval_points}
+    key = _cache_key("dy.d.scalar.mixed.v1", (args,))
+    cache, refresh = _cache_state()
+    if key in cache:
+        return _decode(cache[key])
+    if _offline():
+        raise RuntimeError(f"R cache miss for dy.d.scalar.mixed with key {key}.")
+    with _cache_lock():
+        disk_cache, disk_refresh = _read_cache_from_disk()
+        if refresh or disk_refresh:
+            disk_cache = {}
+        if key in disk_cache:
+            return _decode(disk_cache[key])
+        result = _call_r_dy_d_scalar_mixed(args)
+        disk_cache[key] = _encode(result)
+        _write_cache(disk_cache)
+        return result
+
+
 def nns_arma_pred_int(
     variable: list[float],
     *,
@@ -1624,6 +1649,31 @@ def _call_r_dy_d_scalar(args: dict[str, Any]) -> RValue:
         "first <- result['First', ][[1]]\n"
         "second <- result['Second', ][[1]]\n"
         "out <- list(First = as.numeric(first), Second = as.numeric(second))\n"
+        "cat(jsonlite::toJSON(out, auto_unbox = TRUE, digits = NA))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        input=json.dumps(args),
+        text=True,
+    )
+    return _decode(json.loads(completed.stdout))
+
+
+def _call_r_dy_d_scalar_mixed(args: dict[str, Any]) -> RValue:
+    script = (
+        "library(NNS)\n"
+        "args <- jsonlite::fromJSON(paste(readLines('stdin'), collapse = '\\n'))\n"
+        "eval_points <- args$eval_points\n"
+        "if (is.data.frame(eval_points)) eval_points <- as.matrix(eval_points)\n"
+        "result <- NNS::dy.d_(as.data.frame(args$x), as.numeric(unlist(args$y)), "
+        "wrt = as.integer(args$wrt), eval.point = eval_points, mixed = TRUE, "
+        "messages = FALSE)\n"
+        "out <- list(First = as.numeric(result['First', ][[1]]), "
+        "Second = as.numeric(result['Second', ][[1]]))\n"
+        "if ('Mixed' %in% rownames(result)) out$Mixed <- as.numeric(result['Mixed', ][[1]])\n"
         "cat(jsonlite::toJSON(out, auto_unbox = TRUE, digits = NA))\n"
     )
     completed = subprocess.run(
