@@ -53,7 +53,7 @@ invariant, and property coverage.
 | Stack: `nns_stack` | implemented | medium | Numeric/class paths, intervals, factor expansion, and `ts_test` are covered; exact stochastic sample parity is not expected. |
 | Boost: `nns_boost` | partial | medium | Deterministic and stochastic structures are implemented; one high-feature threshold path remains guarded to match installed-R failure behavior. |
 | Seasonality: `nns_seas` | implemented | high | Non-plotting installed-R path is implemented and cached defensively. |
-| ARMA and VAR: `nns_arma`, `nns_arma_optim`, `nns_var` | implemented | medium | Numeric forecasting and supported VAR dimension-reduction paths are implemented. Stochastic interval streams are structural/statistical parity only. |
+| ARMA and VAR: `nns_arma`, `nns_arma_optim`, `nns_var` | partial | medium | Numeric forecasting and supported VAR dimension-reduction paths are implemented on focused fixtures. Explicit numeric multi-lag ARMA uses actual-lag weighting instead of installed R's position-based weighting quirk. VAR's multivariate stack stage matches R's effective time-series holdout sizing; the remaining macro-like VAR strict xfail is inherited from ARMA optimizer period selection. Stochastic interval streams are structural/statistical parity only. |
 | Nowcast panel: `nns_nowcast_panel` | implemented | medium | Python-native deterministic monthly panel helper backed by `nns_var`. R NNS 12.1 beta removed `NNS.nowcast`, so this is no longer an R-export parity target. |
 | Providers: `CsvNowcastProvider` | implemented | medium | Produces explicit local/offline payloads for `nns_nowcast_panel`. |
 | Bootstrap/Monte Carlo: `nns_meboot`, `nns_mc` | implemented | medium | Deterministic diagnostics are parity-tested; exact stochastic replicate parity with R is not expected. |
@@ -125,6 +125,12 @@ examples include:
   `data.table` objects.
 - Some installed-R quirks are intentionally matched when they affect stable
   public output, such as selected interval and `ts_test` conventions.
+- Practical example parity checks live in `tests/parity/test_practical_examples.py`.
+  Current passing coverage includes partial-moment equivalences, curve fitting,
+  regression residuals, Boston Housing, and the macro-like VAR multivariate
+  stage. Strict xfails track current installed-R deviations in the Iris
+  classification vignette, the documented ARMA numeric multi-lag weighting
+  divergence, and VAR's ARMA-derived univariate/ensemble outputs.
 
 ## Release-Relevant Caveats
 

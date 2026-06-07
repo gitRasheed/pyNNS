@@ -67,6 +67,7 @@ testpaths = ["tests"]
 markers = [
     "benchmark: performance benchmarks excluded from the default test run",
     "parity: tests comparing pynns behavior to the reference R NNS package",
+    "practical: end-to-end practical example parity checks against installed R NNS",
     "invariant: tests for mathematical or API invariants",
     "property: property-based tests",
     "stochastic: stochastic structural/statistical tests",

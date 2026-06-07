@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from numbers import Integral
 from typing import Any, cast
@@ -272,7 +273,7 @@ def _var_multivariate_stack_stage(
         else:
             ivs_test = lagged_iv[-h:, :]
 
-        ts_test = max(2 * h, int(0.2 * lagged_dv.size))
+        ts_test = max(2 * h, math.ceil(0.2 * lagged_dv.size))
 
         def var_obj_fn(predicted: np.ndarray, actual: np.ndarray) -> float:
             predicted_values = np.asarray(predicted, dtype=np.float64)

@@ -338,7 +338,8 @@ recursive: each estimate is appended before the next horizon step. Plot
 arguments are ignored. Prediction intervals use `nns_mc` / `nns_meboot`; exact
 stochastic parity with R is not expected because RNG streams differ.
 `random_seed` is a PyNNS-only convenience for reproducible interval tests.
-No-`pred_int` deterministic forecasts remain exact parity-tested.
+No-`pred_int` deterministic forecasts are parity-tested except where PyNNS
+intentionally uses a more direct seasonal-lag weighting convention.
 `seasonal_factor=True` uses only the first detected period from `nns_seas`,
 matching `ARMA.seas.weighting(TRUE, ...)`; `seasonal_factor=False` uses the
 selected `best_periods` rows. `dynamic=True` with numeric seasonal factors
@@ -347,6 +348,17 @@ installed R, including zero forecasts for automatic seasonality paths and `NaN`
 forecasts for some explicit numeric-lag paths. Character `weights` with numeric
 multi-lag seasonal factors is rejected because installed R errors during numeric
 multiplication on that path.
+
+For explicit numeric multi-lag seasonal factors such as
+`seasonal_factor=[132, 276]`, PyNNS intentionally weights each candidate lag by
+the coefficient of variation of that actual lag's reverse component series.
+Installed R NNS instead computes the coefficient-of-variation term with reverse
+steps `1:length(seasonal.factor)` while still applying the observation penalty
+to the actual lag values. PyNNS keeps the actual-lag weighting because it better
+matches the documented idea that each supplied seasonal factor is weighted by
+its own seasonality strength and observation count. The R-compatible difference
+is covered by a strict xfail practical test rather than hidden.
+
 `nns_arma_optim` is supported for the installed-R optimizer path. It greedily
 selects seasonal factors, evaluates the default co-moment-normalized objective,
 then applies the same equal-weight, bias-shift, shrink, and smooth-regressed
@@ -356,7 +368,11 @@ VaR bands around the in-sample optimizer errors; they are separate from
 `obj_fn` callables may be supplied, but R expression objects are not part of the
 Python API. `nns_var` is implemented for numeric matrix-like inputs with
 `dim_red_method="cor"`, `dim_red_method="NNS.dep"`,
-`dim_red_method="NNS.caus"`, and `dim_red_method="all"` and returns R-compatible public output keys. The `h == 0`
+`dim_red_method="NNS.caus"`, and `dim_red_method="all"` and returns
+R-compatible public output keys. VAR's internal multivariate stack stage uses
+`ceil(0.2 * n)` for the time-series validation window when that term exceeds
+`2 * h`, matching installed R's effective trailing holdout size and preserving
+the documented `ts.test` idea as a count of held-out observations. The `h == 0`
 path is normalized to a Python dictionary containing `interpolated_and_extrapolated`
 and `names` rather than R's bare data-frame return. The first-stage interpolation/extrapolation helper
 `_var_interpolate_and_extrapolate` is implemented to match R's
