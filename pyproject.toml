@@ -24,7 +24,7 @@ keywords = [
     "forecasting",
     "nns",
 ]
-urls = { "Homepage" = "https://github.com/rasheed/pynns", "Repository" = "https://github.com/rasheed/pynns", "Issues" = "https://github.com/rasheed/pynns/issues", "Source" = "https://github.com/rasheed/pynns", "Project" = "https://github.com/rasheed/pynns" }
+urls = { "Homepage" = "https://github.com/gitRasheed/pyNNS", "Repository" = "https://github.com/gitRasheed/pyNNS", "Issues" = "https://github.com/gitRasheed/pyNNS/issues", "Source" = "https://github.com/gitRasheed/pyNNS", "Project" = "https://github.com/gitRasheed/pyNNS" }
 dependencies = [
     "numpy",
     "scipy",

@@ -27,6 +27,16 @@ you want short Python call patterns that are kept in sync with PyNNS.
 | Forecasting | [forecasting.py](forecasting.py) | `nns_arma`, `nns_arma_optim`, `nns_var` | `NNSvignette_Forecasting.Rmd` |
 | Nowcast panel | [nowcast_panel.py](nowcast_panel.py) | deterministic user-supplied panel, date metadata, VAR-backed forecast output | `NNS.VAR` nowcast/frequency-alignment material |
 
+## Notebooks
+
+| Topic | Notebook |
+|---|---|
+| Partial-moment risk workflow | [01_partial_moments_risk_workflow.ipynb](notebooks/01_partial_moments_risk_workflow.ipynb) |
+| Regression, classification, factors | [02_regression_classification_workflow.ipynb](notebooks/02_regression_classification_workflow.ipynb) |
+| Forecasting and local nowcast panel | [03_forecasting_nowcast_workflow.ipynb](notebooks/03_forecasting_nowcast_workflow.ipynb) |
+| Distribution, dominance, simulation | [04_distribution_dominance_simulation_workflow.ipynb](notebooks/04_distribution_dominance_simulation_workflow.ipynb) |
+| Boston Housing regression parity example | [05_boston_housing_regression_workflow.ipynb](notebooks/05_boston_housing_regression_workflow.ipynb) |
+
 Run one example:
 
 ```bash
@@ -39,5 +49,5 @@ Run all examples:
 for example in docs/examples/*.py; do uv run python "$example"; done
 ```
 
-The main R parity guarantees still live in `tests/parity/`. These examples are
-notebook-sized examples, not a replacement for the parity suite.
+The main R parity guarantees still live in `tests/parity/`. These examples and
+notebooks are usage references, not a replacement for the parity suite.

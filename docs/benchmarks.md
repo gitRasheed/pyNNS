@@ -102,8 +102,9 @@ R baselines use installed R NNS 12.1.
 ## Realistic Finance SD North Stars
 
 These benchmarks use the static daily-return fixture at
-`tests/fixtures/finance/sp500_daily_returns_2019_2023.csv`. The fixture contains
-1257 daily return rows and 480 clean return columns after dropping
+`tests/fixtures/finance/sp500_daily_returns_2019_2023.csv`. That finance
+fixture is local-only and not tracked in git; the latest recorded run used 1257
+daily return rows and 480 clean return columns after dropping
 tickers with missing or non-finite returns. Constituent-universe benchmarks exclude
 `SPY` and `GSPC`, leaving 478 columns. Market-relative workflows
 prefer `GSPC` and fall back to `SPY`; tradable-proxy examples use `SPY`.

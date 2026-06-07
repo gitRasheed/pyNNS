@@ -1,16 +1,34 @@
 # PyNNS
 
-Nonlinear nonparametric statistics in Python.
-
-PyNNS is an alpha Python port of the R NNS 12.1 beta package. It provides
-partial-moment statistics, nonlinear dependence, regression, classification,
-forecasting, bootstrap, and related tools in Python on top of NumPy and SciPy.
+Python port of the R NNS 12.1 beta package.
 
 - PyPI package: `nns-pm`
 - Import name: `pynns`
-- Status: alpha, parity-focused
+- Runtime dependencies: NumPy, SciPy
 - R required for normal use: no
+- Status: alpha, parity-focused
 - License: GPL-3.0-only
+
+## Install
+
+```bash
+pip install nns-pm
+```
+
+## Quick Use
+
+```python
+import numpy as np
+from pynns import lpm, nns_dep, nns_reg
+
+x = np.array([-2.0, -1.0, 0.5, 3.0])
+downside = lpm(2, 0.0, x)
+
+grid = np.linspace(-2.0, 2.0, 50)
+dep = nns_dep(grid, grid**2)
+
+fit = nns_reg(grid, np.sin(grid), point_est=np.array([-1.0, 0.0, 1.0]))
+```
 
 ## Documentation
 
@@ -18,116 +36,7 @@ forecasting, bootstrap, and related tools in Python on top of NumPy and SciPy.
 - [Behavior conventions and intentional divergences](docs/conventions.md)
 - [Benchmarks](docs/benchmarks.md)
 - [Examples](docs/examples/README.md)
-
-PyNNS aims to match installed R NNS public behavior where it is stable,
-documented, and useful. It does not try to reproduce every R internal helper,
-plotting side effect, data-frame quirk, or hidden runtime data fetch.
-
-## Installation
-
-```bash
-pip install nns-pm
-```
-
-PyNNS does not auto-load `.env` files and does not fetch network data.
-
-R and the R `NNS` package are only needed by maintainers regenerating live parity
-fixtures. Normal Python users do not need R installed.
-
-## Minimal Examples
-
-### Partial Moments
-
-```python
-import numpy as np
-from pynns import lpm, upm
-
-x = np.array([-2.0, -1.0, 0.5, 3.0])
-
-downside = lpm(2, 0.0, x)
-upside = upm(2, 0.0, x)
-```
-
-### Nonlinear Dependence
-
-```python
-import numpy as np
-from pynns import nns_dep
-
-x = np.linspace(-2.0, 2.0, 50)
-y = x**2
-
-result = nns_dep(x, y)
-print(result["Dependence"], result["Correlation"])
-```
-
-### Regression
-
-```python
-import numpy as np
-from pynns import nns_reg
-
-x = np.linspace(-3.0, 3.0, 80)
-y = np.sin(x) + 0.2 * x
-
-fit = nns_reg(x, y, point_est=np.array([-1.0, 0.0, 1.0]))
-print(fit["Point.est"])
-```
-
-### User-Supplied Nowcast Panel
-
-```python
-from collections import OrderedDict
-from pynns import nns_nowcast_panel
-
-panel = OrderedDict(
-    {
-        "series_a": [1.0, 1.2, 1.4, 1.5, 1.7],
-        "series_b": [2.0, 1.9, 2.1, 2.3, 2.4],
-    }
-)
-
-forecast = nns_nowcast_panel(panel, h=2, tau=1)
-```
-
-R NNS 12.1 beta removed `NNS.nowcast`. PyNNS keeps
-`nns_nowcast_panel(...)` as a deterministic, VAR-backed monthly panel helper.
-`CsvNowcastProvider` can build payloads from local CSV files for
-`nns_nowcast_panel`; there is no public `nns_nowcast` wrapper.
-
-## Main Features
-
-- Core partial moments: `lpm`, `upm`, ratios, co-moments, and partial-moment
-  matrices.
-- Dependence, copula, causation, CDF, distance, and normalization helpers.
-- Regression, multivariate regression, classification, stack, and boost paths.
-- ARMA, VAR, seasonality, and deterministic user-panel nowcasting.
-- Monte Carlo and maximum-entropy bootstrap wrappers.
-- Stochastic dominance, stochastic superiority, and SD clustering.
-- R parity and Python-native invariant tests for public behavior.
-
-## Current Limitations
-
-PyNNS is still alpha. The main remaining public caveats are documented guarded
-paths rather than missing core algorithms:
-
-- Direct raw-factor `nns_m_reg(..., factor_2_dummy=True)` is rejected; use
-  `prepare_factor_predictors(...)` first or call `nns_reg(...,
-  factor_2_dummy=True, factor_levels=...)`.
-- Exact random-stream parity is not expected for stochastic APIs because PyNNS
-  uses NumPy RNG while R NNS uses R's RNG.
-
-See the [API status table](docs/api_status.md) for the full status table.
-
-## Testing
-
-PyNNS tests public behavior against installed R NNS where useful. Tests compare
-public keys, shapes, labels, signs, selected variables, and numerical values
-within documented tolerances.
-
-Exact random-stream parity is not expected for stochastic paths because PyNNS
-uses NumPy RNG while R NNS uses R's RNG. Those paths are tested structurally and
-statistically.
+- [Nowcast design](docs/specs_nowcast.md)
 
 ## Development
 
@@ -138,11 +47,7 @@ uv run ruff check .
 uv run mypy
 ```
 
-Offline parity-cache run:
-
-```bash
-PYNNS_OFFLINE=1 uv run pytest -q -m "not benchmark and not stochastic"
-```
+R and the R `NNS` package are only needed to regenerate parity fixtures.
 
 ## Attribution
 
