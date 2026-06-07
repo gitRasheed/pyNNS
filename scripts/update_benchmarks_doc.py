@@ -106,7 +106,9 @@ def main() -> None:
     args = parser.parse_args()
 
     benchmark_payload = _read_json(args.benchmark_json)
-    r_baseline = _read_json(R_BASELINE)["entries"]
+    r_baseline_payload = _read_json(R_BASELINE)
+    r_baseline = r_baseline_payload["entries"]
+    r_version = str(r_baseline_payload["nns_version"])
     realistic_r = _read_realistic_sd_r_csv(args.realistic_sd_r_csv)
     key_by_test = _r_baseline_keys_by_test()
 
@@ -165,7 +167,10 @@ def main() -> None:
             )
         )
 
-    args.output.write_text(_render(rows, realistic_rows, python_only_rows), encoding="utf-8")
+    args.output.write_text(
+        _render(rows, realistic_rows, python_only_rows, r_version),
+        encoding="utf-8",
+    )
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -282,6 +287,7 @@ def _render(
     rows: list[BenchmarkRow],
     realistic_rows: list[RealisticSDRow],
     python_only_rows: list[PythonOnlyRow],
+    r_version: str,
 ) -> str:
     lines = [
         "# Benchmarks",
@@ -301,6 +307,8 @@ def _render(
         "```",
         "",
         "## Results",
+        "",
+        f"R baselines use installed R NNS {r_version}.",
         "",
         "`Python speed vs R` is computed as `R baseline / Python mean`. Values above `1.00x` "
         "mean Python is faster; values below `1.00x` mean Python is slower.",

@@ -202,7 +202,7 @@ def test_iris_stack_classification_vignette_predicts_holdout_class() -> None:
     np.testing.assert_allclose(stack["reg"], np.full(y_test.shape, 2.0), atol=EXACT)
     np.testing.assert_allclose(stack["dim.red"], y_test, atol=EXACT)
 
-    if expected["nns_version"] == "12.0":
+    if expected["nns_version"] == "12.1":
         r_stack = _array(expected["stack"]["results"])
         np.testing.assert_allclose(r_stack, np.full(y_test.shape, 2.0), atol=EXACT)
 
@@ -211,7 +211,7 @@ def test_iris_stack_classification_vignette_predicts_holdout_class() -> None:
 @pytest.mark.practical
 @pytest.mark.xfail(
     reason=(
-        "Installed R NNS 12.0 and PyNNS balanced Iris boost remain a true "
+        "Installed R NNS 12.1 and PyNNS balanced Iris boost remain a true "
         "diagnostic parity gap; both miss the all-class-3 holdout."
     ),
     strict=True,

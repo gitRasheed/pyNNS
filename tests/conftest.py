@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 _BENCHMARK_BASELINE_PATH = Path(__file__).parent / "benchmarks" / "_r_baseline.json"
 _BENCHMARK_SCHEMA_VERSION = 1
-_NNS_VERSION = "12.0"
+_NNS_VERSION = "12.1"
 
 JsonValue: TypeAlias = float | int | str | list["JsonValue"] | dict[str, "JsonValue"]
 BenchmarkBaseline: TypeAlias = dict[str, JsonValue]
@@ -90,6 +90,11 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_sd_cluster_252x50_degree2_seconds" not in cache:
         cache["nns_sd_cluster_252x50_degree2_seconds"] = _time_r_nns_sd_cluster()
         _write_benchmark_baseline(cache)
+    if "nns_sd_cluster_252x50_degree2_dendrogram_seconds" not in cache:
+        cache["nns_sd_cluster_252x50_degree2_dendrogram_seconds"] = (
+            _time_r_nns_sd_cluster_dendrogram()
+        )
+        _write_benchmark_baseline(cache)
     if "nns_cdf_1000_degree0_seconds" not in cache:
         cache["nns_cdf_1000_degree0_seconds"] = _time_r_nns_cdf_univariate(0)
         _write_benchmark_baseline(cache)
@@ -129,6 +134,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_diff_sin_seconds" not in cache:
         cache["nns_diff_sin_seconds"] = _time_r_nns_diff()
         _write_benchmark_baseline(cache)
+    if "dy_dx_numeric_100_seconds" not in cache:
+        cache["dy_dx_numeric_100_seconds"] = _time_r_dy_dx_numeric()
+        _write_benchmark_baseline(cache)
     if "nns_anova_100x2_seconds" not in cache:
         cache["nns_anova_100x2_seconds"] = _time_r_nns_anova()
         _write_benchmark_baseline(cache)
@@ -156,6 +164,9 @@ def r_baseline() -> BenchmarkBaseline:
     if "nns_reg_factor_dimred_120x2_seconds" not in cache:
         cache["nns_reg_factor_dimred_120x2_seconds"] = _time_r_nns_reg_factor_dimred()
         _write_benchmark_baseline(cache)
+    if "nns_reg_factor_predictor_200_seconds" not in cache:
+        cache["nns_reg_factor_predictor_200_seconds"] = _time_r_nns_reg_factor_predictor()
+        _write_benchmark_baseline(cache)
     if "nns_m_reg_200x3_seconds" not in cache:
         cache["nns_m_reg_200x3_seconds"] = _time_r_nns_m_reg()
         _write_benchmark_baseline(cache)
@@ -170,6 +181,21 @@ def r_baseline() -> BenchmarkBaseline:
         _write_benchmark_baseline(cache)
     if "nns_stack_100x3_seconds" not in cache:
         cache["nns_stack_100x3_seconds"] = _time_r_nns_stack()
+        _write_benchmark_baseline(cache)
+    if "nns_stack_factor_predictor_60_method1_seconds" not in cache:
+        cache["nns_stack_factor_predictor_60_method1_seconds"] = (
+            _time_r_nns_stack_factor_predictor()
+        )
+        _write_benchmark_baseline(cache)
+    if "nns_stack_mixed_factor_predictor_60_method2_seconds" not in cache:
+        cache["nns_stack_mixed_factor_predictor_60_method2_seconds"] = (
+            _time_r_nns_stack_mixed_factor_predictor()
+        )
+        _write_benchmark_baseline(cache)
+    if "nns_stack_mixed_factor_predictor_100x3_method12_seconds" not in cache:
+        cache["nns_stack_mixed_factor_predictor_100x3_method12_seconds"] = (
+            _time_r_nns_stack_mixed_factor_predictor_method12()
+        )
         _write_benchmark_baseline(cache)
     if "nns_stack_100x3_pred_int_seconds" not in cache:
         cache["nns_stack_100x3_pred_int_seconds"] = _time_r_nns_stack_pred_int()
@@ -245,6 +271,9 @@ def r_baseline() -> BenchmarkBaseline:
             method="nonlin",
         )
         _write_benchmark_baseline(cache)
+    if "nns_arma_optim_80_small_seconds" not in cache:
+        cache["nns_arma_optim_80_small_seconds"] = _time_r_nns_arma_optim()
+        _write_benchmark_baseline(cache)
     for eval_points in ("mean", "median", "last", "obs", "apd"):
         key = f"dy_d_scalar_{eval_points}_100x2_seconds"
         if key not in cache:
@@ -256,6 +285,18 @@ def r_baseline() -> BenchmarkBaseline:
         if key not in cache:
             cache[key] = _time_r_nns_var(method)
             _write_benchmark_baseline(cache)
+    if "nns_meboot_500_reps100_seconds" not in cache:
+        cache["nns_meboot_500_reps100_seconds"] = _time_r_nns_meboot(500)
+        _write_benchmark_baseline(cache)
+    if "nns_meboot_1000_reps100_seconds" not in cache:
+        cache["nns_meboot_1000_reps100_seconds"] = _time_r_nns_meboot(1000)
+        _write_benchmark_baseline(cache)
+    if "nns_mc_500_reps30_by02_seconds" not in cache:
+        cache["nns_mc_500_reps30_by02_seconds"] = _time_r_nns_mc(0.2)
+        _write_benchmark_baseline(cache)
+    if "nns_mc_500_reps30_by01_seconds" not in cache:
+        cache["nns_mc_500_reps30_by01_seconds"] = _time_r_nns_mc(0.1)
+        _write_benchmark_baseline(cache)
     if "nns_ss_1000_seconds" not in cache:
         cache["nns_ss_1000_seconds"] = _time_r_nns_ss()
         _write_benchmark_baseline(cache)
@@ -377,6 +418,27 @@ def _time_r_nns_sd_cluster() -> float:
         "}\n"
         "elapsed <- proc.time()[['elapsed']] - start\n"
         "cat(elapsed / 5)\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_sd_cluster_dendrogram() -> float:
+    script = (
+        "library(NNS)\n"
+        "row <- seq(0, 251)\n"
+        "x <- sapply(seq_len(50), function(i) sin(row / (i + 1)) + 0.01 * (i - 1))\n"
+        "run <- function() NNS::NNS.SD.cluster("
+        "x, degree = 2, min_cluster = 1, dendrogram = TRUE)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
     )
     completed = subprocess.run(
         ["Rscript", "-e", script],
@@ -663,6 +725,26 @@ def _time_r_nns_diff() -> float:
     return float(completed.stdout)
 
 
+def _time_r_dy_dx_numeric() -> float:
+    script = (
+        "library(NNS)\n"
+        "x <- seq(-2, 2, length.out = 100)\n"
+        "y <- x + sin(x)\n"
+        "run <- function() NNS::dy.dx(x, y, eval.point = c(-1, 0, 1))\n"
+        "invisible(run())\n"
+        "times <- replicate(20, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
 def _time_r_nns_anova() -> float:
     script = (
         "library(NNS)\n"
@@ -861,6 +943,29 @@ def _time_r_nns_reg_factor_dimred() -> float:
     return float(completed.stdout)
 
 
+def _time_r_nns_reg_factor_predictor() -> float:
+    script = (
+        "library(NNS)\n"
+        "levels <- c('a', 'b', 'c')\n"
+        "x <- factor(rep(levels, length.out = 200), levels = levels)\n"
+        "y <- sin((seq_len(200) - 1) / 11) + ((seq_len(200) - 1) %% 3)\n"
+        "point <- factor(c('a', 'c', 'b', 'a'), levels = levels)\n"
+        "run <- function() NNS::NNS.reg(x, y, factor.2.dummy = TRUE, "
+        "point.est = point, plot = FALSE, residual.plot = FALSE)\n"
+        "invisible(run())\n"
+        "times <- replicate(5, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
 def _time_r_nns_m_reg() -> float:
     script = (
         "library(NNS)\n"
@@ -962,6 +1067,85 @@ def _time_r_nns_stack() -> float:
         "run <- function() NNS::NNS.stack(X, y, IVs.test = X[1:20,], "
         "CV.size = 0.25, folds = 2, method = c(1, 2), stack = TRUE, "
         "dim.red.method = 'cor', status = FALSE, ncores = 1)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_stack_factor_predictor() -> float:
+    script = (
+        "library(NNS)\n"
+        "levels <- c('a', 'b', 'c')\n"
+        "x <- data.frame(x = factor(rep(levels, length.out = 60), levels = levels))\n"
+        "y <- sin((seq_len(60) - 1) / 7) + ((seq_len(60) - 1) %% 3)\n"
+        "point <- data.frame(x = factor(c('a', 'c', 'b', 'a', 'b'), levels = levels))\n"
+        "run <- function() NNS::NNS.stack(x, y, IVs.test = point, CV.size = 0.25, "
+        "folds = 1, method = 1, dim.red.method = 'cor', status = FALSE, ncores = 1)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_stack_mixed_factor_predictor() -> float:
+    script = (
+        "library(NNS)\n"
+        "levels <- c('a', 'b', 'c')\n"
+        "factor_col <- factor(rep(levels, length.out = 60), levels = levels)\n"
+        "numeric <- seq(-1, 1, length.out = 60)\n"
+        "x <- data.frame(factor = factor_col, numeric = numeric)\n"
+        "y <- sin((seq_len(60) - 1) / 7) + ((seq_len(60) - 1) %% 3)\n"
+        "point <- data.frame("
+        "factor = factor(c('a', 'c', 'b', 'a', 'b'), levels = levels), "
+        "numeric = seq(-0.75, 0.75, length.out = 5))\n"
+        "run <- function() NNS::NNS.stack(x, y, IVs.test = point, CV.size = 0.25, "
+        "folds = 1, method = 2, dim.red.method = 'cor', status = FALSE, ncores = 1)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_stack_mixed_factor_predictor_method12() -> float:
+    script = (
+        "library(NNS)\n"
+        "levels <- c('a', 'b', 'c')\n"
+        "factor_col <- factor(rep(levels, length.out = 100), levels = levels)\n"
+        "numeric <- seq(-1, 1, length.out = 100)\n"
+        "x <- data.frame(factor = factor_col, numeric = numeric)\n"
+        "y <- numeric + ifelse(factor_col == 'a', 0, ifelse(factor_col == 'b', 0.5, 1))\n"
+        "point_factor <- c('a', 'c', 'b', 'a', 'b', 'c', 'a', 'c', 'b', 'a', "
+        "'c', 'b', 'a', 'b', 'c', 'a', 'c', 'b', 'a', 'c')\n"
+        "point <- data.frame("
+        "factor = factor(point_factor, levels = levels), "
+        "numeric = seq(-0.8, 0.8, length.out = 20))\n"
+        "run <- function() NNS::NNS.stack(x, y, IVs.test = point, CV.size = 0.25, "
+        "folds = 1, method = c(1, 2), dim.red.method = 'cor', status = FALSE, ncores = 1)\n"
         "invisible(run())\n"
         "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
@@ -1414,6 +1598,28 @@ def _time_r_nns_arma_pred_int(*, auto: bool, method: str) -> float:
     return float(completed.stdout)
 
 
+def _time_r_nns_arma_optim() -> float:
+    script = (
+        "library(NNS)\n"
+        "t <- seq_len(80)\n"
+        "variable <- sin(2 * pi * t / 12) + 0.05 * cos(t / 3) + 2\n"
+        "run <- function() NNS::NNS.ARMA.optim("
+        "variable, h = 5, seasonal.factor = 3:10, lin.only = TRUE, "
+        "print.trace = FALSE, plot = FALSE)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
 def _time_r_dy_d_scalar(eval_points: str) -> float:
     script = (
         "library(NNS)\n"
@@ -1446,6 +1652,48 @@ def _time_r_nns_var(method: str) -> float:
         "sin(t / 11) + cos(t / 13))\n"
         f"run <- function() NNS::NNS.VAR(x, h = 3, tau = 2, dim.red.method = '{method}', "
         "status = FALSE)\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_meboot(n: int) -> float:
+    script = (
+        "library(NNS)\n"
+        f"t <- seq_len({n})\n"
+        "x <- 0.01 * t + sin(t / 11) + 0.2 * cos(t / 5)\n"
+        "run <- function() { set.seed(123); NNS::NNS.meboot("
+        "x, reps = 100, rho = 0, elaps = FALSE) }\n"
+        "invisible(run())\n"
+        "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
+        "cat(max(mean(times), .Machine$double.eps))\n"
+    )
+    completed = subprocess.run(
+        ["Rscript", "-e", script],
+        check=True,
+        capture_output=True,
+        env=_r_env(),
+        text=True,
+    )
+    return float(completed.stdout)
+
+
+def _time_r_nns_mc(step: float) -> float:
+    script = (
+        "library(NNS)\n"
+        "t <- seq_len(500)\n"
+        "x <- 0.01 * t + sin(t / 11) + 0.2 * cos(t / 5)\n"
+        "run <- function() { set.seed(123); NNS::NNS.MC("
+        f"x, reps = 30, lower_rho = -1, upper_rho = 1, by = {step}, exp = 1) }}\n"
         "invisible(run())\n"
         "times <- replicate(3, system.time(invisible(run()))[['elapsed']])\n"
         "cat(max(mean(times), .Machine$double.eps))\n"
