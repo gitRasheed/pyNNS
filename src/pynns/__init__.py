@@ -4,7 +4,7 @@ from typing import Any
 
 from pynns.pm_matrix import pm_matrix as pm_matrix
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 _EXPORTS = {
     "FactorDesign": ("pynns.regression", "FactorDesign"),

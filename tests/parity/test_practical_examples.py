@@ -4,7 +4,7 @@ import functools
 import json
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -228,11 +228,12 @@ def test_iris_boost_classification_vignette_matches_installed_r_diagnostics() ->
 def test_iris_boost_classification_vignette_gap_is_explicit() -> None:
     expected = _r_iris_classification_vignette()
     actual = _iris_boost_diagnostics(expected)
+    expected_boost = cast(dict[str, object], expected["boost"])
     y_test = _array(expected["y_test"])
 
-    assert not np.array_equal(actual["results"], expected["boost"]["results"])
-    assert not np.array_equal(actual["results"], y_test)
-    assert not np.array_equal(_array(expected["boost"]["results"]), y_test)
+    assert not np.array_equal(_array(actual["results"]), _array(expected_boost["results"]))
+    assert not np.array_equal(_array(actual["results"]), y_test)
+    assert not np.array_equal(_array(expected_boost["results"]), y_test)
     assert set(actual) == {"results", "feature_weights", "feature_frequency", "n_best"}
 
 
@@ -656,7 +657,10 @@ def _load_boston_csv() -> tuple[np.ndarray, np.ndarray]:
     if not BOSTON_CSV.exists():
         pytest.skip(f"Boston fixture is missing: {BOSTON_CSV}")
     rows = np.genfromtxt(BOSTON_CSV, delimiter=",", names=True, dtype=np.float64)
-    values = np.column_stack([rows[name] for name in rows.dtype.names or ()])
+    structured_rows = cast(Any, rows)
+    values = np.column_stack(
+        [structured_rows[name] for name in structured_rows.dtype.names or ()]
+    )
     return values[:, :-1], values[:, -1]
 
 
