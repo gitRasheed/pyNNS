@@ -26,7 +26,7 @@ def nns_distance(
 
     scaled_features, scaled_dest = _rescale_joint(features, dest)
     distances = _distance_sum(scaled_features, scaled_dest, zero_eps=1e-10)
-    indices = np.argsort(distances, kind="quicksort")
+    indices = np.argsort(distances, kind="mergesort")
     k_value = _resolve_k(k, features.shape[0])
     selected = indices[:k_value]
     selected_distances = distances[selected]

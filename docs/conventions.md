@@ -265,6 +265,18 @@ the tail `ts_test` rows, while CV testing uses the earlier rows
 counterintuitive. R's `CV.size = NULL` samples a random value between 0.2 and
 1/3; PyNNS uses a deterministic default of `0.25`. Pass `cv_size` explicitly for
 exact R parity.
+
+The installed-R 12.0 Iris classification vignette with `folds=1` is a documented
+stack disparity rather than a PyNNS correctness target. On the `141:150` holdout,
+the true labels are all class code `3`. Installed R 12.0 returns stack class code
+`2` for every row because its learned class-rounding threshold is about `0.60`;
+PyNNS returns class code `3` for every row because its learned threshold is about
+`0.29`. Both implementations have the same high-level shape in that case
+(`reg = 2`, `dim.red = 3`, raw combined stack near `2.5`), but the final
+threshold rounding differs. Since R default `folds=5` also returns class code
+`3`, PyNNS keeps the behavior that matches the practical classification result
+instead of forcing installed-R-12.0 `folds=1` parity.
+
 Factor predictor expansion is supported for `nns_stack(method=1)` and
 `nns_stack(method=2)` with explicit `factor_levels=` metadata. PyNNS expands
 training and test predictors together using the same full-rank dummy convention
@@ -315,6 +327,15 @@ when balance is disabled and structurally tested when balance sampling is
 enabled. The public `n.best` value is structural-only because R's final internal
 `NNS.stack` call samples its own `CV.size = NULL` split, while PyNNS keeps the
 deterministic stack default.
+
+The installed-R 12.0 Iris boost vignette remains a true parity gap, but not a
+quality target for exact output matching. On the same all-class-`3` holdout,
+installed R 12.0 balanced boost returns class code `1` for every row, while PyNNS
+balanced boost returns class code `2` for every row; both are wrong for that
+example. Installed R 12.0 also does not accept the `folds` argument shown in the
+rendered upstream overview for `NNS.boost`, so this example is tracked as
+R-version/upstream-example drift plus a boost parity gap rather than evidence
+that PyNNS should copy the installed-R balanced output.
 
 ## Seasonality
 
@@ -448,7 +469,9 @@ as a rate.
 Classification distance mode returns numeric class codes, not original labels.
 For single-target `nns_distance(..., class_=...)`, installed R uses weighted
 mode with integer replication counts `ceil(100 * weight)`. PyNNS follows that
-behavior. Installed R's `NNS.distance.bulk(..., class=...)` currently ignores
+behavior. For equal-distance nearest-neighbor ties, PyNNS preserves RPM row order
+to match installed R's first-row tie behavior. Installed R's
+`NNS.distance.bulk(..., class=...)` currently ignores
 the class flag in its compiled bulk helper and returns the same inverse-distance
 numeric weighted average as non-class bulk distance; PyNNS matches the installed
 binary rather than the higher-level classification intent.

@@ -27,6 +27,7 @@ from pynns import (
 
 ROOT = Path(__file__).resolve().parents[2]
 BOSTON_CSV = ROOT / "docs" / "examples" / "notebooks" / "data" / "boston_housing.csv"
+_IRIS_CLASS_LEVELS = ["setosa", "versicolor", "virginica"]
 
 
 @pytest.mark.parity
@@ -180,32 +181,11 @@ def test_boston_housing_numeric_chas_path_matches_installed_r() -> None:
 
 @pytest.mark.parity
 @pytest.mark.practical
-@pytest.mark.xfail(
-    reason=(
-        "Installed R NNS 12.0 and PyNNS currently disagree on the Iris "
-        "classification vignette class-code predictions."
-    ),
-    strict=True,
-)
-def test_iris_classification_vignette_matches_installed_r() -> None:
+def test_iris_stack_classification_vignette_predicts_holdout_class() -> None:
     expected = _r_iris_classification_vignette()
     x_train = _matrix(expected["x_train"])
     x_test = _matrix(expected["x_test"])
     y_train = np.asarray(expected["y_train"], dtype=object)
-    class_levels = ["setosa", "versicolor", "virginica"]
-
-    boost = nns_boost(
-        x_train,
-        y_train,
-        x_test,
-        type="class",
-        balance=True,
-        epochs=10,
-        learner_trials=10,
-        status=False,
-        random_seed=123,
-        class_levels=class_levels,
-    )
     stack = nns_stack(
         x_train,
         y_train,
@@ -214,11 +194,46 @@ def test_iris_classification_vignette_matches_installed_r() -> None:
         balance=True,
         folds=1,
         random_seed=123,
-        class_levels=class_levels,
+        class_levels=_IRIS_CLASS_LEVELS,
     )
+    y_test = _array(expected["y_test"])
 
-    np.testing.assert_allclose(boost["results"], _array(expected["boost_results"]), atol=EXACT)
-    np.testing.assert_allclose(stack["stack"], _array(expected["stack_results"]), atol=EXACT)
+    np.testing.assert_allclose(stack["stack"], y_test, atol=EXACT)
+    np.testing.assert_allclose(stack["reg"], np.full(y_test.shape, 2.0), atol=EXACT)
+    np.testing.assert_allclose(stack["dim.red"], y_test, atol=EXACT)
+
+    if expected["nns_version"] == "12.0":
+        r_stack = _array(expected["stack"]["results"])
+        np.testing.assert_allclose(r_stack, np.full(y_test.shape, 2.0), atol=EXACT)
+
+
+@pytest.mark.parity
+@pytest.mark.practical
+@pytest.mark.xfail(
+    reason=(
+        "Installed R NNS 12.0 and PyNNS balanced Iris boost remain a true "
+        "diagnostic parity gap; both miss the all-class-3 holdout."
+    ),
+    strict=True,
+)
+def test_iris_boost_classification_vignette_matches_installed_r_diagnostics() -> None:
+    expected = _r_iris_classification_vignette()
+    actual = _iris_boost_diagnostics(expected)
+
+    _assert_nested_close(actual, expected["boost"], atol=EXACT)
+
+
+@pytest.mark.parity
+@pytest.mark.practical
+def test_iris_boost_classification_vignette_gap_is_explicit() -> None:
+    expected = _r_iris_classification_vignette()
+    actual = _iris_boost_diagnostics(expected)
+    y_test = _array(expected["y_test"])
+
+    assert not np.array_equal(actual["results"], expected["boost"]["results"])
+    assert not np.array_equal(actual["results"], y_test)
+    assert not np.array_equal(_array(expected["boost"]["results"]), y_test)
+    assert set(actual) == {"results", "feature_weights", "feature_frequency", "n_best"}
 
 
 @pytest.mark.parity
@@ -278,6 +293,27 @@ def test_var_macro_like_multivariate_stage_matches_installed_r() -> None:
         _matrix(expected["multivariate"]),
         atol=COMPOUND,
     )
+
+
+def _iris_boost_diagnostics(expected: dict[str, Any]) -> dict[str, object]:
+    boost = nns_boost(
+        _matrix(expected["x_train"]),
+        np.asarray(expected["y_train"], dtype=object),
+        _matrix(expected["x_test"]),
+        type="class",
+        balance=True,
+        epochs=10,
+        learner_trials=10,
+        status=False,
+        random_seed=123,
+        class_levels=_IRIS_CLASS_LEVELS,
+    )
+    return {
+        "results": np.asarray(boost["results"], dtype=np.float64),
+        "feature_weights": np.asarray(boost["feature.weights"], dtype=np.float64),
+        "feature_frequency": np.asarray(boost["feature.frequency"], dtype=np.float64),
+        "n_best": float(boost["n.best"]),
+    }
 
 
 @functools.cache
@@ -505,6 +541,7 @@ def _r_iris_classification_vignette() -> dict[str, Any]:
           status = FALSE
         )
         out <- list(
+          nns_version = as.character(packageVersion("NNS")),
           x_train = unname(lapply(
             seq_len(nrow(iris[-test_set, 1:4])),
             function(i) as.numeric(iris[-test_set, 1:4][i, ])
@@ -516,7 +553,21 @@ def _r_iris_classification_vignette() -> dict[str, Any]:
           y_train = as.character(iris[-test_set, 5]),
           y_test = as.numeric(iris[test_set, 5]),
           boost_results = as.numeric(boost$results),
-          stack_results = as.numeric(stacked$stack)
+          stack_results = as.numeric(stacked$stack),
+          boost = list(
+            results = as.numeric(boost$results),
+            feature_weights = as.numeric(boost$feature.weights),
+            feature_frequency = as.numeric(boost$feature.frequency),
+            n_best = as.numeric(boost$n.best)
+          ),
+          stack = list(
+            results = as.numeric(stacked$stack),
+            reg = as.numeric(stacked$reg),
+            dim_red = as.numeric(stacked$dim.red),
+            probability_threshold = as.numeric(stacked$probability.threshold),
+            n_best = as.numeric(stacked$NNS.reg.n.best),
+            dim_red_threshold = as.numeric(stacked$NNS.dim.red.threshold)
+          )
         )
         cat(jsonlite::toJSON(out, auto_unbox = TRUE, digits = NA, null = 'null'))
         """,

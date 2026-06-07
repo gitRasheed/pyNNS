@@ -36,6 +36,27 @@ def test_nns_distance_class_matches_r(k: int | Literal["all"], case: str) -> Non
 
 
 @pytest.mark.parity
+def test_nns_distance_class_ties_keep_rpm_order() -> None:
+    rpm = np.array(
+        [
+            [0.0, 0.0, 1.0],
+            [1.0, 1.0, 2.0],
+            [1.0, 1.0, 3.0],
+            [1.0, 1.0, 3.0],
+        ],
+        dtype=np.float64,
+    )
+    dest = np.array([1.0, 1.0], dtype=np.float64)
+
+    expected = nns("NNS.distance", _class_rpm_dict(rpm), dest.tolist(), 1, "class")
+    assert isinstance(expected, np.ndarray)
+    actual = nns_distance(rpm, dest, k=1, class_="class")
+
+    assert float(expected) == 2.0
+    np.testing.assert_allclose(actual, float(expected), atol=EXACT)
+
+
+@pytest.mark.parity
 @pytest.mark.parametrize("k", [1, 2, "all"])
 def test_nns_distance_bulk_matches_r(k: int | Literal["all"]) -> None:
     rpm, _ = _rpm_and_target()

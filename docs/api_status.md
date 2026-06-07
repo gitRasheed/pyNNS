@@ -130,7 +130,11 @@ examples include:
   regression residuals, Boston Housing, and the macro-like VAR multivariate
   stage. Strict xfails track current installed-R deviations in the Iris
   classification vignette, the documented ARMA numeric multi-lag weighting
-  divergence, and VAR's ARMA-derived univariate/ensemble outputs.
+  divergence, and VAR's ARMA-derived univariate/ensemble outputs. The Iris
+  classification xfail mixes two different issues: PyNNS stack predicts the
+  correct held-out class where installed R NNS 12.0 rounds the same borderline
+  estimate down, while boost remains a true output disparity whose installed-R
+  and PyNNS balanced predictions both miss the held-out class.
 
 ## Release-Relevant Caveats
 
