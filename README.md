@@ -1,5 +1,16 @@
 # PyNNS
 
+## DEPRECATED
+
+replaced by https://github.com/OVVO-Financial/NNS-python
+
+
+
+
+---
+
+
+
 Python port of the R NNS 12.1 beta package.
 
 - PyPI package: `nns-pm`
